@@ -1,3 +1,27 @@
 @import "tailwindcss";
 
-/* Notion-inspired design tokens will be added in next task */
+@theme {
+  /* Notion-inspired colors */
+  --color-bg-primary: #FFFFFF;
+  --color-bg-secondary: #F7F7F5;
+  --color-bg-hover: #EFEFEF;
+  --color-border: #E0E0E0;
+  --color-text: #37352F;
+  --color-text-muted: #787774;
+  --color-accent: #2EAADC;
+
+  /* Layout spacing */
+  --spacing-sidebar: 250px;
+  --spacing-mail-list: 350px;
+
+  /* Border radius */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+}
+
+/* Base styles */
+body {
+  background-color: var(--color-bg-primary);
+  color: var(--color-text);
+}
