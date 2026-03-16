@@ -1,5 +1,8 @@
 <script lang="ts">
-  import '../app.css';
+	import '../app.css';
+	import { AppShell } from '$lib/components/layout/index.js';
 </script>
 
-<slot />
+<AppShell>
+	<slot />
+</AppShell>
