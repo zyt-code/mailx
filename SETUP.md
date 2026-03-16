@@ -74,6 +74,38 @@ Use Svelte 5 runes for reactivity:
 </script>
 ```
 
+## Design System
+
+### Tailwind CSS v4
+
+Installed via `@tailwindcss/vite` plugin. Configuration in `src/app.css` using `@theme` directive.
+
+### Design Tokens
+
+Notion-inspired tokens defined in `src/app.css`:
+- Colors: `--color-bg-primary`, `--color-bg-secondary`, `--color-bg-hover`, `--color-border`, `--color-text`, `--color-text-muted`, `--color-accent`
+- Spacing: `--spacing-sidebar` (250px), `--spacing-mail-list` (350px)
+- Radius: `--radius-sm`, `--radius-md`, `--radius-lg`
+
+### shadcn-svelte Components
+
+Located in `src/lib/components/ui/`. Add new components:
+
+```bash
+npx shadcn-svelte@latest add <component-name>
+```
+
+Installed: `button`, `card`, `input`, `scroll-area`
+
+### Custom Layout Components
+
+Custom Mailx layout components in `src/lib/components/layout/`:
+- `AppShell.svelte` - Main layout wrapper
+- `Sidebar.svelte` - Left navigation
+- `MailList.svelte` - Email list panel
+- `ReadingPane.svelte` - Content display
+- `Resizer.svelte` - Panel resize handle
+
 ## Key Files
 
 | File | Purpose |
