@@ -4,6 +4,13 @@ use std::sync::Mutex;
 use tauri::AppHandle;
 use tauri::Manager;
 
+/// Email address structure for recipients
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct EmailAddress {
+    pub name: String,
+    pub email: String,
+}
+
 /// Mail structure matching frontend types
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Mail {
@@ -16,6 +23,12 @@ pub struct Mail {
     pub timestamp: i64,
     pub folder: String,
     pub unread: bool,
+    #[serde(default)]
+    pub to: Option<Vec<EmailAddress>>,
+    #[serde(default)]
+    pub cc: Option<Vec<EmailAddress>>,
+    #[serde(default)]
+    pub bcc: Option<Vec<EmailAddress>>,
 }
 
 /// Database wrapper for SQLite operations
@@ -87,6 +100,25 @@ impl Database {
         drop(conn); // Release lock before calling seed_initial_data
         self.seed_initial_data()?;
 
+        // Run any schema migrations
+        self.run_migrations()?;
+
+        Ok(())
+    }
+
+    /// Run database schema migrations
+    fn run_migrations(&self) -> SqliteResult<()> {
+        let conn = self.conn.lock().unwrap();
+
+        // Add to_json column if not exists
+        conn.execute("ALTER TABLE mails ADD COLUMN to_json TEXT", []).ok();
+
+        // Add cc_json column if not exists
+        conn.execute("ALTER TABLE mails ADD COLUMN cc_json TEXT", []).ok();
+
+        // Add bcc_json column if not exists
+        conn.execute("ALTER TABLE mails ADD COLUMN bcc_json TEXT", []).ok();
+
         Ok(())
     }
 
@@ -123,6 +155,9 @@ impl Database {
                 timestamp: now - (4 * 60 * 60 * 1000), // 4 hours ago
                 folder: "inbox".to_string(),
                 unread: true,
+                to: None,
+                cc: None,
+                bcc: None,
             },
             Mail {
                 id: "2".to_string(),
@@ -134,6 +169,9 @@ impl Database {
                 timestamp: now - (5 * 60 * 60 * 1000), // 5 hours ago
                 folder: "inbox".to_string(),
                 unread: true,
+                to: None,
+                cc: None,
+                bcc: None,
             },
             Mail {
                 id: "3".to_string(),
@@ -145,6 +183,9 @@ impl Database {
                 timestamp: now - one_day,
                 folder: "inbox".to_string(),
                 unread: false,
+                to: None,
+                cc: None,
+                bcc: None,
             },
             Mail {
                 id: "4".to_string(),
@@ -156,6 +197,9 @@ impl Database {
                 timestamp: now - two_days,
                 folder: "inbox".to_string(),
                 unread: false,
+                to: None,
+                cc: None,
+                bcc: None,
             },
             Mail {
                 id: "5".to_string(),
@@ -167,6 +211,9 @@ impl Database {
                 timestamp: now - four_days,
                 folder: "inbox".to_string(),
                 unread: false,
+                to: None,
+                cc: None,
+                bcc: None,
             },
             Mail {
                 id: "6".to_string(),
@@ -178,6 +225,12 @@ impl Database {
                 timestamp: now - (3 * 60 * 60 * 1000), // 3 hours ago
                 folder: "sent".to_string(),
                 unread: false,
+                to: Some(vec![EmailAddress {
+                    name: "Alice Chen".to_string(),
+                    email: "alice.chen@example.com".to_string(),
+                }]),
+                cc: None,
+                bcc: None,
             },
             Mail {
                 id: "7".to_string(),
@@ -189,6 +242,18 @@ impl Database {
                 timestamp: now - (6 * 24 * 60 * 60 * 1000), // 6 days ago
                 folder: "drafts".to_string(),
                 unread: false,
+                to: Some(vec![
+                    EmailAddress {
+                        name: "Bob Smith".to_string(),
+                        email: "bob.smith@example.com".to_string(),
+                    },
+                    EmailAddress {
+                        name: "Carol Wang".to_string(),
+                        email: "carol.wang@example.com".to_string(),
+                    },
+                ]),
+                cc: None,
+                bcc: None,
             },
         ];
 
@@ -203,7 +268,7 @@ impl Database {
     pub fn get_mails(&self, folder: Option<String>) -> SqliteResult<Vec<Mail>> {
         let conn = self.conn.lock().unwrap();
 
-        let mut query = "SELECT id, from_name, from_email, subject, preview, body, timestamp, folder, unread FROM mails".to_string();
+        let mut query = "SELECT id, from_name, from_email, subject, preview, body, timestamp, folder, unread, to_json, cc_json, bcc_json FROM mails".to_string();
         let mut mails: Vec<Mail> = Vec::new();
 
         if let Some(folder) = folder {
@@ -220,6 +285,9 @@ impl Database {
                     timestamp: row.get(6)?,
                     folder: row.get(7)?,
                     unread: row.get::<_, i32>(8)? == 1,
+                    to: parse_json_addresses(row.get(9)?),
+                    cc: parse_json_addresses(row.get(10)?),
+                    bcc: parse_json_addresses(row.get(11)?),
                 })
             })?;
             for mail in mail_iter {
@@ -239,6 +307,9 @@ impl Database {
                     timestamp: row.get(6)?,
                     folder: row.get(7)?,
                     unread: row.get::<_, i32>(8)? == 1,
+                    to: parse_json_addresses(row.get(9)?),
+                    cc: parse_json_addresses(row.get(10)?),
+                    bcc: parse_json_addresses(row.get(11)?),
                 })
             })?;
             for mail in mail_iter {
@@ -253,7 +324,7 @@ impl Database {
     pub fn get_mail(&self, id: &str) -> SqliteResult<Option<Mail>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT id, from_name, from_email, subject, preview, body, timestamp, folder, unread
+            "SELECT id, from_name, from_email, subject, preview, body, timestamp, folder, unread, to_json, cc_json, bcc_json
              FROM mails WHERE id = ?1"
         )?;
 
@@ -268,6 +339,9 @@ impl Database {
                 timestamp: row.get(6)?,
                 folder: row.get(7)?,
                 unread: row.get::<_, i32>(8)? == 1,
+                to: parse_json_addresses(row.get(9)?),
+                cc: parse_json_addresses(row.get(10)?),
+                bcc: parse_json_addresses(row.get(11)?),
             })
         });
 
@@ -282,9 +356,12 @@ impl Database {
     pub fn insert_mail(&self, mail: &Mail) -> SqliteResult<()> {
         let conn = self.conn.lock().unwrap();
         let now = chrono::Utc::now().timestamp_millis();
+        let to_json = serialize_addresses(&mail.to);
+        let cc_json = serialize_addresses(&mail.cc);
+        let bcc_json = serialize_addresses(&mail.bcc);
         conn.execute(
-            "INSERT INTO mails (id, from_name, from_email, subject, preview, body, timestamp, folder, unread, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+            "INSERT INTO mails (id, from_name, from_email, subject, preview, body, timestamp, folder, unread, created_at, to_json, cc_json, bcc_json)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
             params![
                 &mail.id,
                 &mail.from_name,
@@ -296,6 +373,9 @@ impl Database {
                 &mail.folder,
                 if mail.unread { 1 } else { 0 },
                 now,
+                to_json,
+                cc_json,
+                bcc_json,
             ],
         )?;
         Ok(())
@@ -304,6 +384,9 @@ impl Database {
     /// Update an existing mail
     pub fn update_mail(&self, mail: &Mail) -> SqliteResult<()> {
         let conn = self.conn.lock().unwrap();
+        let to_json = serialize_addresses(&mail.to);
+        let cc_json = serialize_addresses(&mail.cc);
+        let bcc_json = serialize_addresses(&mail.bcc);
         conn.execute(
             "UPDATE mails SET
              from_name = ?1,
@@ -313,8 +396,11 @@ impl Database {
              body = ?5,
              timestamp = ?6,
              folder = ?7,
-             unread = ?8
-             WHERE id = ?9",
+             unread = ?8,
+             to_json = ?9,
+             cc_json = ?10,
+             bcc_json = ?11
+             WHERE id = ?12",
             params![
                 &mail.from_name,
                 &mail.from_email,
@@ -324,6 +410,9 @@ impl Database {
                 &mail.timestamp,
                 &mail.folder,
                 if mail.unread { 1 } else { 0 },
+                to_json,
+                cc_json,
+                bcc_json,
                 &mail.id,
             ],
         )?;
@@ -362,4 +451,14 @@ impl Database {
         }
         Ok(())
     }
+}
+
+/// Parse a JSON string into a vector of EmailAddress
+fn parse_json_addresses(json: Option<String>) -> Option<Vec<EmailAddress>> {
+    json.and_then(|s| serde_json::from_str(&s).ok())
+}
+
+/// Serialize a vector of EmailAddress to a JSON string
+fn serialize_addresses(addresses: &Option<Vec<EmailAddress>>) -> Option<String> {
+    addresses.as_ref().and_then(|addrs| serde_json::to_string(addrs).ok())
 }

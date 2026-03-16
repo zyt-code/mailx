@@ -73,6 +73,10 @@ mailx/
 | `MailList.svelte` | `src/lib/components/layout/` | Email list panel |
 | `ReadingPane.svelte` | `src/lib/components/layout/` | Content display |
 | `Resizer.svelte` | `src/lib/components/layout/` | Panel resize handle |
+| `ComposeModal.svelte` | `src/lib/components/compose/` | Mail composition modal |
+| `ComposeHeader.svelte` | `src/lib/components/compose/` | To/Cc/Bcc/Subject inputs |
+| `ComposeEditor.svelte` | `src/lib/components/compose/` | Message body editor |
+| `ComposeActions.svelte` | `src/lib/components/compose/` | Send/Discard/Close actions |
 
 ## Code Style
 
@@ -134,8 +138,11 @@ interface ListProps<T> {
 | Add new route | `src/routes/+page.svelte` |
 | Create component | `src/lib/components/` |
 | Global styles | `src/app.css` |
-| Tauri commands | `src-tauri/src/commands/` |
+| Tauri commands | `src-tauri/src/commands.rs` |
+| Database operations | `src-tauri/src/database.rs` |
+| Database API | `src/lib/db/index.ts` |
 | Tailwind config | `tailwind.config.js` |
+| Type definitions | `src/lib/types.ts` |
 
 ## Common Tasks
 
@@ -172,3 +179,7 @@ npm run format
 - Sidebar collapses to 64px (icons only)
 - Mobile: stacked layout with slide-in nav
 - All icons from Lucide Svelte
+- Compose modal auto-saves drafts every 30 seconds
+- Drafts are stored in SQLite with folder='drafts'
+- Sent emails move to folder='sent' after sending
+- Discarded drafts move to folder='trash'

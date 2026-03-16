@@ -147,6 +147,7 @@
 		{activeFolder}
 		onToggle={toggleSidebar}
 		onSelectFolder={selectFolder}
+		onRefresh={loadMails}
 	/>
 
 	{#if isMobile}

@@ -11,6 +11,8 @@
 		PanelLeftOpen,
 		Plus
 	} from 'lucide-svelte';
+	import { ComposeModal } from '$lib/components/compose/index.js';
+	import * as db from '$lib/db/index.js';
 
 	interface Props {
 		collapsed: boolean;
@@ -18,9 +20,10 @@
 		activeFolder: Folder;
 		onToggle: () => void;
 		onSelectFolder: (folder: Folder) => void;
+		onRefresh?: () => void;
 	}
 
-	let { collapsed, isMobile, activeFolder, onToggle, onSelectFolder }: Props = $props();
+	let { collapsed, isMobile, activeFolder, onToggle, onSelectFolder, onRefresh }: Props = $props();
 
 	const navItems: { icon: typeof Inbox; label: string; folder: Folder; count: number }[] = [
 		{ icon: Inbox, label: 'Inbox', folder: 'inbox', count: 12 },
@@ -29,9 +32,27 @@
 		{ icon: Trash2, label: 'Trash', folder: 'trash', count: 0 }
 	];
 
+	let showCompose = $state(false);
+
 	function handleFolderClick(folder: Folder) {
 		onSelectFolder(folder);
 		if (isMobile) onToggle();
+	}
+
+	function openCompose() {
+		showCompose = true;
+	}
+
+	function closeCompose() {
+		showCompose = false;
+	}
+
+	async function onComposeSent() {
+		showCompose = false;
+		// Refresh mail list to show new sent mail
+		if (onRefresh) {
+			onRefresh();
+		}
 	}
 </script>
 
@@ -68,12 +89,18 @@
 
 	<!-- Compose button -->
 	<div class="p-2">
-		<Button variant="default" class={cn('w-full', collapsed && !isMobile && 'px-0')}>
+		<button
+			class={cn(
+				'flex w-full items-center justify-center gap-2 rounded-md bg-accent px-3 py-2 text-sm font-medium text-white transition-colors hover:opacity-90',
+				collapsed && !isMobile && 'px-0'
+			)}
+			onclick={openCompose}
+		>
 			<Plus class="size-4 shrink-0" />
 			{#if !collapsed || isMobile}
 				<span class="ml-2">Compose</span>
 			{/if}
-		</Button>
+		</button>
 	</div>
 
 	<!-- Navigation -->
@@ -99,4 +126,11 @@
 			</button>
 		{/each}
 	</nav>
+
+	<!-- Compose Modal -->
+	<ComposeModal
+		isOpen={showCompose}
+		onClose={closeCompose}
+		onSent={onComposeSent}
+	/>
 </aside>
