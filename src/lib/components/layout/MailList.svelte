@@ -24,7 +24,8 @@
 			? folderMails.filter((m) => {
 					const q = searchQuery.toLowerCase();
 					return (
-						m.from.toLowerCase().includes(q) ||
+						m.from_name.toLowerCase().includes(q) ||
+						m.from_email.toLowerCase().includes(q) ||
 						m.subject.toLowerCase().includes(q) ||
 						m.preview.toLowerCase().includes(q)
 					);
@@ -38,6 +39,31 @@
 		drafts: 'Drafts',
 		trash: 'Trash'
 	};
+
+	function formatMailTime(timestamp: number): string {
+		const now = Date.now();
+		const diff = now - timestamp;
+		const oneDay = 24 * 60 * 60 * 1000;
+		const oneWeek = 7 * oneDay;
+
+		if (diff < oneDay) {
+			// Show time for today's emails
+			return new Date(timestamp).toLocaleTimeString('en-US', {
+				hour: 'numeric',
+				minute: '2-digit',
+				hour12: true
+			});
+		} else if (diff < oneWeek) {
+			// Show day of week for this week
+			return new Date(timestamp).toLocaleDateString('en-US', { weekday: 'short' });
+		} else {
+			// Show date for older emails
+			return new Date(timestamp).toLocaleDateString('en-US', {
+				month: 'short',
+				day: 'numeric'
+			});
+		}
+	}
 </script>
 
 <div
@@ -83,10 +109,10 @@
 								<span
 									class={cn('text-sm text-text', mail.unread && 'font-semibold')}
 								>
-									{mail.from}
+									{mail.from_name}
 								</span>
 							</div>
-							<span class="text-xs text-text-muted">{mail.time}</span>
+							<span class="text-xs text-text-muted">{formatMailTime(mail.timestamp)}</span>
 						</div>
 						<span class="text-sm text-text">{mail.subject}</span>
 						<span class="truncate text-xs text-text-muted">{mail.preview}</span>

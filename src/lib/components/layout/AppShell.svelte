@@ -7,6 +7,7 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Menu } from 'lucide-svelte';
 	import type { Mail, Folder } from '$lib/types.js';
+	import * as db from '$lib/db/index.js';
 
 	const STORAGE_KEY = 'mailx-layout';
 	const DEFAULTS = { sidebarCollapsed: false, mailListWidth: 350 };
@@ -25,54 +26,31 @@
 	let selectedMailId: string | null = $state(null);
 	let mobileView: 'list' | 'reading' = $state('list');
 
+	// Data state
+	let mails: Mail[] = $state([]);
+	let isLoading = $state(true);
+	let error = $state<string | null>(null);
+
 	let sidebarWidth = $derived(sidebarCollapsed ? SIDEBAR_COLLAPSED : SIDEBAR_EXPANDED);
-
-	const mails: Mail[] = [
-		{
-			id: '1', from: 'Alice Chen', subject: 'Project update for Q1',
-			preview: 'Hi team, here is the latest update on our Q1 goals...',
-			body: 'Hi team,\n\nHere is the latest update on our Q1 goals. We have completed 80% of the planned features and are on track to deliver by the end of March.\n\nKey highlights:\n- Authentication module is complete\n- Dashboard redesign is in review\n- API performance improved by 40%\n\nPlease review the attached report and let me know if you have any questions.\n\nBest,\nAlice',
-			time: '10:30 AM', unread: true, folder: 'inbox'
-		},
-		{
-			id: '2', from: 'Bob Smith', subject: 'Meeting notes',
-			preview: "Attached are the meeting notes from yesterday's standup...",
-			body: "Hi everyone,\n\nAttached are the meeting notes from yesterday's standup. Here's a quick summary:\n\n1. Sprint progress is at 65%\n2. Two blockers identified — need design review for the new sidebar and API endpoint for mail sync\n3. Next demo is scheduled for Friday\n\nAction items:\n- Alice: Finalize Q1 report\n- Carol: Update mockups\n- David: Send invoices\n\nThanks,\nBob",
-			time: '9:15 AM', unread: true, folder: 'inbox'
-		},
-		{
-			id: '3', from: 'Carol Wang', subject: 'Design review feedback',
-			preview: 'Great work on the mockups! I have a few suggestions...',
-			body: 'Great work on the mockups! I have a few suggestions:\n\n1. The sidebar could use more contrast between active and inactive states\n2. Consider adding a subtle animation for the panel resize\n3. The mobile layout should stack vertically rather than hiding the mail list\n\nOverall the direction looks fantastic. Let me know when you have an updated version and I will do another pass.\n\nCheers,\nCarol',
-			time: 'Yesterday', unread: false, folder: 'inbox'
-		},
-		{
-			id: '4', from: 'David Lee', subject: 'Invoice #1234',
-			preview: 'Please find the invoice for March attached...',
-			body: 'Hi,\n\nPlease find the invoice for March attached. The total amount is $4,500 for the consulting services provided.\n\nPayment terms: Net 30\nDue date: April 15, 2026\n\nLet me know if you need any adjustments.\n\nRegards,\nDavid Lee',
-			time: 'Yesterday', unread: false, folder: 'inbox'
-		},
-		{
-			id: '5', from: 'Eve Johnson', subject: 'Welcome to the team!',
-			preview: 'We are thrilled to have you join us. Here is what...',
-			body: 'Welcome to the team!\n\nWe are thrilled to have you join us. Here is what you need to get started:\n\n1. Set up your development environment using the README\n2. Join our Slack channels: #general, #engineering, #random\n3. Schedule a 1:1 with your manager\n4. Complete the onboarding checklist in Notion\n\nIf you have any questions, do not hesitate to reach out. We are here to help!\n\nBest,\nEve',
-			time: 'Mar 12', unread: false, folder: 'inbox'
-		},
-		{
-			id: '6', from: 'Me', subject: 'Re: Project update for Q1',
-			preview: 'Thanks for the update, Alice. Looks great!',
-			body: 'Thanks for the update, Alice. Looks great!\n\nI reviewed the report and everything is on track. Let us schedule a quick sync on Wednesday to discuss the remaining 20%.\n\nBest regards',
-			time: '11:00 AM', unread: false, folder: 'sent'
-		},
-		{
-			id: '7', from: 'Me', subject: 'Draft: Team offsite planning',
-			preview: 'Ideas for the upcoming team offsite in April...',
-			body: 'Ideas for the upcoming team offsite in April:\n\n- Location: Mountain retreat or coastal venue\n- Duration: 2-3 days\n- Activities: Team building, strategy planning, hackathon\n- Budget: TBD\n\nNeed to finalize by end of month.',
-			time: 'Mar 10', unread: false, folder: 'drafts'
-		}
-	];
-
 	let selectedMail = $derived(mails.find((m) => m.id === selectedMailId) ?? null);
+
+	async function loadMails() {
+		isLoading = true;
+		error = null;
+		try {
+			mails = await db.getMails(activeFolder);
+		} catch (e) {
+			error = e instanceof Error ? e.message : 'Failed to load mails';
+			console.error('Failed to load mails:', e);
+		} finally {
+			isLoading = false;
+		}
+	}
+
+	// Reload mails when folder changes
+	$effect(() => {
+		loadMails();
+	});
 
 	// Load persisted state on mount
 	$effect(() => {
@@ -126,9 +104,20 @@
 		persistLayout();
 	}
 
-	function selectMail(id: string) {
+	async function selectMail(id: string) {
 		selectedMailId = id;
 		if (isMobile) mobileView = 'reading';
+
+		// Mark as read when selected
+		const mail = mails.find(m => m.id === id);
+		if (mail?.unread) {
+			try {
+				await db.markMailRead(id, true);
+				mail.unread = false;
+			} catch (e) {
+				console.error('Failed to mark mail as read:', e);
+			}
+		}
 	}
 
 	function selectFolder(folder: Folder) {

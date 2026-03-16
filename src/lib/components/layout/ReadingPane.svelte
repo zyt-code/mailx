@@ -11,6 +11,19 @@
 	}
 
 	let { mail, isMobile, onBack }: Props = $props();
+
+	function formatFullTime(timestamp: number): string {
+		const date = new Date(timestamp);
+		return date.toLocaleString('en-US', {
+			weekday: 'short',
+			month: 'short',
+			day: 'numeric',
+			year: 'numeric',
+			hour: 'numeric',
+			minute: '2-digit',
+			hour12: true
+		});
+	}
 </script>
 
 <div class="flex flex-1 min-w-0 h-full bg-bg-primary">
@@ -26,8 +39,8 @@
 				<div class="flex-1 min-w-0">
 					<h2 class="text-lg font-semibold text-text">{mail.subject}</h2>
 					<div class="flex items-center gap-2 mt-1">
-						<span class="text-sm text-text">{mail.from}</span>
-						<span class="text-xs text-text-muted">{mail.time}</span>
+						<span class="text-sm text-text">{mail.from_name} &lt;{mail.from_email}&gt;</span>
+						<span class="text-xs text-text-muted">{formatFullTime(mail.timestamp)}</span>
 					</div>
 				</div>
 			</div>
