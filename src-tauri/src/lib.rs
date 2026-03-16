@@ -95,13 +95,11 @@ pub fn run() {
                         "settings" => {
                             if let Some(window) = app.get_webview_window("main") {
                                 let _ = window.emit("navigate", "/settings");
-                                let _ = window.eval("window.location.href = '/settings'");
                             }
                         }
                         "about" => {
                             if let Some(window) = app.get_webview_window("main") {
                                 let _ = window.emit("navigate", "/about");
-                                let _ = window.eval("window.location.href = '/about'");
                             }
                         }
                         _ => {}
@@ -111,30 +109,12 @@ pub fn run() {
 
             #[cfg(not(target_os = "macos"))]
             {
-                use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
+                // Windows: Use empty menu to hide menu bar
+                // macOS: Keep menu for native app menu experience
+                use tauri::menu::Menu;
 
-                let settings_item = MenuItem::with_id(app, "settings", "Settings...", true, Some("Ctrl+,"))?;
-                let quit_item = PredefinedMenuItem::quit(app, Some("Ctrl+Q"))?;
-                let accounts_item = MenuItem::with_id(app, "accounts", "Manage Accounts...", true, None::<&str>)?;
-
-                let file_menu = Submenu::with_items(app, "File", true, &[&settings_item, &quit_item])?;
-                let account_menu = Submenu::with_items(app, "Account", true, &[&accounts_item])?;
-
-                let menu = Menu::with_items(app, &[&file_menu, &account_menu])?;
+                let menu = Menu::new(app)?;
                 app.set_menu(menu)?;
-
-                // Handle menu events
-                app.on_menu_event(|app, event| {
-                    match event.id.as_ref() {
-                        "settings" | "accounts" => {
-                            if let Some(window) = app.get_webview_window("main") {
-                                let _ = window.emit("navigate", "/settings");
-                                let _ = window.eval("window.location.href = '/settings'");
-                            }
-                        }
-                        _ => {}
-                    }
-                });
             }
 
             Ok(())

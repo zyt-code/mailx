@@ -4,7 +4,7 @@ use ammonia::{Builder, UrlRelative};
 /// Uses a conservative allowlist for safe HTML elements and attributes
 pub fn sanitize_html(html: &str) -> String {
 	Builder::default()
-		// Add common safe tags
+		// Add common safe tags (removed link tag as it can be unsafe)
 		.add_tags(&[
 			"a", "abbr", "acronym", "address", "area", "article", "aside", "audio",
 			"b", "bdi", "bdo", "blockquote", "br", "button",
@@ -15,29 +15,30 @@ pub fn sanitize_html(html: &str) -> String {
 			"h1", "h2", "h3", "h4", "h5", "h6", "header", "hr",
 			"i", "iframe", "img", "input", "ins",
 			"kbd",
-			"label", "legend", "li", "link",
+			"label", "legend", "li",
 			"main", "map", "mark", "menu", "menuitem", "meter",
 			"nav", "noscript",
 			"object", "ol", "optgroup", "option", "output",
 			"p", "param", "picture", "pre", "progress",
 			"q",
 			"rp", "rt", "ruby",
-			"s", "samp", "section", "select", "small", "source", "span", "strong", "style", "sub", "summary", "sup",
+			"s", "samp", "section", "select", "small", "source", "span", "strong", "sub", "summary", "sup",
 			"table", "tbody", "td", "textarea", "tfoot", "th", "thead", "time", "tr", "track",
 			"u", "ul", "use",
 			"var", "video",
 			"wbr"
 		])
-		// Add safe attributes (generic)
+		// Add safe attributes (generic) - removed style as it can contain unsafe CSS
 		.add_generic_attributes(&[
-			"accesskey", "autocapitalize", "class", "contenteditable", "contextmenu",
+			"accesskey", "autocapitalize", "class", "contenteditable",
 			"dir", "draggable", "enterkeyhint", "hidden", "id", "inputmode", "is",
 			"itemid", "itemprop", "itemref", "itemscope", "itemtype", "lang",
-			"nonce", "part", "role", "slot", "spellcheck", "style", "tabindex",
+			"part", "role", "slot", "tabindex",
 			"title", "translate"
 		])
 		// Add safe attributes for specific tags
-		.add_tag_attributes("a", &["href", "hreflang", "target", "rel", "type", "download"])
+		// NOTE: Do NOT add "rel" to anchor tags - ammonia manages this internally
+		.add_tag_attributes("a", &["href", "hreflang", "target", "type", "download"])
 		.add_tag_attributes("img", &["src", "alt", "width", "height", "loading", "srcset", "sizes"])
 		.add_tag_attributes("source", &["src", "type", "media", "srcset"])
 		.add_tag_attributes("video", &["src", "poster", "width", "height", "controls", "loop", "muted", "autoplay"])
@@ -48,7 +49,6 @@ pub fn sanitize_html(html: &str) -> String {
 		.add_tag_attributes("col", &["span"])
 		.add_tag_attributes("colgroup", &["span"])
 		// Add safe URL schemes
-		.add_allowed_classes("html", ["ammonia"])
 		.url_relative(UrlRelative::Deny)
 		// Remove script tags and event handlers
 		.clean(html)
