@@ -1,6 +1,4 @@
 <script lang="ts">
-	import { Input } from '$lib/components/ui/input/index.js';
-	import { Button } from '$lib/components/ui/button/index.js';
 	import { cn } from '$lib/utils.js';
 	import { X, Plus } from 'lucide-svelte';
 	import type { EmailAddress } from '$lib/types.js';
@@ -26,7 +24,6 @@
 		const trimmed = inputValue.trim();
 		if (!trimmed) return;
 
-		// Simple email validation - check for @ and basic format
 		const emailMatch = trimmed.match(/([^<]+)<([^>]+)>/) || trimmed.match(/(.+)@(.+)/);
 
 		if (emailMatch) {
@@ -48,7 +45,6 @@
 			event.preventDefault();
 			addRecipient(list, inputValue);
 		} else if (event.key === 'Backspace' && !inputValue) {
-			// Remove last recipient if input is empty
 			if (list.length > 0) {
 				list.pop();
 			}
@@ -56,21 +52,21 @@
 	}
 </script>
 
-<div class="flex flex-col gap-3 border-b border-border p-4">
-	<!-- To field -->
-	<div class="flex items-center gap-2">
-		<label for="to-input" class="w-12 text-sm font-medium text-text-muted">To:</label>
-		<div class="flex flex-1 flex-wrap items-center gap-2 rounded-md border border-border bg-bg-primary px-2 py-1 focus-within:border-ring">
+<div class="flex flex-col border-b border-zinc-100">
+	<!-- To -->
+	<div class="flex items-center gap-2 px-5 py-2 border-b border-zinc-50">
+		<label for="to-input" class="text-[13px] text-zinc-400 w-8 shrink-0">To</label>
+		<div class="flex flex-1 flex-wrap items-center gap-1.5">
 			{#each values.to as addr, index}
-				<span class="flex items-center gap-1 rounded-sm bg-bg-hover px-2 py-0.5 text-sm">
-					{addr.name ? `${addr.name} <${addr.email}>` : addr.email}
+				<span class="flex items-center gap-1 rounded-md bg-zinc-100 px-2 py-0.5 text-[12px] text-zinc-600">
+					{addr.name ? addr.name : addr.email}
 					<button
 						type="button"
-						class="hover:text-text-muted text-text"
+						class="text-zinc-400 hover:text-zinc-600"
 						onclick={() => removeRecipient(values.to, index)}
-						aria-label="Remove recipient"
+						aria-label="Remove"
 					>
-						<X class="size-3" />
+						<X class="size-3" strokeWidth={1.5} />
 					</button>
 				</span>
 			{/each}
@@ -79,27 +75,30 @@
 				bind:value={toInput}
 				onkeydown={(e) => handleKeyDown(e, values.to, toInput)}
 				type="text"
-				placeholder="Add recipient"
-				class="flex-1 min-w-[120px] bg-transparent text-sm outline-none placeholder:text-text-muted"
+				placeholder={values.to.length === 0 ? "Recipients" : ""}
+				class="flex-1 min-w-[100px] bg-transparent text-[13px] text-zinc-900 outline-none placeholder:text-zinc-300"
 			/>
+		</div>
+		<div class="flex gap-1">
+			{#if !showCc}
+				<button onclick={() => showCc = true} class="text-[11px] text-zinc-400 hover:text-zinc-600 px-1">Cc</button>
+			{/if}
+			{#if !showBcc}
+				<button onclick={() => showBcc = true} class="text-[11px] text-zinc-400 hover:text-zinc-600 px-1">Bcc</button>
+			{/if}
 		</div>
 	</div>
 
-	<!-- Cc field (toggleable) -->
+	<!-- Cc -->
 	{#if showCc}
-		<div class="flex items-center gap-2">
-			<label for="cc-input" class="w-12 text-sm font-medium text-text-muted">Cc:</label>
-			<div class="flex flex-1 flex-wrap items-center gap-2 rounded-md border border-border bg-bg-primary px-2 py-1 focus-within:border-ring">
+		<div class="flex items-center gap-2 px-5 py-2 border-b border-zinc-50">
+			<label for="cc-input" class="text-[13px] text-zinc-400 w-8 shrink-0">Cc</label>
+			<div class="flex flex-1 flex-wrap items-center gap-1.5">
 				{#each values.cc as addr, index}
-					<span class="flex items-center gap-1 rounded-sm bg-bg-hover px-2 py-0.5 text-sm">
-						{addr.name ? `${addr.name} <${addr.email}>` : addr.email}
-						<button
-							type="button"
-							class="hover:text-text-muted text-text"
-							onclick={() => removeRecipient(values.cc, index)}
-							aria-label="Remove recipient"
-						>
-							<X class="size-3" />
+					<span class="flex items-center gap-1 rounded-md bg-zinc-100 px-2 py-0.5 text-[12px] text-zinc-600">
+						{addr.name ? addr.name : addr.email}
+						<button type="button" class="text-zinc-400 hover:text-zinc-600" onclick={() => removeRecipient(values.cc, index)} aria-label="Remove">
+							<X class="size-3" strokeWidth={1.5} />
 						</button>
 					</span>
 				{/each}
@@ -108,28 +107,23 @@
 					bind:value={ccInput}
 					onkeydown={(e) => handleKeyDown(e, values.cc, ccInput)}
 					type="text"
-					placeholder="Add Cc recipient"
-					class="flex-1 min-w-[120px] bg-transparent text-sm outline-none placeholder:text-text-muted"
+					placeholder=""
+					class="flex-1 min-w-[100px] bg-transparent text-[13px] text-zinc-900 outline-none placeholder:text-zinc-300"
 				/>
 			</div>
 		</div>
 	{/if}
 
-	<!-- Bcc field (toggleable) -->
+	<!-- Bcc -->
 	{#if showBcc}
-		<div class="flex items-center gap-2">
-			<label for="bcc-input" class="w-12 text-sm font-medium text-text-muted">Bcc:</label>
-			<div class="flex flex-1 flex-wrap items-center gap-2 rounded-md border border-border bg-bg-primary px-2 py-1 focus-within:border-ring">
+		<div class="flex items-center gap-2 px-5 py-2 border-b border-zinc-50">
+			<label for="bcc-input" class="text-[13px] text-zinc-400 w-8 shrink-0">Bcc</label>
+			<div class="flex flex-1 flex-wrap items-center gap-1.5">
 				{#each values.bcc as addr, index}
-					<span class="flex items-center gap-1 rounded-sm bg-bg-hover px-2 py-0.5 text-sm">
-						{addr.name ? `${addr.name} <${addr.email}>` : addr.email}
-						<button
-							type="button"
-							class="hover:text-text-muted text-text"
-							onclick={() => removeRecipient(values.bcc, index)}
-							aria-label="Remove recipient"
-						>
-							<X class="size-3" />
+					<span class="flex items-center gap-1 rounded-md bg-zinc-100 px-2 py-0.5 text-[12px] text-zinc-600">
+						{addr.name ? addr.name : addr.email}
+						<button type="button" class="text-zinc-400 hover:text-zinc-600" onclick={() => removeRecipient(values.bcc, index)} aria-label="Remove">
+							<X class="size-3" strokeWidth={1.5} />
 						</button>
 					</span>
 				{/each}
@@ -138,50 +132,21 @@
 					bind:value={bccInput}
 					onkeydown={(e) => handleKeyDown(e, values.bcc, bccInput)}
 					type="text"
-					placeholder="Add Bcc recipient"
-					class="flex-1 min-w-[120px] bg-transparent text-sm outline-none placeholder:text-text-muted"
+					placeholder=""
+					class="flex-1 min-w-[100px] bg-transparent text-[13px] text-zinc-900 outline-none placeholder:text-zinc-300"
 				/>
 			</div>
 		</div>
 	{/if}
 
-	<!-- Cc/Bcc toggle buttons -->
-	<div class="flex items-center gap-2">
-		<div class="w-12"></div>
-		<div class="flex gap-2">
-			{#if !showCc}
-				<Button
-					variant="ghost"
-					size="sm"
-					class="h-6 px-2 text-xs"
-					onclick={() => (showCc = true)}
-				>
-					<Plus class="size-3" />
-					Cc
-				</Button>
-			{/if}
-			{#if !showBcc}
-				<Button
-					variant="ghost"
-					size="sm"
-					class="h-6 px-2 text-xs"
-					onclick={() => (showBcc = true)}
-				>
-					<Plus class="size-3" />
-					Bcc
-				</Button>
-			{/if}
-		</div>
-	</div>
-
-	<!-- Subject field -->
-	<div class="flex items-center gap-2">
-		<label for="subject-input" class="w-12 text-sm font-medium text-text-muted">Subject:</label>
-		<Input
+	<!-- Subject -->
+	<div class="flex items-center gap-2 px-5 py-2">
+		<label for="subject-input" class="text-[13px] text-zinc-400 w-8 shrink-0">Sub</label>
+		<input
 			id="subject-input"
 			bind:value={values.subject}
-			placeholder="Enter subject"
-			class="flex-1"
+			placeholder="Subject"
+			class="flex-1 bg-transparent text-[13px] text-zinc-900 outline-none placeholder:text-zinc-300 font-medium"
 		/>
 	</div>
 </div>

@@ -89,10 +89,10 @@
 	{#if mail}
 		<div class="flex flex-1 flex-col">
 			{#if isMobile}
-				<div class="flex items-center border-b border-zinc-200/60 p-3">
-					<Button variant="ghost" size="icon-sm" onclick={onBack} aria-label="Back to list" class="hover:bg-zinc-100">
-						<ArrowLeft class="size-4" />
-					</Button>
+				<div class="flex items-center border-b border-zinc-100 px-3 py-2">
+					<button onclick={onBack} class="flex size-7 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-100/60" aria-label="Back to list">
+						<ArrowLeft class="size-[18px]" strokeWidth={1.5} />
+					</button>
 				</div>
 			{/if}
 
@@ -113,35 +113,24 @@
 
 			<!-- Email body -->
 			<ScrollArea class="flex-1">
-				<div class="p-6 max-w-4xl">
+				<div class="px-8 py-6 max-w-3xl">
 					{#if mail.html_body}
-						<div class="prose prose-sm prose-zinc max-w-none">
+						<div class="prose prose-sm prose-zinc max-w-none prose-p:text-zinc-600 prose-p:leading-relaxed prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline">
 							{@html DOMPurify.sanitize(mail.html_body)}
 						</div>
 					{:else}
-						<p class="text-sm text-zinc-700 leading-relaxed whitespace-pre-wrap font-mono">{mail.body}</p>
+						<p class="text-[14px] text-zinc-600 leading-[1.7] whitespace-pre-wrap">{mail.body}</p>
 					{/if}
 				</div>
 			</ScrollArea>
 		</div>
 	{:else}
-		<!-- Refined Empty State -->
-		<div class="flex h-full items-center justify-center p-8">
-			<div class="flex flex-col items-center gap-5 text-center max-w-sm">
-				<!-- Icon with subtle background -->
-				<div class="relative">
-					<div class="absolute inset-0 bg-zinc-100 rounded-3xl blur-2xl"></div>
-					<div class="relative flex size-20 items-center justify-center rounded-2xl bg-gradient-to-br from-zinc-50 to-zinc-100 border border-zinc-200/60">
-						<MailIcon class="size-10 text-zinc-400" />
-					</div>
-				</div>
-
-				<!-- Message -->
+		<!-- Empty State - Notion minimal -->
+		<div class="flex h-full w-full items-center justify-center">
+			<div class="flex flex-col items-center gap-3 text-center">
+				<MailIcon class="size-8 text-zinc-200" strokeWidth={1} />
 				<div>
-					<h3 class="text-base font-semibold text-zinc-700 mb-1.5">No email selected</h3>
-					<p class="text-sm text-zinc-400 leading-relaxed">
-						Select an email from the list to read its contents here
-					</p>
+					<p class="text-[13px] text-zinc-400">Select an email to read</p>
 				</div>
 			</div>
 		</div>

@@ -55,24 +55,15 @@
 	aria-orientation="vertical"
 	tabindex="0"
 	class={cn(
-		'w-1.5 shrink-0 cursor-col-resize transition-all duration-200 relative',
-		dragging
-			? 'bg-zinc-300'
-			: 'bg-transparent hover:bg-zinc-200/80'
+		'w-px shrink-0 cursor-col-resize relative group',
+		dragging ? 'bg-zinc-200' : 'bg-zinc-100 hover:bg-zinc-200'
 	)}
+	style="transition: background-color 150ms ease;"
 	onpointerdown={onPointerDown}
 	onpointermove={onPointerMove}
 	onpointerup={onPointerUp}
 	onkeydown={onKeyDown}
 >
-	<!-- Visual indicator on hover/drag -->
-	{#if dragging}
-		<div class="absolute inset-0 flex items-center justify-center">
-			<div class="w-0.5 h-12 bg-zinc-400 rounded-full"></div>
-		</div>
-	{:else}
-		<div class="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity pointer-events-none">
-			<div class="w-0.5 h-8 bg-zinc-400 rounded-full"></div>
-		</div>
-	{/if}
+	<!-- Invisible wider hit area -->
+	<div class="absolute inset-y-0 -left-1 -right-1"></div>
 </div>

@@ -8,11 +8,11 @@
 	import * as db from '$lib/db/index.js';
 
 	const STORAGE_KEY = 'mailx-layout';
-	const DEFAULTS = { sidebarCollapsed: false, mailListWidth: 350 };
+	const DEFAULTS = { sidebarCollapsed: false, mailListWidth: 360 };
 	const MIN_MAIL_WIDTH = 280;
 	const MIN_READING_WIDTH = 400;
-	const SIDEBAR_EXPANDED = 280;
-	const SIDEBAR_COLLAPSED = 64;
+	const SIDEBAR_EXPANDED = 240;
+	const SIDEBAR_COLLAPSED = 56;
 
 	// Layout state
 	let sidebarCollapsed = $state(DEFAULTS.sidebarCollapsed);
@@ -45,12 +45,10 @@
 		}
 	}
 
-	// Reload mails when folder changes
 	$effect(() => {
 		loadMails();
 	});
 
-	// Load persisted state on mount
 	$effect(() => {
 		try {
 			const stored = localStorage.getItem(STORAGE_KEY);
@@ -60,10 +58,9 @@
 				if (typeof parsed.mailListWidth === 'number') mailListWidth = parsed.mailListWidth;
 			}
 		} catch {
-			// Ignore invalid localStorage data
+			// Ignore
 		}
 
-		// Mobile detection
 		const mq = window.matchMedia('(max-width: 768px)');
 		isMobile = mq.matches;
 
@@ -71,18 +68,14 @@
 			isMobile = e.matches;
 		}
 		mq.addEventListener('change', onMediaChange);
-
 		return () => mq.removeEventListener('change', onMediaChange);
 	});
 
 	function persistLayout() {
 		try {
-			localStorage.setItem(STORAGE_KEY, JSON.stringify({
-				sidebarCollapsed,
-				mailListWidth
-			}));
+			localStorage.setItem(STORAGE_KEY, JSON.stringify({ sidebarCollapsed, mailListWidth }));
 		} catch {
-			// Ignore storage errors
+			// Ignore
 		}
 	}
 
@@ -104,7 +97,6 @@
 		selectedMailId = id;
 		if (isMobile) mobileView = 'reading';
 
-		// Mark as read when selected
 		const mail = mails.find(m => m.id === id);
 		if (mail?.unread) {
 			try {
@@ -127,46 +119,30 @@
 	}
 </script>
 
-<div class="flex flex-col h-screen w-screen overflow-hidden">
+<div class="flex flex-col h-screen w-screen overflow-hidden bg-white">
 	<!-- Custom Titlebar -->
 	<Titlebar />
 
-	<div class="flex flex-1 overflow-hidden bg-zinc-50 text-zinc-900 font-sans">
-	{#if isMobile && mobileView === 'list'}
-		<!-- Mobile: sidebar overlay when needed -->
-	{/if}
+	<div class="flex flex-1 overflow-hidden">
+		<Sidebar
+			collapsed={sidebarCollapsed}
+			{isMobile}
+			{activeFolder}
+			onToggle={toggleSidebar}
+			onSelectFolder={selectFolder}
+			onRefresh={loadMails}
+		/>
 
-	<Sidebar
-		collapsed={sidebarCollapsed}
-		{isMobile}
-		{activeFolder}
-		onToggle={toggleSidebar}
-		onSelectFolder={selectFolder}
-		onRefresh={loadMails}
-	/>
-
-	{#if isMobile}
-		{#if mobileView === 'list'}
-			<MailList
-				{mails}
-				{activeFolder}
-				{selectedMailId}
-				onSelectMail={selectMail}
-				width={undefined}
-			/>
+		{#if isMobile}
+			{#if mobileView === 'list'}
+				<MailList {mails} {activeFolder} {selectedMailId} onSelectMail={selectMail} width={undefined} />
+			{:else}
+				<ReadingPane mail={selectedMail} {isMobile} onBack={goBackToList} onRefresh={loadMails} />
+			{/if}
 		{:else}
+			<MailList {mails} {activeFolder} {selectedMailId} onSelectMail={selectMail} width={mailListWidth} />
+			<Resizer {onResize} {onResizeEnd} />
 			<ReadingPane mail={selectedMail} {isMobile} onBack={goBackToList} onRefresh={loadMails} />
 		{/if}
-	{:else}
-		<MailList
-			{mails}
-			{activeFolder}
-			{selectedMailId}
-			onSelectMail={selectMail}
-			width={mailListWidth}
-		/>
-		<Resizer {onResize} {onResizeEnd} />
-		<ReadingPane mail={selectedMail} {isMobile} onBack={goBackToList} onRefresh={loadMails} />
-	{/if}
-</div>
+	</div>
 </div>
