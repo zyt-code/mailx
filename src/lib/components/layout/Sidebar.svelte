@@ -9,10 +9,12 @@
 		Trash2,
 		PanelLeftClose,
 		PanelLeftOpen,
-		Plus
+		Plus,
+		Settings
 	} from 'lucide-svelte';
 	import { ComposeModal } from '$lib/components/compose/index.js';
 	import * as db from '$lib/db/index.js';
+	import { goto } from '$app/navigation';
 
 	interface Props {
 		collapsed: boolean;
@@ -21,9 +23,10 @@
 		onToggle: () => void;
 		onSelectFolder: (folder: Folder) => void;
 		onRefresh?: () => void;
+		currentRoute?: string;
 	}
 
-	let { collapsed, isMobile, activeFolder, onToggle, onSelectFolder, onRefresh }: Props = $props();
+	let { collapsed, isMobile, activeFolder, onToggle, onSelectFolder, onRefresh, currentRoute = '/' }: Props = $props();
 
 	const navItems: { icon: typeof Inbox; label: string; folder: Folder; count: number }[] = [
 		{ icon: Inbox, label: 'Inbox', folder: 'inbox', count: 12 },
@@ -53,6 +56,11 @@
 		if (onRefresh) {
 			onRefresh();
 		}
+	}
+
+	function handleSettingsClick() {
+		goto('/settings');
+		if (isMobile) onToggle();
 	}
 </script>
 
@@ -125,6 +133,23 @@
 				{/if}
 			</button>
 		{/each}
+
+		<!-- Settings button at bottom -->
+		<button
+			class={cn(
+				'flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors mt-auto',
+				currentRoute === '/settings'
+					? 'bg-bg-hover text-text font-medium'
+					: 'text-text-muted hover:bg-bg-hover',
+				collapsed && !isMobile && 'justify-center px-0'
+			)}
+			onclick={handleSettingsClick}
+		>
+			<Settings class="size-4 shrink-0" />
+			{#if !collapsed || isMobile}
+				<span class="truncate">Settings</span>
+			{/if}
+		</button>
 	</nav>
 
 	<!-- Compose Modal -->

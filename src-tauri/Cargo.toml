@@ -20,8 +20,23 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
+tauri-plugin-credential = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 rusqlite = { version = "0.32", features = ["bundled"] }
 chrono = "0.4"
+async-imap = { version = "0.9", default-features = false, features = ["runtime-tokio"] }
+lettre = "0.11"
+tokio = { version = "1", features = ["full"] }
+tokio-util = { version = "0.7", features = ["codec"] }
+base64 = "0.22"
+thiserror = "2"
+mail-parser = "0.9"
+imap = { version = "0.9", default-features = false }
+native-tls = "0.2"
+async-net = "2"
+async-futures = "0.1"
+futures = "0.3"
+regex = "1"
+html-escape = "0.2"
 

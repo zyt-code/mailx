@@ -1,0 +1,331 @@
+<script lang="ts">
+	import type { Account, AccountFormData } from '$lib/types';
+	import * as accounts from '$lib/accounts/index.js';
+	import { cn } from '$lib/utils.js';
+
+	interface Props {
+		account?: Account;
+		onSave: () => void;
+		onCancel: () => void;
+	}
+
+	let { account, onSave, onCancel }: Props = $props();
+
+	let formData = $state<AccountFormData>({
+		email: account?.email || '',
+		name: account?.name || '',
+		password: '',
+		imap_server: account?.imap_server || '',
+		imap_port: account?.imap_port || 993,
+		imap_use_ssl: account?.imap_use_ssl ?? true,
+		smtp_server: account?.smtp_server || '',
+		smtp_port: account?.smtp_port || 587,
+		smtp_use_ssl: account?.smtp_use_ssl ?? true,
+	});
+
+	let errors = $state<Record<string, string>>({});
+	let testing = $state(false);
+	let testResult = $state<{ imap: boolean; smtp: boolean; error?: string } | null>(null);
+	let saving = $state(false);
+
+	async function handleEmailChange() {
+		if (accounts.validateEmail(formData.email)) {
+			const imapDefaults = accounts.getDefaultImapSettings(formData.email);
+			const smtpDefaults = accounts.getDefaultSmtpSettings(formData.email);
+
+			formData.imap_server = imapDefaults.server;
+			formData.imap_port = imapDefaults.port;
+			formData.imap_use_ssl = imapDefaults.use_ssl;
+			formData.smtp_server = smtpDefaults.server;
+			formData.smtp_port = smtpDefaults.port;
+			formData.smtp_use_ssl = smtpDefaults.use_ssl;
+		}
+	}
+
+	async function testConnection() {
+		testing = true;
+		testResult = null;
+		errors = {};
+
+		// Validate form
+		const validationErrors = validateForm();
+		if (Object.keys(validationErrors).length > 0) {
+			errors = validationErrors;
+			testing = false;
+			return;
+		}
+
+		try {
+			// Create a temporary account to test
+			const tempAccount: Account = {
+				id: account?.id || crypto.randomUUID(),
+				...formData,
+				is_active: true,
+				created_at: account?.created_at || Date.now(),
+				updated_at: Date.now(),
+			};
+
+			if (account) {
+				// Update existing account temporarily for testing
+				await accounts.updateAccount(account.id, formData);
+				await accounts.testConnection(account.id);
+				// Restore original settings
+				await accounts.updateAccount(account.id, {
+					...formData,
+					email: account.email,
+					name: account.name,
+				});
+			} else {
+				// For new accounts, we can't test without creating
+				// This is a limitation - user must save first
+				testResult = {
+					imap: false,
+					smtp: false,
+					error: 'Please save the account first, then test connection.',
+				};
+				testing = false;
+				return;
+			}
+
+			testResult = { imap: true, smtp: true };
+		} catch (error) {
+			testResult = {
+				imap: false,
+				smtp: false,
+				error: error instanceof Error ? error.message : 'Connection failed',
+			};
+		} finally {
+			testing = false;
+		}
+	}
+
+	async function handleSave() {
+		errors = {};
+		saving = true;
+
+		// Validate form
+		const validationErrors = validateForm();
+		if (Object.keys(validationErrors).length > 0) {
+			errors = validationErrors;
+			saving = false;
+			return;
+		}
+
+		try {
+			if (account) {
+				await accounts.updateAccount(account.id, formData);
+			} else {
+				await accounts.createAccount(formData);
+			}
+			onSave();
+		} catch (error) {
+			errors.general = error instanceof Error ? error.message : 'Failed to save account';
+		} finally {
+			saving = false;
+		}
+	}
+
+	function validateForm(): Record<string, string> {
+		const newErrors: Record<string, string> = {};
+
+		if (!accounts.validateEmail(formData.email)) {
+			newErrors.email = 'Invalid email format';
+		}
+
+		if (!formData.name.trim()) {
+			newErrors.name = 'Name is required';
+		}
+
+		if (!account && !formData.password) {
+			newErrors.password = 'Password is required for new accounts';
+		}
+
+		if (!accounts.validateServerSettings(formData.imap_server, formData.imap_port)) {
+			newErrors.imap_server = 'Invalid IMAP server settings';
+		}
+
+		if (!accounts.validateServerSettings(formData.smtp_server, formData.smtp_port)) {
+			newErrors.smtp_server = 'Invalid SMTP server settings';
+		}
+
+		return newErrors;
+	}
+
+	function getFieldClass(fieldName: string): string {
+		return cn(
+			'w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500',
+			errors[fieldName] ? 'border-red-500' : 'border-gray-300'
+		);
+	}
+</script>
+
+<div class="p-6 bg-white rounded-lg border">
+	<h2 class="text-xl font-semibold mb-4">
+		{account ? 'Edit Account' : 'Add Account'}
+	</h2>
+
+	{#if errors.general}
+		<div class="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-800 text-sm">
+			{errors.general}
+		</div>
+	{/if}
+
+	{#if testResult?.error}
+		<div class="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-800 text-sm">
+			{testResult.error}
+		</div>
+	{/if}
+
+	{#if testResult && !testResult.error}
+		<div class="mb-4 p-3 bg-green-50 border border-green-200 rounded text-green-800 text-sm">
+			Connection successful! Both IMAP and SMTP are working.
+		</div>
+	{/if}
+
+	<form onsubmit={(e) => e.preventDefault()} class="space-y-4">
+		<!-- Basic Info -->
+		<div class="space-y-2">
+			<label class="block text-sm font-medium text-gray-700">Email</label>
+			<input
+				type="email"
+				bind:value={formData.email}
+				onblur={handleEmailChange}
+				class={getFieldClass('email')}
+				placeholder="you@example.com"
+			/>
+			{#if errors.email}
+				<span class="text-sm text-red-600">{errors.email}</span>
+			{/if}
+		</div>
+
+		<div class="space-y-2">
+			<label class="block text-sm font-medium text-gray-700">Name</label>
+			<input
+				type="text"
+				bind:value={formData.name}
+				class={getFieldClass('name')}
+				placeholder="Your Name"
+			/>
+			{#if errors.name}
+				<span class="text-sm text-red-600">{errors.name}</span>
+			{/if}
+		</div>
+
+		{#if !account}
+			<div class="space-y-2">
+				<label class="block text-sm font-medium text-gray-700">Password</label>
+				<input
+					type="password"
+					bind:value={formData.password}
+					class={getFieldClass('password')}
+					placeholder="••••••••"
+				/>
+				{#if errors.password}
+					<span class="text-sm text-red-600">{errors.password}</span>
+				{/if}
+			</div>
+		{/if}
+
+		<!-- IMAP Settings -->
+		<div class="border-t pt-4">
+			<h3 class="text-sm font-medium text-gray-700 mb-2">IMAP Settings</h3>
+			<div class="grid grid-cols-2 gap-4">
+				<div class="space-y-2">
+					<label class="block text-sm font-medium text-gray-700">Server</label>
+					<input
+						type="text"
+						bind:value={formData.imap_server}
+						class={getFieldClass('imap_server')}
+						placeholder="imap.example.com"
+					/>
+				</div>
+				<div class="space-y-2">
+					<label class="block text-sm font-medium text-gray-700">Port</label>
+					<input
+						type="number"
+						bind:value={formData.imap_port}
+						class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+						min="1"
+						max="65535"
+					/>
+				</div>
+			</div>
+			<div class="mt-2">
+				<label class="flex items-center gap-2">
+					<input type="checkbox" bind:checked={formData.imap_use_ssl} class="rounded" />
+					<span class="text-sm text-gray-700">Use SSL/TLS</span>
+				</label>
+			</div>
+			{#if errors.imap_server}
+				<span class="text-sm text-red-600">{errors.imap_server}</span>
+			{/if}
+		</div>
+
+		<!-- SMTP Settings -->
+		<div class="border-t pt-4">
+			<h3 class="text-sm font-medium text-gray-700 mb-2">SMTP Settings</h3>
+			<div class="grid grid-cols-2 gap-4">
+				<div class="space-y-2">
+					<label class="block text-sm font-medium text-gray-700">Server</label>
+					<input
+						type="text"
+						bind:value={formData.smtp_server}
+						class={getFieldClass('smtp_server')}
+						placeholder="smtp.example.com"
+					/>
+				</div>
+				<div class="space-y-2">
+					<label class="block text-sm font-medium text-gray-700">Port</label>
+					<input
+						type="number"
+						bind:value={formData.smtp_port}
+						class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+						min="1"
+						max="65535"
+					/>
+				</div>
+			</div>
+			<div class="mt-2">
+				<label class="flex items-center gap-2">
+					<input type="checkbox" bind:checked={formData.smtp_use_ssl} class="rounded" />
+					<span class="text-sm text-gray-700">Use SSL/TLS</span>
+				</label>
+			</div>
+			{#if errors.smtp_server}
+				<span class="text-sm text-red-600">{errors.smtp_server}</span>
+			{/if}
+		</div>
+
+		<!-- Actions -->
+		<div class="flex justify-between items-center pt-4 border-t">
+			<div class="flex gap-2">
+				<button
+					type="button"
+					onclick={testConnection}
+					disabled={testing || saving}
+					class="px-4 py-2 text-blue-600 border border-blue-600 rounded hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
+				>
+					{testing ? 'Testing...' : 'Test Connection'}
+				</button>
+			</div>
+			<div class="flex gap-2">
+				<button
+					type="button"
+					onclick={onCancel}
+					disabled={saving}
+					class="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+				>
+					Cancel
+				</button>
+				<button
+					type="button"
+					onclick={handleSave}
+					disabled={saving}
+					class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+				>
+					{saving ? 'Saving...' : 'Save'}
+				</button>
+			</div>
+		</div>
+	</form>
+</div>

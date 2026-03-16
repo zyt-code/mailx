@@ -14,6 +14,9 @@ export interface Mail {
 	to?: EmailAddress[];
 	cc?: EmailAddress[];
 	bcc?: EmailAddress[];
+	// IMAP sync fields
+	account_id?: string;
+	uid?: number;
 }
 
 export interface EmailAddress {
@@ -32,3 +35,107 @@ export interface MailLegacy {
 	unread: boolean;
 	folder: Folder;
 }
+
+// ============================================================================
+// Account Management Types
+// ============================================================================
+
+export interface Account {
+	id: string;
+	email: string;
+	name: string;
+	imap_server: string;
+	imap_port: number;
+	imap_use_ssl: boolean;
+	smtp_server: string;
+	smtp_port: number;
+	smtp_use_ssl: boolean;
+	is_active: boolean;
+	created_at: number;
+	updated_at: number;
+}
+
+export interface ImapConfig {
+	server: string;
+	port: number;
+	use_ssl: boolean;
+}
+
+export interface SmtpConfig {
+	server: string;
+	port: number;
+	use_ssl: boolean;
+}
+
+export type SyncState = 'idle' | 'syncing' | 'failed' | 'cancelled';
+
+export interface SyncStatus {
+	account_id: string;
+	account_email: string;
+	status: SyncState;
+	last_sync?: number;
+	error_message?: string;
+	retry_count: number;
+}
+
+export interface OutboxItem {
+	id: string;
+	account_id: string;
+	mail_data: string;
+	recipients: string;
+	status: 'pending' | 'sending' | 'sent' | 'failed';
+	error_message?: string;
+	retry_count: number;
+	created_at: number;
+	updated_at: number;
+}
+
+// ============================================================================
+// Form Types
+// ============================================================================
+
+export interface AccountFormData {
+	email: string;
+	name: string;
+	password: string;
+	imap_server: string;
+	imap_port: number;
+	imap_use_ssl: boolean;
+	smtp_server: string;
+	smtp_port: number;
+	smtp_use_ssl: boolean;
+}
+
+export interface ConnectionTestResult {
+	imap: boolean;
+	smtp: boolean;
+	error?: string;
+}
+
+// ============================================================================
+// Event Types
+// ============================================================================
+
+export interface AccountCreatedEvent {
+	id: string;
+}
+
+export interface AccountUpdatedEvent {
+	id: string;
+}
+
+export interface AccountDeletedEvent {
+	id: string;
+}
+
+export interface MailSentEvent {
+	id: string;
+	account_id: string;
+}
+
+export interface SyncStartedEvent {
+	account_id: string;
+	email: string;
+}
+
+export interface SyncCompletedEvent extends SyncStatus {}

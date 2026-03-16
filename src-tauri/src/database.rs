@@ -119,6 +119,83 @@ impl Database {
         // Add bcc_json column if not exists
         conn.execute("ALTER TABLE mails ADD COLUMN bcc_json TEXT", []).ok();
 
+        // Add account_id column if not exists
+        conn.execute("ALTER TABLE mails ADD COLUMN account_id TEXT", []).ok();
+
+        // Add uid column if not exists
+        conn.execute("ALTER TABLE mails ADD COLUMN uid INTEGER", []).ok();
+
+        // Create accounts table
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS accounts (
+                id TEXT PRIMARY KEY,
+                email TEXT NOT NULL UNIQUE,
+                name TEXT NOT NULL,
+                imap_server TEXT NOT NULL,
+                imap_port INTEGER NOT NULL DEFAULT 993,
+                imap_use_ssl INTEGER NOT NULL DEFAULT 1,
+                smtp_server TEXT NOT NULL,
+                smtp_port INTEGER NOT NULL DEFAULT 587,
+                smtp_use_ssl INTEGER NOT NULL DEFAULT 1,
+                is_active INTEGER NOT NULL DEFAULT 1,
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL
+            )",
+            [],
+        )?;
+
+        // Create imap_folders table
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS imap_folders (
+                id TEXT PRIMARY KEY,
+                account_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                remote_uid_validity INTEGER NOT NULL,
+                remote_last_uid INTEGER NOT NULL DEFAULT 0,
+                local_count INTEGER NOT NULL DEFAULT 0,
+                created_at INTEGER NOT NULL,
+                FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE
+            )",
+            [],
+        )?;
+
+        // Create sync_state table
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS sync_state (
+                account_id TEXT PRIMARY KEY,
+                last_full_sync INTEGER,
+                last_incremental_sync INTEGER,
+                sync_status TEXT NOT NULL DEFAULT 'idle',
+                error_message TEXT,
+                retry_count INTEGER NOT NULL DEFAULT 0,
+                FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE
+            )",
+            [],
+        )?;
+
+        // Create outbox table
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS outbox (
+                id TEXT PRIMARY KEY,
+                account_id TEXT NOT NULL,
+                mail_data TEXT NOT NULL,
+                recipients TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending',
+                error_message TEXT,
+                retry_count INTEGER NOT NULL DEFAULT 0,
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL,
+                FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE
+            )",
+            [],
+        )?;
+
+        // Create index for account-based mail queries
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_mails_account ON mails(account_id, folder)",
+            [],
+        )?;
+
         Ok(())
     }
 

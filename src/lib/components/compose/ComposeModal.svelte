@@ -1,11 +1,14 @@
 <script lang="ts">
 	import * as db from '$lib/db/index.js';
+	import * as accounts from '$lib/accounts/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
+	import { ChevronDown } from 'lucide-svelte';
 	import ComposeHeader from './ComposeHeader.svelte';
 	import ComposeEditor from './ComposeEditor.svelte';
 	import ComposeActions from './ComposeActions.svelte';
 	import { X } from 'lucide-svelte';
-	import type { EmailAddress, Folder, Mail } from '$lib/types.js';
+	import type { Account, EmailAddress, Folder, Mail } from '$lib/types.js';
+	import { onMount } from 'svelte';
 
 	interface Props {
 		isOpen: boolean;
@@ -16,6 +19,10 @@
 	}
 
 	let { isOpen, onClose, onSent, replyTo, forward }: Props = $props();
+
+	// Account state
+	let availableAccounts = $state<Account[]>([]);
+	let selectedAccountId = $state<string | null>(null);
 
 	// Draft state
 	let draft = $state({
@@ -31,10 +38,33 @@
 	let lastSaved = $state<Date | null>(null);
 	let isSending = $state(false);
 	let autoSaveInterval = $state<ReturnType<typeof setInterval> | null>(null);
+	let showAccountDropdown = $state(false);
+
+	// Load accounts on mount
+	onMount(async () => {
+		await loadAccounts();
+	});
+
+	async function loadAccounts() {
+		try {
+			availableAccounts = await accounts.getAccounts();
+			// Select first active account by default
+			if (availableAccounts.length > 0 && !selectedAccountId) {
+				selectedAccountId = availableAccounts.find(a => a.is_active)?.id || availableAccounts[0].id;
+			}
+		} catch (error) {
+			console.error('Failed to load accounts:', error);
+		}
+	}
 
 	// Initialize when modal opens
 	$effect(() => {
 		if (isOpen) {
+			// Ensure accounts are loaded
+			if (availableAccounts.length === 0) {
+				loadAccounts();
+			}
+
 			// Initialize draft based on replyTo/forward
 			if (replyTo) {
 				draft.to = replyTo.to?.[0] ? [replyTo.to[0]] : [];
@@ -73,10 +103,14 @@
 	async function saveDraft() {
 		if (!isOpen) return;
 
-		const mail: Omit<Mail, 'id'> & { id?: string } = {
+		const selectedAccount = availableAccounts.find(a => a.id === selectedAccountId);
+		if (!selectedAccount) return;
+
+		const mail: Omit<Mail, 'id'> & { id?: string; account_id?: string } = {
 			id: draftId || undefined,
-			from_name: 'Me', // TODO: Get from account settings
-			from_email: 'me@example.com', // TODO: Get from account settings
+			account_id: selectedAccount.id,
+			from_name: selectedAccount.name,
+			from_email: selectedAccount.email,
 			subject: draft.subject || '(No subject)',
 			preview: draft.body.slice(0, 100),
 			body: draft.body,
@@ -97,23 +131,33 @@
 	}
 
 	async function sendMail() {
+		if (!selectedAccountId) {
+			alert('Please select an account to send from');
+			return;
+		}
+
+		// Validate recipients
+		if (draft.to.length === 0 && draft.cc.length === 0 && draft.bcc.length === 0) {
+			alert('Please add at least one recipient');
+			return;
+		}
+
 		isSending = true;
 
 		// Save draft first
 		await saveDraft();
 
-		// Move to sent folder
 		if (draftId) {
 			try {
-				const mail = await db.getMail(draftId);
-				mail.folder = 'sent';
-				await db.updateMail(mail);
+				// Send via SMTP
+				await accounts.sendMail(draftId, selectedAccountId);
 			} catch (error) {
 				console.error('Failed to send mail:', error);
+				alert(`Failed to send email: ${error instanceof Error ? error.message : 'Unknown error'}`);
+				isSending = false;
+				return;
 			}
 		}
-
-		// TODO: SMTP integration in Phase 4
 
 		isSending = false;
 		onSent();
@@ -133,6 +177,10 @@
 
 	function closeModal() {
 		onClose();
+	}
+
+	function getSelectedAccount(): Account | undefined {
+		return availableAccounts.find(a => a.id === selectedAccountId);
 	}
 </script>
 
@@ -157,9 +205,49 @@
 		>
 			<!-- Header with title and close button -->
 			<div class="flex items-center justify-between border-b border-border px-4 py-3">
-				<h2 id="compose-title" class="text-lg font-semibold text-text">
-					New Message
-				</h2>
+				<div class="flex items-center gap-4">
+					<h2 id="compose-title" class="text-lg font-semibold text-text">
+						New Message
+					</h2>
+
+					<!-- Account selector -->
+					{#if availableAccounts.length > 0}
+						<div class="relative">
+							<button
+								onclick={() => showAccountDropdown = !showAccountDropdown}
+								class="flex items-center gap-2 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-md text-sm"
+							>
+								<span>{getSelectedAccount()?.email}</span>
+								<ChevronDown class="w-4 h-4" />
+							</button>
+
+							{#if showAccountDropdown}
+								<div class="absolute top-full left-0 mt-1 w-64 bg-white border rounded-md shadow-lg z-10">
+									{#each availableAccounts as account}
+										<button
+											onclick={() => {
+												selectedAccountId = account.id;
+												showAccountDropdown = false;
+											}}
+											class="w-full px-3 py-2 text-left hover:bg-gray-100 flex items-center gap-2 {selectedAccountId === account.id ? 'bg-gray-100' : ''}"
+										>
+											<div class="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-xs font-medium">
+												{account.name.charAt(0).toUpperCase()}
+											</div>
+											<div class="flex-1 min-w-0">
+												<div class="text-sm font-medium truncate">{account.name}</div>
+												<div class="text-xs text-gray-500 truncate">{account.email}</div>
+											</div>
+										</button>
+									{/each}
+								</div>
+							{/if}
+						</div>
+					{:else}
+						<div class="text-sm text-gray-500">No accounts configured</div>
+					{/if}
+				</div>
+
 				<Button
 					variant="ghost"
 					size="icon-sm"
