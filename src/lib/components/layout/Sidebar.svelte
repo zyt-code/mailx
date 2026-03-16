@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { cn } from '$lib/utils.js';
-	import { Button } from '$lib/components/ui/button/index.js';
 	import type { Folder } from '$lib/types.js';
 	import {
 		Inbox,
@@ -10,11 +9,10 @@
 		PanelLeftClose,
 		PanelLeftOpen,
 		Plus,
-		Settings
+		Archive,
+		RefreshCw
 	} from 'lucide-svelte';
 	import { ComposeModal } from '$lib/components/compose/index.js';
-	import * as db from '$lib/db/index.js';
-	import { goto } from '$app/navigation';
 
 	interface Props {
 		collapsed: boolean;
@@ -32,12 +30,14 @@
 		{ icon: Inbox, label: 'Inbox', folder: 'inbox', count: 12 },
 		{ icon: Send, label: 'Sent', folder: 'sent', count: 0 },
 		{ icon: FileEdit, label: 'Drafts', folder: 'drafts', count: 3 },
+		{ icon: Archive, label: 'Archive', folder: 'archive', count: 0 },
 		{ icon: Trash2, label: 'Trash', folder: 'trash', count: 0 }
 	];
 
 	let showCompose = $state(false);
+	let isRefreshing = $state(false);
 
-	function handleFolderClick(folder: Folder) {
+	async function handleFolderClick(folder: Folder) {
 		onSelectFolder(folder);
 		if (isMobile) onToggle();
 	}
@@ -52,104 +52,112 @@
 
 	async function onComposeSent() {
 		showCompose = false;
-		// Refresh mail list to show new sent mail
 		if (onRefresh) {
 			onRefresh();
 		}
 	}
 
-	function handleSettingsClick() {
-		goto('/settings');
-		if (isMobile) onToggle();
+	async function handleRefresh() {
+		if (!onRefresh || isRefreshing) return;
+		isRefreshing = true;
+		try {
+			await onRefresh();
+		} finally {
+			isRefreshing = false;
+		}
 	}
 </script>
 
 {#if isMobile && !collapsed}
-	<!-- Backdrop for mobile overlay -->
-	<button
-		class="fixed inset-0 z-30 bg-black/30"
+	<div
+		class="fixed inset-0 z-30 bg-black/10 backdrop-blur-sm transition-opacity duration-200"
 		onclick={onToggle}
 		aria-label="Close sidebar"
-	></button>
+	></div>
 {/if}
 
 <aside
 	class={cn(
-		'flex h-full flex-col border-r border-border bg-bg-secondary transition-[width] duration-200 overflow-hidden',
-		isMobile && 'fixed inset-y-0 left-0 z-40 shadow-lg',
-		isMobile && collapsed && '-translate-x-full'
+		'flex h-full flex-col bg-zinc-50/80 backdrop-blur-md transition-all duration-300 ease-out',
+		isMobile && 'fixed inset-y-0 left-0 z-40 shadow-2xl',
+		isMobile && collapsed && '-translate-x-full',
+		!isMobile && 'border-r border-zinc-200/60'
 	)}
-	style:width={collapsed && !isMobile ? '64px' : '250px'}
+	style:width={collapsed && !isMobile ? '64px' : '280px'}
 >
-	<!-- Toggle button -->
-	<div class="flex h-12 items-center px-3 border-b border-border">
-		<Button variant="ghost" size="icon-sm" onclick={onToggle} aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
+	<!-- Toggle button (top, inline with layout) -->
+	<div class="flex h-9 items-center justify-between px-3">
+		<button
+			onclick={onToggle}
+			class="flex size-7 items-center justify-center rounded-lg text-zinc-500 transition-all duration-200 hover:bg-zinc-200/80 hover:text-zinc-700 active:scale-95"
+			aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+		>
 			{#if collapsed && !isMobile}
 				<PanelLeftOpen class="size-4" />
 			{:else}
 				<PanelLeftClose class="size-4" />
 			{/if}
-		</Button>
-		{#if !collapsed}
-			<span class="ml-2 text-sm font-semibold text-text">Mailx</span>
+		</button>
+		{#if !collapsed && onRefresh}
+			<button
+				onclick={handleRefresh}
+				disabled={isRefreshing}
+				class="flex size-7 items-center justify-center rounded-lg text-zinc-500 transition-all duration-200 hover:bg-zinc-200/80 hover:text-zinc-700 active:scale-95 disabled:opacity-40"
+				aria-label="Refresh"
+			>
+				<RefreshCw class={cn('size-4', isRefreshing && 'animate-spin')} />
+			</button>
 		{/if}
 	</div>
 
-	<!-- Compose button -->
-	<div class="p-2">
+	<!-- Compose Button -->
+	<div class="px-3 pt-3 pb-3">
 		<button
 			class={cn(
-				'flex w-full items-center justify-center gap-2 rounded-md bg-accent px-3 py-2 text-sm font-medium text-white transition-colors hover:opacity-90',
+				'group relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white shadow-lg shadow-zinc-900/20 transition-all duration-200 hover:bg-zinc-800 hover:shadow-xl hover:shadow-zinc-900/30 active:scale-[0.97]',
 				collapsed && !isMobile && 'px-0'
 			)}
 			onclick={openCompose}
 		>
 			<Plus class="size-4 shrink-0" />
 			{#if !collapsed || isMobile}
-				<span class="ml-2">Compose</span>
+				<span class="font-medium tracking-tight">New Message</span>
 			{/if}
 		</button>
 	</div>
 
 	<!-- Navigation -->
-	<nav class="flex-1 p-2 space-y-0.5">
-		{#each navItems as item}
-			<button
-				class={cn(
-					'flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
-					item.folder === activeFolder
-						? 'bg-bg-hover text-text font-medium'
-						: 'text-text-muted hover:bg-bg-hover',
-					collapsed && !isMobile && 'justify-center px-0'
-				)}
-				onclick={() => handleFolderClick(item.folder)}
-			>
-				<item.icon class="size-4 shrink-0" />
-				{#if !collapsed || isMobile}
-					<span class="truncate">{item.label}</span>
-					{#if item.count > 0}
-						<span class="ml-auto text-xs text-text-muted">{item.count}</span>
+	<nav class="flex-1 overflow-y-auto px-2 pb-2">
+		<div class="space-y-0.5">
+			{#each navItems as item}
+				<button
+					class={cn(
+						'group relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
+						item.folder === activeFolder
+							? 'bg-accent text-zinc-900'
+							: 'text-zinc-600 hover:bg-accent/60',
+						collapsed && !isMobile && 'justify-center px-3'
+					)}
+					onclick={() => handleFolderClick(item.folder)}
+				>
+					<item.icon class={cn(
+						'size-4 shrink-0',
+						item.folder === activeFolder && 'text-zinc-900',
+						item.folder === activeFolder && item.icon === Inbox && 'fill-current'
+					)} />
+					{#if !collapsed || isMobile}
+						<span class="flex-1 text-left truncate font-medium">
+							{item.label}
+						</span>
+						{#if item.count > 0}
+							<span class="flex size-5 items-center justify-center rounded-full bg-zinc-200 text-xs font-semibold text-zinc-600 group-hover:bg-zinc-300 transition-colors">
+								{item.count}
+							</span>
+						{/if}
 					{/if}
-				{/if}
-			</button>
-		{/each}
-
-		<!-- Settings button at bottom -->
-		<button
-			class={cn(
-				'flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors mt-auto',
-				currentRoute === '/settings'
-					? 'bg-bg-hover text-text font-medium'
-					: 'text-text-muted hover:bg-bg-hover',
-				collapsed && !isMobile && 'justify-center px-0'
-			)}
-			onclick={handleSettingsClick}
-		>
-			<Settings class="size-4 shrink-0" />
-			{#if !collapsed || isMobile}
-				<span class="truncate">Settings</span>
-			{/if}
-		</button>
+				</button>
+			{/each}
+		</div>
 	</nav>
 
 	<!-- Compose Modal -->

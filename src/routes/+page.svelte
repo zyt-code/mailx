@@ -1,3 +1,5 @@
 <script lang="ts">
-	// Placeholder page — content will display in the ReadingPane
+	import { AppShell } from '$lib/components/layout/index.js';
 </script>
+
+<AppShell />

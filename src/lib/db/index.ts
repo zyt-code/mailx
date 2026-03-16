@@ -62,3 +62,24 @@ export async function markMailRead(id: string, read: boolean): Promise<void> {
 export async function moveToTrash(id: string, currentFolder: Folder): Promise<void> {
 	await invoke('move_to_trash', { id, currentFolder });
 }
+
+/**
+ * Move a mail to archive
+ */
+export async function moveToArchive(id: string): Promise<void> {
+	await invoke('archive_mail', { id });
+}
+
+/**
+ * Unarchive a mail (move back to inbox)
+ */
+export async function unarchiveMail(id: string): Promise<void> {
+	await invoke('unarchive_mail', { id });
+}
+
+/**
+ * Toggle star status for a mail
+ */
+export async function toggleStar(id: string, starred: boolean): Promise<void> {
+	await invoke('toggle_star', { id, starred });
+}

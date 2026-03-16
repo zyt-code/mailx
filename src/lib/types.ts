@@ -1,4 +1,14 @@
-export type Folder = 'inbox' | 'sent' | 'drafts' | 'trash';
+export type Folder = 'inbox' | 'sent' | 'drafts' | 'trash' | 'archive';
+
+export interface Attachment {
+	id: string;
+	mail_id: string;
+	file_name: string;
+	content_type: string;
+	size: number;
+	stored_path: string;
+	created_at: number;
+}
 
 export interface Mail {
 	id: string;
@@ -10,10 +20,16 @@ export interface Mail {
 	timestamp: number; // Unix milliseconds
 	folder: Folder;
 	unread: boolean;
-	// Future fields for compose functionality
+	// Compose functionality fields
 	to?: EmailAddress[];
 	cc?: EmailAddress[];
 	bcc?: EmailAddress[];
+	// Extended display fields
+	html_body?: string;
+	reply_to?: EmailAddress[];
+	attachments?: Attachment[];
+	starred?: boolean;
+	has_attachments?: boolean;
 	// IMAP sync fields
 	account_id?: string;
 	uid?: number;

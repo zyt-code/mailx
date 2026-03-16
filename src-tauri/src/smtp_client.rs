@@ -1,8 +1,8 @@
 use crate::accounts::SmtpConfig;
 use crate::database::{EmailAddress, Mail};
-use lettre::message::{header, Mailbox, Message as LettreMessage};
+use lettre::message::{header, Mailbox, Message};
 use lettre::transport::smtp::authentication::Credentials;
-use lettre::{Message, SmtpTransport, Transport};
+use lettre::{SmtpTransport, Transport};
 use thiserror::Error;
 
 /// SMTP client errors
@@ -149,7 +149,7 @@ impl SmtpClient {
     }
 
     /// Build an email message from a Mail structure
-    fn build_email_message(&self, mail: &Mail) -> Result<LettreMessage> {
+    fn build_email_message(&self, mail: &Mail) -> Result<Message> {
         // Parse from address
         let from_mailbox: Mailbox = mail.from_email.parse()
             .map_err(|_| SmtpError::InvalidEmail(format!("Invalid from email: {}", mail.from_email)))?;
@@ -206,7 +206,7 @@ impl SmtpClient {
         cc: Option<&[EmailAddress]>,
         subject: &str,
         body: &str,
-    ) -> Result<LettreMessage> {
+    ) -> Result<Message> {
         // Parse from address
         let from_mailbox: Mailbox = from.parse()
             .map_err(|_| SmtpError::InvalidEmail(format!("Invalid from email: {}", from)))?;
@@ -252,16 +252,6 @@ impl SmtpClient {
         SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)
             .unwrap_or_default().as_nanos().hash(&mut hasher);
         format!("{:x}", hasher.finish())
-    }
-}
-
-impl Clone for SmtpConfig {
-    fn clone(&self) -> Self {
-        Self {
-            server: self.server.clone(),
-            port: self.port,
-            use_ssl: self.use_ssl,
-        }
     }
 }
 

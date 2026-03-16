@@ -1,11 +1,9 @@
 <script lang="ts">
-	import { untrack } from 'svelte';
 	import Sidebar from './Sidebar.svelte';
 	import MailList from './MailList.svelte';
 	import Resizer from './Resizer.svelte';
 	import ReadingPane from './ReadingPane.svelte';
-	import { Button } from '$lib/components/ui/button/index.js';
-	import { Menu } from 'lucide-svelte';
+	import Titlebar from './Titlebar.svelte';
 	import type { Mail, Folder } from '$lib/types.js';
 	import * as db from '$lib/db/index.js';
 
@@ -13,7 +11,7 @@
 	const DEFAULTS = { sidebarCollapsed: false, mailListWidth: 350 };
 	const MIN_MAIL_WIDTH = 280;
 	const MIN_READING_WIDTH = 400;
-	const SIDEBAR_EXPANDED = 250;
+	const SIDEBAR_EXPANDED = 280;
 	const SIDEBAR_COLLAPSED = 64;
 
 	// Layout state
@@ -54,18 +52,16 @@
 
 	// Load persisted state on mount
 	$effect(() => {
-		untrack(() => {
-			try {
-				const stored = localStorage.getItem(STORAGE_KEY);
-				if (stored) {
-					const parsed = JSON.parse(stored);
-					if (typeof parsed.sidebarCollapsed === 'boolean') sidebarCollapsed = parsed.sidebarCollapsed;
-					if (typeof parsed.mailListWidth === 'number') mailListWidth = parsed.mailListWidth;
-				}
-			} catch {
-				// Ignore invalid localStorage data
+		try {
+			const stored = localStorage.getItem(STORAGE_KEY);
+			if (stored) {
+				const parsed = JSON.parse(stored);
+				if (typeof parsed.sidebarCollapsed === 'boolean') sidebarCollapsed = parsed.sidebarCollapsed;
+				if (typeof parsed.mailListWidth === 'number') mailListWidth = parsed.mailListWidth;
 			}
-		});
+		} catch {
+			// Ignore invalid localStorage data
+		}
 
 		// Mobile detection
 		const mq = window.matchMedia('(max-width: 768px)');
@@ -131,14 +127,13 @@
 	}
 </script>
 
-<div class="flex h-screen w-screen overflow-hidden bg-bg-primary text-text">
+<div class="flex flex-col h-screen w-screen overflow-hidden">
+	<!-- Custom Titlebar -->
+	<Titlebar />
+
+	<div class="flex flex-1 overflow-hidden bg-zinc-50 text-zinc-900 font-sans">
 	{#if isMobile && mobileView === 'list'}
-		<!-- Mobile: hamburger menu -->
-		<div class="fixed top-0 left-0 z-20 flex h-12 items-center px-3">
-			<Button variant="ghost" size="icon-sm" onclick={toggleSidebar} aria-label="Open sidebar">
-				<Menu class="size-4" />
-			</Button>
-		</div>
+		<!-- Mobile: sidebar overlay when needed -->
 	{/if}
 
 	<Sidebar
@@ -160,7 +155,7 @@
 				width={undefined}
 			/>
 		{:else}
-			<ReadingPane mail={selectedMail} {isMobile} onBack={goBackToList} />
+			<ReadingPane mail={selectedMail} {isMobile} onBack={goBackToList} onRefresh={loadMails} />
 		{/if}
 	{:else}
 		<MailList
@@ -171,6 +166,7 @@
 			width={mailListWidth}
 		/>
 		<Resizer {onResize} {onResizeEnd} />
-		<ReadingPane mail={selectedMail} {isMobile} onBack={goBackToList} />
+		<ReadingPane mail={selectedMail} {isMobile} onBack={goBackToList} onRefresh={loadMails} />
 	{/if}
+</div>
 </div>

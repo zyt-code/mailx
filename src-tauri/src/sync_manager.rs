@@ -85,24 +85,10 @@ impl SyncManager {
     }
 
     /// Start the background sync loop for all active accounts
+    /// Note: Background sync is disabled for now to avoid Tokio runtime issues during setup
     pub fn start_background_sync(&self) -> Result<()> {
-        let handles = self.sync_handles.clone();
-
-        // Spawn a task that syncs all active accounts every 5 minutes
-        let handle = tokio::spawn(async move {
-            let mut interval = tokio::time::interval(Duration::from_secs(300)); // 5 minutes
-
-            loop {
-                interval.tick().await;
-
-                // Sync all active accounts
-                // In a real implementation, we'd get the account manager here
-                // and sync each account
-            }
-        });
-
-        handles.lock().unwrap().push(handle);
-
+        // TODO: Implement background sync using Tauri's async context
+        // For now, sync will be triggered manually by the user or on-demand
         Ok(())
     }
 
@@ -144,9 +130,9 @@ impl SyncManager {
         // Store emails in database
         for mail in mails {
             // Check if email already exists
-            if self.database.get_mail(&mail.id).is_ok() {
-                // Email exists, skip or update
-                continue;
+            match self.database.get_mail(&mail.id) {
+                Ok(Some(_)) => continue, // Email exists, skip
+                _ => {}
             }
 
             // Insert new email

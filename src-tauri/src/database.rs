@@ -11,6 +11,18 @@ pub struct EmailAddress {
     pub email: String,
 }
 
+/// Attachment structure for email attachments
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct Attachment {
+    pub id: String,
+    pub mail_id: String,
+    pub file_name: String,
+    pub content_type: String,
+    pub size: i64,
+    pub stored_path: String,
+    pub created_at: i64,
+}
+
 /// Mail structure matching frontend types
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Mail {
@@ -29,6 +41,16 @@ pub struct Mail {
     pub cc: Option<Vec<EmailAddress>>,
     #[serde(default)]
     pub bcc: Option<Vec<EmailAddress>>,
+    #[serde(default)]
+    pub html_body: Option<String>,
+    #[serde(default)]
+    pub reply_to: Option<Vec<EmailAddress>>,
+    #[serde(default)]
+    pub attachments: Option<Vec<Attachment>>,
+    #[serde(default)]
+    pub starred: Option<bool>,
+    #[serde(default)]
+    pub has_attachments: Option<bool>,
 }
 
 /// Database wrapper for SQLite operations
@@ -55,6 +77,7 @@ impl Database {
 
         let db_path = app_data_dir.join("mailx.db");
         let conn = Connection::open(db_path)?;
+        conn.execute_batch("PRAGMA journal_mode=WAL")?;
 
         let db = Database { conn: Mutex::new(conn) };
         db.init_schema()?;
@@ -96,12 +119,13 @@ impl Database {
             [],
         )?;
 
-        // Seed initial data if database is empty
         drop(conn); // Release lock before calling seed_initial_data
-        self.seed_initial_data()?;
 
-        // Run any schema migrations
+        // Run any schema migrations BEFORE seeding
         self.run_migrations()?;
+
+        // Seed initial data if database is empty
+        self.seed_initial_data()?;
 
         Ok(())
     }
@@ -124,6 +148,18 @@ impl Database {
 
         // Add uid column if not exists
         conn.execute("ALTER TABLE mails ADD COLUMN uid INTEGER", []).ok();
+
+        // Add html_body column if not exists (Phase 1)
+        conn.execute("ALTER TABLE mails ADD COLUMN html_body TEXT", []).ok();
+
+        // Add reply_to_json column if not exists (Phase 1)
+        conn.execute("ALTER TABLE mails ADD COLUMN reply_to_json TEXT", []).ok();
+
+        // Add starred column if not exists (Phase 1)
+        conn.execute("ALTER TABLE mails ADD COLUMN starred INTEGER DEFAULT 0", []).ok();
+
+        // Add has_attachments column if not exists (Phase 1)
+        conn.execute("ALTER TABLE mails ADD COLUMN has_attachments INTEGER DEFAULT 0", []).ok();
 
         // Create accounts table
         conn.execute(
@@ -229,12 +265,17 @@ impl Database {
                 subject: "Project update for Q1".to_string(),
                 preview: "Hi team, here is the latest update on our Q1 goals...".to_string(),
                 body: "Hi team,\n\nHere is the latest update on our Q1 goals. We have completed 80% of the planned features and are on track to deliver by the end of March.\n\nKey highlights:\n- Authentication module is complete\n- Dashboard redesign is in review\n- API performance improved by 40%\n\nPlease review the attached report and let me know if you have any questions.\n\nBest,\nAlice".to_string(),
+                html_body: Some("<p>Hi team,</p><p>Here is the latest update on our Q1 goals. We have completed <strong>80%</strong> of the planned features and are on track to deliver by the end of March.</p><p>Key highlights:</p><ul><li>Authentication module is <strong>complete</strong></li><li>Dashboard redesign is in review</li><li>API performance improved by <em>40%</em></li></ul><p>Please review the attached report and let me know if you have any questions.</p><p>Best,<br>Alice</p>".to_string()),
                 timestamp: now - (4 * 60 * 60 * 1000), // 4 hours ago
                 folder: "inbox".to_string(),
                 unread: true,
                 to: None,
                 cc: None,
                 bcc: None,
+                reply_to: None,
+                attachments: None,
+                starred: Some(false),
+                has_attachments: Some(true),
             },
             Mail {
                 id: "2".to_string(),
@@ -243,12 +284,17 @@ impl Database {
                 subject: "Meeting notes".to_string(),
                 preview: "Attached are the meeting notes from yesterday's standup...".to_string(),
                 body: "Hi everyone,\n\nAttached are the meeting notes from yesterday's standup. Here's a quick summary:\n\n1. Sprint progress is at 65%\n2. Two blockers identified — need design review for the new sidebar and API endpoint for mail sync\n3. Next demo is scheduled for Friday\n\nAction items:\n- Alice: Finalize Q1 report\n- Carol: Update mockups\n- David: Send invoices\n\nThanks,\nBob".to_string(),
+                html_body: None,
                 timestamp: now - (5 * 60 * 60 * 1000), // 5 hours ago
                 folder: "inbox".to_string(),
                 unread: true,
                 to: None,
                 cc: None,
                 bcc: None,
+                reply_to: None,
+                attachments: None,
+                starred: Some(true),
+                has_attachments: Some(false),
             },
             Mail {
                 id: "3".to_string(),
@@ -257,12 +303,17 @@ impl Database {
                 subject: "Design review feedback".to_string(),
                 preview: "Great work on the mockups! I have a few suggestions...".to_string(),
                 body: "Great work on the mockups! I have a few suggestions:\n\n1. The sidebar could use more contrast between active and inactive states\n2. Consider adding a subtle animation for the panel resize\n3. The mobile layout should stack vertically rather than hiding the mail list\n\nOverall the direction looks fantastic. Let me know when you have an updated version and I will do another pass.\n\nCheers,\nCarol".to_string(),
+                html_body: None,
                 timestamp: now - one_day,
                 folder: "inbox".to_string(),
                 unread: false,
                 to: None,
                 cc: None,
                 bcc: None,
+                reply_to: None,
+                attachments: None,
+                starred: Some(false),
+                has_attachments: Some(false),
             },
             Mail {
                 id: "4".to_string(),
@@ -271,12 +322,17 @@ impl Database {
                 subject: "Invoice #1234".to_string(),
                 preview: "Please find the invoice for March attached...".to_string(),
                 body: "Hi,\n\nPlease find the invoice for March attached. The total amount is $4,500 for the consulting services provided.\n\nPayment terms: Net 30\nDue date: April 15, 2026\n\nLet me know if you need any adjustments.\n\nRegards,\nDavid Lee".to_string(),
+                html_body: None,
                 timestamp: now - two_days,
                 folder: "inbox".to_string(),
                 unread: false,
                 to: None,
                 cc: None,
                 bcc: None,
+                reply_to: None,
+                attachments: None,
+                starred: Some(false),
+                has_attachments: Some(true),
             },
             Mail {
                 id: "5".to_string(),
@@ -285,12 +341,17 @@ impl Database {
                 subject: "Welcome to the team!".to_string(),
                 preview: "We are thrilled to have you join us. Here is what...".to_string(),
                 body: "Welcome to the team!\n\nWe are thrilled to have you join us. Here is what you need to get started:\n\n1. Set up your development environment using the README\n2. Join our Slack channels: #general, #engineering, #random\n3. Schedule a 1:1 with your manager\n4. Complete the onboarding checklist in Notion\n\nIf you have any questions, do not hesitate to reach out. We are here to help!\n\nBest,\nEve".to_string(),
+                html_body: None,
                 timestamp: now - four_days,
                 folder: "inbox".to_string(),
                 unread: false,
                 to: None,
                 cc: None,
                 bcc: None,
+                reply_to: None,
+                attachments: None,
+                starred: Some(false),
+                has_attachments: Some(false),
             },
             Mail {
                 id: "6".to_string(),
@@ -299,6 +360,7 @@ impl Database {
                 subject: "Re: Project update for Q1".to_string(),
                 preview: "Thanks for the update, Alice. Looks great!".to_string(),
                 body: "Thanks for the update, Alice. Looks great!\n\nI reviewed the report and everything is on track. Let us schedule a quick sync on Wednesday to discuss the remaining 20%.\n\nBest regards".to_string(),
+                html_body: None,
                 timestamp: now - (3 * 60 * 60 * 1000), // 3 hours ago
                 folder: "sent".to_string(),
                 unread: false,
@@ -308,6 +370,10 @@ impl Database {
                 }]),
                 cc: None,
                 bcc: None,
+                reply_to: None,
+                attachments: None,
+                starred: Some(false),
+                has_attachments: Some(false),
             },
             Mail {
                 id: "7".to_string(),
@@ -316,6 +382,7 @@ impl Database {
                 subject: "Draft: Team offsite planning".to_string(),
                 preview: "Ideas for the upcoming team offsite in April...".to_string(),
                 body: "Ideas for the upcoming team offsite in April:\n\n- Location: Mountain retreat or coastal venue\n- Duration: 2-3 days\n- Activities: Team building, strategy planning, hackathon\n- Budget: TBD\n\nNeed to finalize by end of month.".to_string(),
+                html_body: None,
                 timestamp: now - (6 * 24 * 60 * 60 * 1000), // 6 days ago
                 folder: "drafts".to_string(),
                 unread: false,
@@ -331,6 +398,10 @@ impl Database {
                 ]),
                 cc: None,
                 bcc: None,
+                reply_to: None,
+                attachments: None,
+                starred: Some(false),
+                has_attachments: Some(false),
             },
         ];
 
@@ -345,7 +416,7 @@ impl Database {
     pub fn get_mails(&self, folder: Option<String>) -> SqliteResult<Vec<Mail>> {
         let conn = self.conn.lock().unwrap();
 
-        let mut query = "SELECT id, from_name, from_email, subject, preview, body, timestamp, folder, unread, to_json, cc_json, bcc_json FROM mails".to_string();
+        let mut query = "SELECT id, from_name, from_email, subject, preview, body, timestamp, folder, unread, to_json, cc_json, bcc_json, html_body, reply_to_json, starred, has_attachments FROM mails".to_string();
         let mut mails: Vec<Mail> = Vec::new();
 
         if let Some(folder) = folder {
@@ -365,6 +436,11 @@ impl Database {
                     to: parse_json_addresses(row.get(9)?),
                     cc: parse_json_addresses(row.get(10)?),
                     bcc: parse_json_addresses(row.get(11)?),
+                    html_body: row.get(12)?,
+                    reply_to: parse_json_addresses(row.get(13)?),
+                    starred: Some(row.get::<_, i32>(14).unwrap_or(0) == 1),
+                    has_attachments: Some(row.get::<_, i32>(15).unwrap_or(0) == 1),
+                    attachments: None, // Loaded separately
                 })
             })?;
             for mail in mail_iter {
@@ -387,6 +463,11 @@ impl Database {
                     to: parse_json_addresses(row.get(9)?),
                     cc: parse_json_addresses(row.get(10)?),
                     bcc: parse_json_addresses(row.get(11)?),
+                    html_body: row.get(12)?,
+                    reply_to: parse_json_addresses(row.get(13)?),
+                    starred: Some(row.get::<_, i32>(14).unwrap_or(0) == 1),
+                    has_attachments: Some(row.get::<_, i32>(15).unwrap_or(0) == 1),
+                    attachments: None, // Loaded separately
                 })
             })?;
             for mail in mail_iter {
@@ -401,7 +482,7 @@ impl Database {
     pub fn get_mail(&self, id: &str) -> SqliteResult<Option<Mail>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT id, from_name, from_email, subject, preview, body, timestamp, folder, unread, to_json, cc_json, bcc_json
+            "SELECT id, from_name, from_email, subject, preview, body, timestamp, folder, unread, to_json, cc_json, bcc_json, html_body, reply_to_json, starred, has_attachments
              FROM mails WHERE id = ?1"
         )?;
 
@@ -419,6 +500,11 @@ impl Database {
                 to: parse_json_addresses(row.get(9)?),
                 cc: parse_json_addresses(row.get(10)?),
                 bcc: parse_json_addresses(row.get(11)?),
+                html_body: row.get(12)?,
+                reply_to: parse_json_addresses(row.get(13)?),
+                starred: Some(row.get::<_, i32>(14).unwrap_or(0) == 1),
+                has_attachments: Some(row.get::<_, i32>(15).unwrap_or(0) == 1),
+                attachments: None, // Loaded separately
             })
         });
 
@@ -436,9 +522,10 @@ impl Database {
         let to_json = serialize_addresses(&mail.to);
         let cc_json = serialize_addresses(&mail.cc);
         let bcc_json = serialize_addresses(&mail.bcc);
+        let reply_to_json = serialize_addresses(&mail.reply_to);
         conn.execute(
-            "INSERT INTO mails (id, from_name, from_email, subject, preview, body, timestamp, folder, unread, created_at, to_json, cc_json, bcc_json)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
+            "INSERT INTO mails (id, from_name, from_email, subject, preview, body, timestamp, folder, unread, created_at, to_json, cc_json, bcc_json, html_body, reply_to_json, starred, has_attachments)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)",
             params![
                 &mail.id,
                 &mail.from_name,
@@ -453,6 +540,10 @@ impl Database {
                 to_json,
                 cc_json,
                 bcc_json,
+                &mail.html_body,
+                reply_to_json,
+                if mail.starred.unwrap_or(false) { 1 } else { 0 },
+                if mail.has_attachments.unwrap_or(false) { 1 } else { 0 },
             ],
         )?;
         Ok(())
@@ -464,6 +555,7 @@ impl Database {
         let to_json = serialize_addresses(&mail.to);
         let cc_json = serialize_addresses(&mail.cc);
         let bcc_json = serialize_addresses(&mail.bcc);
+        let reply_to_json = serialize_addresses(&mail.reply_to);
         conn.execute(
             "UPDATE mails SET
              from_name = ?1,
@@ -476,8 +568,12 @@ impl Database {
              unread = ?8,
              to_json = ?9,
              cc_json = ?10,
-             bcc_json = ?11
-             WHERE id = ?12",
+             bcc_json = ?11,
+             html_body = ?12,
+             reply_to_json = ?13,
+             starred = ?14,
+             has_attachments = ?15
+             WHERE id = ?16",
             params![
                 &mail.from_name,
                 &mail.from_email,
@@ -490,6 +586,10 @@ impl Database {
                 to_json,
                 cc_json,
                 bcc_json,
+                &mail.html_body,
+                reply_to_json,
+                if mail.starred.unwrap_or(false) { 1 } else { 0 },
+                if mail.has_attachments.unwrap_or(false) { 1 } else { 0 },
                 &mail.id,
             ],
         )?;
@@ -526,6 +626,36 @@ impl Database {
                 params![id],
             )?;
         }
+        Ok(())
+    }
+
+    /// Move a mail to archive folder
+    pub fn archive_mail(&self, id: &str) -> SqliteResult<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE mails SET folder = 'archive' WHERE id = ?1",
+            params![id],
+        )?;
+        Ok(())
+    }
+
+    /// Unarchive a mail (move back to inbox)
+    pub fn unarchive_mail(&self, id: &str) -> SqliteResult<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE mails SET folder = 'inbox' WHERE id = ?1",
+            params![id],
+        )?;
+        Ok(())
+    }
+
+    /// Toggle star status for a mail
+    pub fn toggle_star(&self, id: &str, starred: bool) -> SqliteResult<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE mails SET starred = ?1 WHERE id = ?2",
+            params![if starred { 1 } else { 0 }, id],
+        )?;
         Ok(())
     }
 }

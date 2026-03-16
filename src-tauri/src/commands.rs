@@ -1,12 +1,21 @@
 use crate::accounts::{Account, AccountManager, ImapConfig, SmtpConfig};
 use crate::credentials::CredentialManager;
 use crate::database::{Database, Mail};
+use crate::html_sanitize;
 use crate::imap_client::ImapClient;
 use crate::smtp_client::SmtpClient;
 use crate::sync_manager::{SyncManager, SyncStatus};
 use serde_json::json;
 use tauri::{AppHandle, Emitter, State};
 use std::sync::{Arc, Mutex};
+
+/// Sanitize html_body field on a Mail if present
+fn sanitize_mail_html(mut mail: Mail) -> Mail {
+    if let Some(ref html) = mail.html_body {
+        mail.html_body = Some(html_sanitize::sanitize_html(html));
+    }
+    mail
+}
 
 /// Get all mails, optionally filtered by folder
 #[tauri::command]
@@ -15,6 +24,7 @@ pub fn get_mails(
     db: State<'_, Database>,
 ) -> Result<Vec<Mail>, String> {
     db.inner().get_mails(folder)
+        .map(|mails| mails.into_iter().map(sanitize_mail_html).collect())
         .map_err(|e| format!("Failed to get mails: {}", e))
 }
 
@@ -26,6 +36,7 @@ pub fn get_mail(
 ) -> Result<Mail, String> {
     db.inner().get_mail(&id)
         .map_err(|e| format!("Failed to get mail: {}", e))?
+        .map(sanitize_mail_html)
         .ok_or_else(|| format!("Mail with id '{}' not found", id))
 }
 
@@ -80,6 +91,37 @@ pub fn move_to_trash(
 ) -> Result<(), String> {
     db.inner().move_to_trash(&id, &current_folder)
         .map_err(|e| format!("Failed to move mail to trash: {}", e))
+}
+
+/// Archive a mail
+#[tauri::command]
+pub fn archive_mail(
+    id: String,
+    db: State<'_, Database>,
+) -> Result<(), String> {
+    db.inner().archive_mail(&id)
+        .map_err(|e| format!("Failed to archive mail: {}", e))
+}
+
+/// Unarchive a mail (move back to inbox)
+#[tauri::command]
+pub fn unarchive_mail(
+    id: String,
+    db: State<'_, Database>,
+) -> Result<(), String> {
+    db.inner().unarchive_mail(&id)
+        .map_err(|e| format!("Failed to unarchive mail: {}", e))
+}
+
+/// Toggle star status for a mail
+#[tauri::command]
+pub fn toggle_star(
+    id: String,
+    starred: bool,
+    db: State<'_, Database>,
+) -> Result<(), String> {
+    db.inner().toggle_star(&id, starred)
+        .map_err(|e| format!("Failed to toggle star: {}", e))
 }
 
 // ============================================================================

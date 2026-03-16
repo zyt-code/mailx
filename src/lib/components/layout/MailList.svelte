@@ -2,7 +2,7 @@
 	import { cn } from '$lib/utils.js';
 	import ScrollArea from '$lib/components/ui/scroll-area/scroll-area.svelte';
 	import Input from '$lib/components/ui/input/input.svelte';
-	import { Search } from 'lucide-svelte';
+	import { Search, Star, Paperclip } from 'lucide-svelte';
 	import type { Mail, Folder } from '$lib/types.js';
 
 	interface Props {
@@ -37,28 +37,37 @@
 		inbox: 'Inbox',
 		sent: 'Sent',
 		drafts: 'Drafts',
-		trash: 'Trash'
+		trash: 'Trash',
+		archive: 'Archive'
 	};
 
+	// Professional date formatting
 	function formatMailTime(timestamp: number): string {
-		const now = Date.now();
-		const diff = now - timestamp;
-		const oneDay = 24 * 60 * 60 * 1000;
-		const oneWeek = 7 * oneDay;
+		const now = new Date();
+		const mailDate = new Date(timestamp);
 
-		if (diff < oneDay) {
-			// Show time for today's emails
-			return new Date(timestamp).toLocaleTimeString('en-US', {
+		// Reset time to compare dates only
+		const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+		const mailDay = new Date(mailDate.getFullYear(), mailDate.getMonth(), mailDate.getDate());
+
+		const diffDays = Math.floor((today.getTime() - mailDay.getTime()) / (1000 * 60 * 60 * 24));
+
+		if (diffDays === 0) {
+			// Today: show time
+			return mailDate.toLocaleTimeString('en-US', {
 				hour: 'numeric',
 				minute: '2-digit',
 				hour12: true
 			});
-		} else if (diff < oneWeek) {
-			// Show day of week for this week
-			return new Date(timestamp).toLocaleDateString('en-US', { weekday: 'short' });
+		} else if (diffDays === 1) {
+			// Yesterday
+			return 'Yesterday';
+		} else if (diffDays < 7) {
+			// This week: show day name
+			return mailDate.toLocaleDateString('en-US', { weekday: 'short' });
 		} else {
-			// Show date for older emails
-			return new Date(timestamp).toLocaleDateString('en-US', {
+			// Older: show date
+			return mailDate.toLocaleDateString('en-US', {
 				month: 'short',
 				day: 'numeric'
 			});
@@ -67,17 +76,17 @@
 </script>
 
 <div
-	class="flex h-full flex-col border-r border-border bg-bg-primary"
+	class="flex h-full flex-col border-r border-zinc-200/60 bg-white/60 backdrop-blur-sm"
 	style:width={width !== undefined ? `${width}px` : undefined}
 	class:w-full={width === undefined}
 >
-	<!-- Header -->
-	<div class="flex items-center gap-2 border-b border-border p-3" class:pl-12={width === undefined}>
-		<Search class="size-4 text-text-muted shrink-0" />
+	<!-- Header with Search -->
+	<div class="flex items-center gap-2.5 border-b border-zinc-200/60 p-4">
+		<Search class="size-4 text-zinc-400 shrink-0" />
 		<Input
 			type="search"
 			placeholder="Search {folderLabels[activeFolder].toLowerCase()}..."
-			class="h-8 border-none shadow-none focus-visible:ring-0"
+			class="h-8 border-none bg-transparent shadow-none focus-visible:ring-0 placeholder:text-zinc-400 text-sm"
 			bind:value={searchQuery}
 		/>
 	</div>
@@ -85,37 +94,77 @@
 	<!-- Mail items -->
 	<ScrollArea class="flex-1">
 		{#if filteredMails.length === 0}
-			<div class="flex h-32 items-center justify-center">
-				<p class="text-sm text-text-muted">No emails found</p>
+			<div class="flex h-40 flex-col items-center justify-center p-8">
+				<Search class="size-10 text-zinc-300 mb-3" />
+				<p class="text-sm font-medium text-zinc-500">No emails found</p>
+				<p class="text-xs text-zinc-400 mt-1">Try a different search term</p>
 			</div>
 		{:else}
-			<div class="divide-y divide-border">
+			<div class="divide-y divide-zinc-100/80">
 				{#each filteredMails as mail}
 					<button
 						class={cn(
-							'flex w-full flex-col gap-1 p-3 text-left transition-colors',
+							'group relative flex w-full gap-3 p-4 text-left transition-all duration-200',
 							mail.id === selectedMailId
-								? 'bg-accent/10 border-l-2 border-l-accent'
-								: 'hover:bg-bg-hover',
-							mail.unread && mail.id !== selectedMailId && 'bg-bg-secondary'
+								? 'bg-white'
+								: 'hover:bg-zinc-100/50',
+							mail.unread && mail.id !== selectedMailId && 'bg-zinc-50/40'
 						)}
 						onclick={() => onSelectMail(mail.id)}
 					>
-						<div class="flex items-center justify-between">
-							<div class="flex items-center gap-2">
-								{#if mail.unread}
-									<span class="size-2 rounded-full bg-accent shrink-0"></span>
-								{/if}
+						<!-- Unread indicator -->
+						<div class="flex-shrink-0 pt-1">
+							{#if mail.unread && mail.id !== selectedMailId}
+								<div class="size-2 rounded-full bg-blue-500"></div>
+							{:else}
+								<div class="size-2"></div>
+							{/if}
+						</div>
+
+						<!-- Main content -->
+						<div class="flex-1 min-w-0">
+							<!-- Sender row with date -->
+							<div class="flex items-start justify-between gap-2 mb-1">
 								<span
-									class={cn('text-sm text-text', mail.unread && 'font-semibold')}
+									class={cn(
+										'truncate text-sm font-semibold',
+										mail.unread && mail.id !== selectedMailId
+											? 'text-zinc-900'
+											: 'text-zinc-700'
+									)}
 								>
 									{mail.from_name}
 								</span>
+								<span class="text-xs text-zinc-400 tabular-nums shrink-0">
+									{formatMailTime(mail.timestamp)}
+								</span>
 							</div>
-							<span class="text-xs text-text-muted">{formatMailTime(mail.timestamp)}</span>
+
+							<!-- Subject -->
+							<div class={cn(
+								'truncate text-sm mb-1 leading-snug font-medium',
+								mail.unread && mail.id !== selectedMailId
+									? 'font-semibold text-zinc-800'
+									: 'text-zinc-600'
+							)}>
+								{mail.subject}
+							</div>
+
+							<!-- Preview -->
+							<p class="line-clamp-2 text-xs text-zinc-400 leading-relaxed">
+								{mail.preview}
+							</p>
 						</div>
-						<span class="text-sm text-text">{mail.subject}</span>
-						<span class="truncate text-xs text-text-muted">{mail.preview}</span>
+
+						<!-- Actions column -->
+						<div class="flex flex-col items-end gap-1 flex-shrink-0">
+							{#if mail.starred}
+								<Star class="size-4 fill-amber-400 text-amber-400" />
+							{/if}
+							{#if mail.has_attachments}
+								<Paperclip class="size-3.5 text-zinc-400" />
+							{/if}
+						</div>
 					</button>
 				{/each}
 			</div>

@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { cn } from '$lib/utils.js';
+
 	interface Props {
 		onResize: (deltaX: number) => void;
 		onResizeEnd: () => void;
@@ -52,10 +54,25 @@
 	role="separator"
 	aria-orientation="vertical"
 	tabindex="0"
-	class="w-1.5 shrink-0 cursor-col-resize bg-transparent hover:bg-border active:bg-accent transition-colors"
-	class:bg-accent={dragging}
+	class={cn(
+		'w-1.5 shrink-0 cursor-col-resize transition-all duration-200 relative',
+		dragging
+			? 'bg-zinc-300'
+			: 'bg-transparent hover:bg-zinc-200/80'
+	)}
 	onpointerdown={onPointerDown}
 	onpointermove={onPointerMove}
 	onpointerup={onPointerUp}
 	onkeydown={onKeyDown}
-></div>
+>
+	<!-- Visual indicator on hover/drag -->
+	{#if dragging}
+		<div class="absolute inset-0 flex items-center justify-center">
+			<div class="w-0.5 h-12 bg-zinc-400 rounded-full"></div>
+		</div>
+	{:else}
+		<div class="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity pointer-events-none">
+			<div class="w-0.5 h-8 bg-zinc-400 rounded-full"></div>
+		</div>
+	{/if}
+</div>

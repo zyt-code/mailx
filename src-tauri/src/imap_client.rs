@@ -1,6 +1,6 @@
 use crate::accounts::ImapConfig;
 use crate::database::{EmailAddress, Mail};
-use mail_parser::Message;
+use mail_parser::{Message, MessageParser};
 use thiserror::Error;
 
 /// IMAP client errors
@@ -65,48 +65,36 @@ impl ImapClient {
 
     /// Connect to the IMAP server and test authentication
     pub async fn test_connection(&self) -> Result<()> {
-        use imap::{Client as ImapClient, types::Fetch};
-        use native_tls::TlsConnector;
-
-        let addr = format!("{}:{}", self.config.server, self.config.port);
-
-        // Create TLS connector
-        let tls = TlsConnector::builder()
+        let tls = native_tls::TlsConnector::builder()
             .build()
             .map_err(|e| ImapError::Tls(format!("Failed to create TLS connector: {}", e)))?;
 
-        // Connect to the server
-        let client = tokio::task::spawn_blocking({
-            let addr = addr.clone();
-            move || {
-                ImapClient::builder()
-                    .addr(&addr)
-                    .connect(tls)
-            }
+        let server = self.config.server.clone();
+        let port = self.config.port;
+        let email = self.email.clone();
+        let password = self.password.clone();
+
+        tokio::task::spawn_blocking(move || {
+            let addr = (server.as_str(), port);
+            let client = imap::connect(addr, addr.0, &tls)
+                .map_err(|e| ImapError::ConnectionFailed(format!("Failed to connect: {}", e)))?;
+
+            let mut session = client
+                .login(&email, &password)
+                .map_err(|(e, _)| ImapError::AuthenticationFailed(format!("Login failed: {}", e)))?;
+
+            session
+                .select("INBOX")
+                .map_err(|e| ImapError::Protocol(format!("Failed to select INBOX: {}", e)))?;
+
+            session
+                .logout()
+                .map_err(|e| ImapError::Protocol(format!("Logout failed: {}", e)))?;
+
+            Ok(())
         })
         .await
         .map_err(|e| ImapError::ConnectionFailed(format!("Connection task failed: {}", e)))?
-        .map_err(|e| ImapError::ConnectionFailed(format!("Failed to connect to {}: {}", addr, e)))?;
-
-        // Login
-        let mut client = client
-            .login(&self.email, &self.password)
-            .map_err(|e| match e {
-                imap::error::Error::Login { .. } => ImapError::InvalidCredentials,
-                _ => ImapError::AuthenticationFailed(format!("Login failed: {}", e)),
-            })?;
-
-        // Try to select INBOX
-        client
-            .select("INBOX")
-            .map_err(|e| ImapError::Protocol(format!("Failed to select INBOX: {}", e)))?;
-
-        // Logout
-        client
-            .logout()
-            .map_err(|e| ImapError::Protocol(format!("Logout failed: {}", e)))?;
-
-        Ok(())
     }
 
     /// Fetch emails from a folder since a specific UID
@@ -136,57 +124,44 @@ impl ImapClient {
         folder: &str,
         limit: usize,
     ) -> Result<Vec<Mail>> {
-        use imap::types::{Fetch, Flag};
-
-        let addr = format!("{}:{}", config.server, config.port);
-
-        // Create TLS connector
-        let tls = TlsConnector::builder()
+        let tls = native_tls::TlsConnector::builder()
             .build()
             .map_err(|e| ImapError::Tls(format!("Failed to create TLS connector: {}", e)))?;
 
-        // Connect to the server
-        let client = imap::Client::builder()
-            .addr(&addr)
-            .connect(tls)
+        let addr = (config.server.as_str(), config.port);
+
+        let client = imap::connect(addr, addr.0, &tls)
             .map_err(|e| ImapError::ConnectionFailed(format!("Failed to connect: {}", e)))?;
 
-        // Login
-        let mut client = client
+        let mut session = client
             .login(&email, &password)
-            .map_err(|e| match e {
-                imap::error::Error::Login { .. } => ImapError::InvalidCredentials,
-                _ => ImapError::AuthenticationFailed(format!("Login failed: {}", e)),
-            })?;
+            .map_err(|(e, _)| ImapError::AuthenticationFailed(format!("Login failed: {}", e)))?;
 
-        // Select folder
-        let mailbox = client
+        let mailbox = session
             .select(folder)
             .map_err(|e| ImapError::Protocol(format!("Failed to select folder '{}': {}", folder, e)))?;
 
         // Get recent emails
-        let max_uid = mailbox.uid_next.unwrap_or(0);
-        let start_uid = max_uid.saturating_sub(limit as u32);
-        let uid_range = if start_uid == 0 {
-            format!("1:*")
+        let exists = mailbox.exists;
+        let start = if exists > limit as u32 {
+            exists - limit as u32 + 1
         } else {
-            format!("{}:*", start_uid)
+            1
         };
+        let range = format!("{}:{}", start, exists);
 
-        // Fetch the emails
-        let fetch_results = client
-            .uid_fetch(format!("{}", uid_range), "(RFC822 UID FLAGS)")
+        let fetch_results = session
+            .fetch(range, "(RFC822 UID FLAGS)")
             .map_err(|e| ImapError::FetchFailed(format!("Fetch failed: {}", e)))?;
 
         let mut mails = Vec::new();
-        for fetch in fetch_results {
-            if let Ok(mail) = Self::parse_fetch_response(&fetch, folder) {
+        for fetch in fetch_results.iter() {
+            if let Ok(mail) = Self::parse_fetch_response(fetch, folder) {
                 mails.push(mail);
             }
         }
 
-        // Logout
-        client
+        session
             .logout()
             .map_err(|e| ImapError::Protocol(format!("Logout failed: {}", e)))?;
 
@@ -195,8 +170,6 @@ impl ImapClient {
 
     /// Parse a fetch response into a Mail structure
     fn parse_fetch_response(fetch: &imap::types::Fetch, folder: &str) -> Result<Mail> {
-        use imap::types::Flag;
-
         // Get the UID
         let uid = fetch.uid.ok_or_else(|| {
             ImapError::ParseError("No UID in fetch response".to_string())
@@ -208,23 +181,23 @@ impl ImapClient {
         })?;
 
         // Parse the email using mail-parser
-        let message = Message::parse(body)
+        let message = MessageParser::default().parse(body)
             .ok_or_else(|| ImapError::ParseError("Failed to parse email".to_string()))?;
 
-        // Extract headers
-        let from = message.from().and_then(|f| f.first()).ok_or_else(|| {
-            ImapError::ParseError("No from address".to_string())
-        })?;
-
-        let from_name = from.name().unwrap_or("").to_string();
-        let from_email = from.address().to_string();
+        // Extract from address
+        let from_addr = message.from();
+        let (from_name, from_email) = Self::extract_first_address(from_addr);
 
         let subject = message.subject().unwrap_or("").to_string();
+
+        // Extract bodies
         let body_text = Self::extract_body_text(&message);
+        let html_body = message.body_html(0).map(|h| h.to_string());
         let preview = Self::create_preview(&body_text);
 
         // Get flags for read/unread status
-        let is_seen = fetch.flags.contains(&Flag::Seen);
+        let flags = fetch.flags();
+        let is_seen = flags.iter().any(|f| matches!(f, imap::types::Flag::Seen));
 
         // Generate unique ID
         let id = Self::generate_id(&from_email, uid);
@@ -232,12 +205,21 @@ impl ImapClient {
         // Get timestamp
         let timestamp = message
             .date()
-            .and_then(|d| {
-                chrono::DateTime::parse_from_rfc2822(d)
-                    .ok()
+            .map(|d| {
+                chrono::DateTime::from_timestamp(d.to_timestamp(), 0)
                     .map(|dt| dt.timestamp_millis())
+                    .unwrap_or_else(|| chrono::Utc::now().timestamp_millis())
             })
             .unwrap_or_else(|| chrono::Utc::now().timestamp_millis());
+
+        // Parse recipients
+        let to = Self::extract_from_address(message.to());
+        let cc = Self::extract_from_address(message.cc());
+        let bcc = Self::extract_from_address(message.bcc());
+        let reply_to = Self::extract_from_address(message.reply_to());
+
+        // Check for attachments
+        let attachment_count = message.attachment_count();
 
         Ok(Mail {
             id,
@@ -246,32 +228,34 @@ impl ImapClient {
             subject,
             preview,
             body: body_text,
+            html_body,
             timestamp,
             folder: folder.to_string(),
             unread: !is_seen,
-            to: Self::parse_address_list(message.to()),
-            cc: Self::parse_address_list(message.cc()),
-            bcc: Self::parse_address_list(message.bcc()),
+            to,
+            cc,
+            bcc,
+            reply_to,
+            attachments: None,
+            starred: Some(false),
+            has_attachments: Some(attachment_count > 0),
         })
     }
 
     /// Extract plain text body from an email
     fn extract_body_text(message: &Message) -> String {
         // Try to get plain text part first
-        if let Some(text) = message.text_body(0) {
+        if let Some(text) = message.body_text(0) {
             return text.to_string();
         }
 
         // Fall back to HTML body (stripped)
-        if let Some(html) = message.html_body(0) {
-            return Self::strip_html(html);
+        if let Some(html) = message.body_html(0) {
+            return Self::strip_html(&html);
         }
 
-        // Fall back to raw body
-        message
-            .body()
-            .map(|b| String::from_utf8_lossy(b).to_string())
-            .unwrap_or_else(|| "".to_string())
+        // No body available
+        String::new()
     }
 
     /// Create a preview snippet from the body text
@@ -319,23 +303,61 @@ impl ImapClient {
         result
     }
 
-    /// Parse an address list from the email message
-    fn parse_address_list(addresses: Option<&[mail_parser::Address]>) -> Option<Vec<EmailAddress>> {
-        addresses.map(|addrs| {
-            addrs
-                .iter()
-                .filter_map(|addr| {
-                    if let Some(email) = addr.address() {
-                        Some(EmailAddress {
+    /// Extract the first address from an Address enum
+    fn extract_first_address(address: Option<&mail_parser::Address>) -> (String, String) {
+        match address {
+            Some(mail_parser::Address::List(addrs)) if !addrs.is_empty() => {
+                let addr = &addrs[0];
+                let name = addr.name().unwrap_or("").to_string();
+                let email = addr.address().unwrap_or("unknown@unknown").to_string();
+                (name, email)
+            }
+            Some(mail_parser::Address::Group(groups)) if !groups.is_empty() => {
+                // Get the first group and its first address
+                let group = &groups[0];
+                if let Some(addr) = group.addresses.first() {
+                    let name = addr.name().unwrap_or("").to_string();
+                    let email = addr.address().unwrap_or("unknown@unknown").to_string();
+                    (name, email)
+                } else {
+                    ("Unknown".to_string(), "unknown@unknown".to_string())
+                }
+            }
+            _ => ("Unknown".to_string(), "unknown@unknown".to_string()),
+        }
+    }
+
+    /// Extract addresses from an Address enum (can be a list or group)
+    fn extract_from_address(address: Option<&mail_parser::Address>) -> Option<Vec<EmailAddress>> {
+        match address {
+            Some(mail_parser::Address::List(addrs)) => {
+                let list: Vec<EmailAddress> = addrs
+                    .iter()
+                    .filter_map(|addr| {
+                        addr.address().map(|email| EmailAddress {
                             name: addr.name().unwrap_or("").to_string(),
                             email: email.to_string(),
                         })
-                    } else {
-                        None
-                    }
-                })
-                .collect()
-        })
+                    })
+                    .collect();
+                if list.is_empty() { None } else { Some(list) }
+            }
+            Some(mail_parser::Address::Group(groups)) => {
+                let list: Vec<EmailAddress> = groups
+                    .iter()
+                    .flat_map(|group| {
+                        group.addresses.iter().filter_map(|addr| {
+                            addr.address().map(|email| EmailAddress {
+                                name: addr.name().unwrap_or("").to_string(),
+                                email: email.to_string(),
+                            })
+                        })
+                    })
+                    .collect();
+                if list.is_empty() { None } else { Some(list) }
+            }
+            None => None,
+        }
     }
 
     /// Generate a unique ID for an email
@@ -347,16 +369,6 @@ impl ImapClient {
         from_email.hash(&mut hasher);
         uid.hash(&mut hasher);
         format!("{:x}", hasher.finish())
-    }
-}
-
-impl Clone for ImapConfig {
-    fn clone(&self) -> Self {
-        Self {
-            server: self.server.clone(),
-            port: self.port,
-            use_ssl: self.use_ssl,
-        }
     }
 }
 
