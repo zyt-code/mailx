@@ -125,12 +125,12 @@
 			</ScrollArea>
 		</div>
 	{:else}
-		<!-- Empty State - Notion minimal -->
+		<!-- Empty State - Linear minimal -->
 		<div class="flex h-full w-full items-center justify-center">
 			<div class="flex flex-col items-center gap-3 text-center">
-				<MailIcon class="size-8 text-zinc-200" strokeWidth={1} />
+				<MailIcon class="size-6 text-zinc-300 opacity-20" strokeWidth={1.5} />
 				<div>
-					<p class="text-[13px] text-zinc-400">Select an email to read</p>
+					<p class="text-[13px] text-zinc-400 leading-relaxed">Select an email to read</p>
 				</div>
 			</div>
 		</div>

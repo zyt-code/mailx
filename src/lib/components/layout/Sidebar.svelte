@@ -110,18 +110,18 @@
 		{/if}
 	</div>
 
-	<!-- Compose Button -->
+	<!-- Compose Button - Notion Mail subtle style -->
 	<div class="px-3 pb-4 pt-1">
 		<button
 			class={cn(
-				'group flex w-full items-center justify-center gap-2 rounded-lg bg-zinc-900 px-3 py-2 text-[13px] font-medium text-white hover:bg-zinc-800 active:scale-[0.98]',
+				'group flex w-full items-center justify-center gap-2 rounded-lg bg-white border border-zinc-200 shadow-sm px-3 py-2 text-[13px] font-medium text-zinc-700 hover:bg-zinc-50 hover:border-zinc-300 active:scale-[0.98] transition-all duration-150',
 				collapsed && !isMobile && 'px-0'
 			)}
 			onclick={openCompose}
 		>
-			<SquarePen class="size-4 shrink-0" strokeWidth={1.5} />
+			<SquarePen class="size-4 shrink-0 text-zinc-500" strokeWidth={1.5} />
 			{#if !collapsed || isMobile}
-				<span>Compose</span>
+				<span class="text-zinc-700">Compose</span>
 			{/if}
 		</button>
 	</div>
@@ -132,10 +132,10 @@
 			{#each navItems as item}
 				<button
 					class={cn(
-						'group flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] transition-colors duration-100',
+						'group flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] transition-all duration-150',
 						item.folder === activeFolder
-							? 'bg-zinc-100/80 text-zinc-900 font-medium'
-							: 'text-zinc-500 hover:bg-zinc-100/50 hover:text-zinc-700',
+							? 'bg-zinc-100 text-zinc-900 font-semibold'
+							: 'text-zinc-500 hover:bg-zinc-50 hover:text-zinc-700',
 						collapsed && !isMobile && 'justify-center px-2'
 					)}
 					onclick={() => handleFolderClick(item.folder)}

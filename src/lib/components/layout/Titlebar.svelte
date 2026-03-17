@@ -1,16 +1,21 @@
 <script lang="ts">
 	import { getCurrentWindow } from '@tauri-apps/api/window';
 	import { browser } from '$app/environment';
+	import { X, Minus, Square } from 'lucide-svelte';
 
 	// Platform detection using navigator (works in Tauri webview)
-	let isWindows = $state(true);
-	let isMacos = $state(false);
+	let platform = $state<'windows' | 'macos' | 'linux'>('linux');
 
 	function detectPlatform() {
 		if (browser) {
 			const userAgent = navigator.userAgent;
-			isWindows = userAgent.includes('Windows');
-			isMacos = userAgent.includes('Mac');
+			if (userAgent.includes('Windows')) {
+				platform = 'windows';
+			} else if (userAgent.includes('Mac')) {
+				platform = 'macos';
+			} else {
+				platform = 'linux';
+			}
 		}
 	}
 
@@ -32,12 +37,12 @@
 	}
 </script>
 
-{#if isWindows}
-	<!-- Windows 11 WinUI 3 Style Titlebar -->
+{#if platform === 'windows'}
+	<!-- Windows 11 Style Titlebar -->
 	<div class="titlebar titlebar-windows">
 		<div class="titlebar-drag-region" data-tauri-drag-region></div>
 
-		<!-- Left side: App icon/title area -->
+		<!-- Left side: App icon/title area (draggable) -->
 		<div class="titlebar-left" data-tauri-drag-region>
 			<div class="titlebar-icon">
 				<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
@@ -47,43 +52,34 @@
 			<span class="titlebar-text">Mailx</span>
 		</div>
 
-		<!-- Right side: Windows caption buttons -->
+		<!-- Right side: Window controls -->
 		<div class="titlebar-controls">
 			<button
 				onclick={minimizeWindow}
-				class="caption-button caption-minimize"
+				class="caption-button"
 				aria-label="Minimize"
-				title="Minimize"
 			>
-				<svg width="10" height="10" viewBox="0 0 10 1" fill="currentColor">
-					<rect width="10" height="1"/>
-				</svg>
+				<Minus class="size-3" strokeWidth={1.5} />
 			</button>
 			<button
 				onclick={maximizeWindow}
-				class="caption-button caption-maximize"
+				class="caption-button"
 				aria-label="Maximize"
-				title="Maximize"
 			>
-				<svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor">
-					<path d="M0 0V10H10V0H0ZM9 9H1V1H9V9Z"/>
-				</svg>
+				<Square class="size-3" strokeWidth={1.5} />
 			</button>
 			<button
 				onclick={closeWindow}
 				class="caption-button caption-close"
 				aria-label="Close"
-				title="Close"
 			>
-				<svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor">
-					<path d="M5.5 5L10 0.5L9.5 0L5 4.5L0.5 0L0 0.5L4.5 5L0 9.5L0.5 10L5 5.5L9.5 10L10 9.5L5.5 5Z"/>
-				</svg>
+				<X class="size-3" strokeWidth={1.5} />
 			</button>
 		</div>
 	</div>
 {:else}
-	<!-- macOS/Linux Style Titlebar -->
-	<div class="titlebar titlebar-macos">
+	<!-- macOS/Linux Style Titlebar with Traffic Lights -->
+	<div class="titlebar titlebar-unix">
 		<div class="titlebar-drag-region" data-tauri-drag-region></div>
 
 		<!-- Traffic Lights (left side) -->
@@ -92,16 +88,13 @@
 			<button onclick={minimizeWindow} class="traffic-light traffic-light-minimize" aria-label="Minimize"></button>
 			<button onclick={maximizeWindow} class="traffic-light traffic-light-maximize" aria-label="Maximize"></button>
 		</div>
-
-		<!-- App Title (centered, shows on hover) -->
-		<div class="titlebar-title" data-tauri-drag-region>
-			<span class="text-[11px] font-medium text-zinc-400 tracking-wide">Mailx</span>
-		</div>
 	</div>
 {/if}
 
 <style>
-	/* Common titlebar styles */
+	/* ============================================
+	   Common Titlebar Styles
+	   ============================================ */
 	.titlebar {
 		flex-shrink: 0;
 		display: flex;
@@ -113,11 +106,10 @@
 	.titlebar-drag-region {
 		position: absolute;
 		inset: 0;
-		pointer-events: none;
 	}
 
 	/* ============================================
-	   Windows 11 WinUI 3 Style
+	   Windows 11 Style
 	   ============================================ */
 	.titlebar-windows {
 		height: 32px;
@@ -128,36 +120,46 @@
 	}
 
 	/* Left side: Icon and title */
-	.titlebar-left {
+	.titlebar-windows .titlebar-left {
 		display: flex;
 		align-items: center;
 		gap: 8px;
 		padding-left: 12px;
 		height: 100%;
-		z-index: 1;
+		position: relative;
+		z-index: 10;
+		pointer-events: auto;
 	}
 
-	.titlebar-icon {
+	.titlebar-windows .titlebar-icon {
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		color: #737373;
+		transition: color 0.15s ease;
 	}
 
-	.titlebar-text {
+	.titlebar-windows .titlebar-icon:hover {
+		color: #1a1a1a;
+	}
+
+	.titlebar-windows .titlebar-text {
 		font-size: 12px;
 		font-weight: 400;
 		color: #1a1a1a;
 		font-family: 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
 	}
 
-	/* Right side: Caption buttons */
+	/* Right side: Window controls */
 	.titlebar-windows .titlebar-controls {
 		display: flex;
 		height: 100%;
+		position: relative;
+		z-index: 10;
+		pointer-events: auto;
 	}
 
-	.caption-button {
+	.titlebar-windows .caption-button {
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -167,58 +169,49 @@
 		background: transparent;
 		cursor: pointer;
 		transition: background 0.1s ease;
-	}
-
-	.caption-button svg {
+		pointer-events: auto;
 		color: #1a1a1a;
 	}
 
 	/* Minimize and Maximize hover */
-	.caption-minimize:hover,
-	.caption-maximize:hover {
+	.titlebar-windows .caption-button:hover {
 		background: #e5e5e5;
 	}
 
 	/* Close button special handling */
-	.caption-close:hover {
-		background: #c42b1c;
-	}
-
-	.caption-close:hover svg {
+	.titlebar-windows .caption-close:hover {
+		background: #e81123;
 		color: #ffffff;
 	}
 
-	.caption-close:active {
+	.titlebar-windows .caption-close:active {
 		background: #a02619;
 	}
 
-	/* Icon hover effect */
-	.titlebar-icon:hover {
-		color: #1a1a1a;
-	}
-
 	/* ============================================
-	   macOS Style (original traffic lights)
+	   macOS/Linux Style (Traffic Lights)
 	   ============================================ */
-	.titlebar-macos {
+	.titlebar-unix {
 		height: 38px;
 		padding: 0 14px;
 		background: #ffffff;
 		border-bottom: 1px solid rgb(244 244 245);
 	}
 
-	.titlebar-macos .titlebar-drag-region {
-		margin: 0 60px;
+	.titlebar-unix .titlebar-drag-region {
+		margin: 0 60px; /* Leave space for traffic lights */
 	}
 
-	.titlebar-macos .titlebar-controls {
+	.titlebar-unix .titlebar-controls {
 		display: flex;
 		align-items: center;
 		gap: 8px;
-		z-index: 1;
+		position: relative;
+		z-index: 10;
+		pointer-events: auto;
 	}
 
-	.traffic-light {
+	.titlebar-unix .traffic-light {
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -228,25 +221,26 @@
 		border: 0.5px solid rgba(0, 0, 0, 0.06);
 		cursor: pointer;
 		transition: filter 0.1s ease;
+		pointer-events: auto;
 	}
 
-	.traffic-light:hover { filter: brightness(0.92); }
-	.traffic-light:active { filter: brightness(0.85); }
-
-	.traffic-light-close { background: #ff5f57; }
-	.traffic-light-minimize { background: #febc2e; }
-	.traffic-light-maximize { background: #28c840; }
-
-	.titlebar-macos .titlebar-title {
-		position: absolute;
-		left: 50%;
-		top: 50%;
-		transform: translate(-50%, -50%);
-		opacity: 0;
-		transition: opacity 0.2s ease;
+	.titlebar-unix .traffic-light:hover {
+		filter: brightness(0.92);
 	}
 
-	.titlebar-macos:hover .titlebar-title {
-		opacity: 1;
+	.titlebar-unix .traffic-light:active {
+		filter: brightness(0.85);
+	}
+
+	.titlebar-unix .traffic-light-close {
+		background: #ff5f57;
+	}
+
+	.titlebar-unix .traffic-light-minimize {
+		background: #febc2e;
+	}
+
+	.titlebar-unix .traffic-light-maximize {
+		background: #28c840;
 	}
 </style>

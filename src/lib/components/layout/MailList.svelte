@@ -109,7 +109,7 @@
 		<input
 			type="text"
 			placeholder="Search {folderLabels[activeFolder].toLowerCase()}..."
-			class="flex-1 bg-transparent text-[13px] text-zinc-900 outline-none placeholder:text-zinc-400"
+			class="flex-1 bg-transparent text-[13px] text-zinc-900 outline-none placeholder:text-zinc-400 transition-colors duration-150 focus:bg-zinc-100/50 rounded-md px-2 -mx-2"
 			bind:value={searchQuery}
 		/>
 	</div>
@@ -123,9 +123,9 @@
 		{:else}
 			<div class="px-2 py-1">
 				{#each groupedMails as group}
-					<!-- Date group header -->
-					<div class="px-2 pt-4 pb-1.5">
-						<span class="text-[11px] font-medium text-zinc-400 uppercase tracking-wider">
+					<!-- Date group header - Linear style -->
+					<div class="px-3 pt-6 pb-2">
+						<span class="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
 							{group.label}
 						</span>
 					</div>
@@ -134,22 +134,21 @@
 					{#each group.mails as mail}
 						<button
 							class={cn(
-								'group flex w-full items-start gap-3 rounded-lg px-3 py-3 text-left transition-colors duration-100',
+								'group relative flex w-full items-start gap-3 text-left transition-colors duration-150 border-b border-zinc-50',
+								'px-5 py-4',
 								mail.id === selectedMailId
-									? 'bg-zinc-100/80'
-									: 'hover:bg-zinc-50'
+									? 'bg-zinc-50'
+									: 'hover:bg-zinc-50/50'
 							)}
 							onclick={() => onSelectMail(mail.id)}
 						>
-							<!-- Unread dot -->
-							<div class="flex-shrink-0 pt-2 w-2">
-								{#if mail.unread && mail.id !== selectedMailId}
-									<div class="size-2 rounded-full bg-blue-600"></div>
-								{/if}
-							</div>
+							<!-- Unread blue border indicator - absolute positioned -->
+							{#if mail.unread && mail.id !== selectedMailId}
+								<div class="absolute left-0 top-0 bottom-0 w-[2px] bg-blue-500"></div>
+							{/if}
 
 							<!-- Content -->
-							<div class="flex-1 min-w-0">
+							<div class="flex-1 min-w-0 flex flex-col gap-1">
 								<!-- Row 1: Sender + Time -->
 								<div class="flex items-baseline justify-between gap-2">
 									<span
@@ -162,14 +161,14 @@
 									>
 										{mail.from_name}
 									</span>
-									<span class="text-[11px] text-zinc-400 tabular-nums shrink-0">
+									<span class="text-[11px] text-zinc-400 font-normal tabular-nums shrink-0">
 										{formatMailTime(mail.timestamp)}
 									</span>
 								</div>
 
 								<!-- Row 2: Subject -->
 								<div class={cn(
-									'truncate text-[13px] mt-0.5',
+									'truncate text-[13px]',
 									mail.unread && mail.id !== selectedMailId
 										? 'text-zinc-900'
 										: 'text-zinc-500'
@@ -178,14 +177,14 @@
 								</div>
 
 								<!-- Row 3: Preview -->
-								<p class="line-clamp-1 text-[12px] text-zinc-400 mt-0.5 leading-relaxed">
+								<p class="line-clamp-1 text-[12px] text-zinc-400 leading-relaxed">
 									{mail.preview}
 								</p>
 							</div>
 
 							<!-- Attachment indicator -->
 							{#if mail.has_attachments}
-								<div class="flex-shrink-0 pt-1.5">
+								<div class="flex-shrink-0 pt-1">
 									<Paperclip class="size-3.5 text-zinc-300" strokeWidth={1.5} />
 								</div>
 							{/if}
