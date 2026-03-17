@@ -142,6 +142,7 @@ pub fn run() {
             commands::sync_account,
             commands::sync_all_accounts,
             commands::get_sync_status,
+            commands::test_imap_connection,
             // Send mail command
             commands::send_mail,
         ])

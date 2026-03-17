@@ -327,6 +327,35 @@ pub fn get_sync_status(
     Ok(statuses)
 }
 
+/// Test IMAP connection only (lightweight ping: connect + login + select INBOX)
+#[tauri::command]
+pub async fn test_imap_connection(
+    id: String,
+    account_manager: State<'_, Arc<AccountManager>>,
+    credential_manager: State<'_, Arc<CredentialManager>>,
+) -> Result<String, String> {
+    let account = account_manager
+        .get(&id)
+        .map_err(|e| format!("Failed to get account: {}", e))?;
+
+    let password = credential_manager
+        .get_password(&id)
+        .map_err(|e| format!("Failed to get password: {}", e))?;
+
+    let imap_config = account_manager
+        .get_imap_config(&id)
+        .map_err(|e| format!("Failed to get IMAP config: {}", e))?;
+
+    let server_info = format!("{}:{}", imap_config.server, imap_config.port);
+    let imap_client = ImapClient::new(imap_config, account.email.clone(), password);
+    imap_client
+        .test_connection()
+        .await
+        .map_err(|e| format!("IMAP ping failed ({}): {}", server_info, e))?;
+
+    Ok(format!("IMAP OK — connected to {} as {}", server_info, account.email))
+}
+
 // ============================================================================
 // Send Mail Command
 // ============================================================================

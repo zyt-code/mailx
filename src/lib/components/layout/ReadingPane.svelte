@@ -113,13 +113,13 @@
 
 			<!-- Email body -->
 			<ScrollArea class="flex-1">
-				<div class="px-8 py-6 max-w-3xl" data-allow-context-menu>
+				<div class="px-8 pt-8 pb-6 max-w-3xl select-text leading-relaxed" data-allow-context-menu>
 					{#if mail.html_body}
 						<div class="prose prose-sm prose-zinc max-w-none prose-p:text-zinc-600 prose-p:leading-relaxed prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline">
 							{@html DOMPurify.sanitize(mail.html_body)}
 						</div>
 					{:else}
-						<p class="text-[14px] text-zinc-600 leading-[1.7] whitespace-pre-wrap">{mail.body}</p>
+						<p class="text-[14px] text-zinc-600 leading-relaxed whitespace-pre-wrap">{mail.body}</p>
 					{/if}
 				</div>
 			</ScrollArea>

@@ -2,7 +2,7 @@
 	import type { Snippet } from 'svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
-	import { ArrowLeft, User, Palette, Bell, Shield, Key } from 'lucide-svelte';
+	import { ArrowLeft, User, Palette, Bell, Shield, Keyboard } from 'lucide-svelte';
 
 	interface Props {
 		children: Snippet;
@@ -15,7 +15,7 @@
 		{ id: 'appearance', label: 'Appearance', icon: Palette, href: '/settings/appearance', color: 'from-amber-500 to-orange-600' },
 		{ id: 'notifications', label: 'Notifications', icon: Bell, href: '/settings/notifications', color: 'from-rose-500 to-pink-600' },
 		{ id: 'privacy', label: 'Privacy', icon: Shield, href: '/settings/privacy', color: 'from-emerald-500 to-teal-600' },
-		{ id: 'keyboard', label: 'Keyboard', icon: Key, href: '/settings/keyboard', color: 'from-blue-500 to-indigo-600' }
+		{ id: 'keyboard', label: 'Keyboard', icon: Keyboard, href: '/settings/keyboard', color: 'from-blue-500 to-indigo-600' }
 	];
 
 	let activeSection = $derived($page.url.pathname.split('/').pop() || 'accounts');
@@ -33,7 +33,7 @@
 			onclick={goBack}
 			class="back-button"
 		>
-			<ArrowLeft class="size-4" />
+			<ArrowLeft class="size-[15px]" strokeWidth={1.5} />
 			<span>Back</span>
 		</button>
 
@@ -50,7 +50,7 @@
 					style="--item-index: {index}"
 				>
 					<div class="icon-container bg-gradient-to-br {item.color}">
-						<item.icon class="size-4" />
+						<item.icon class="size-4" strokeWidth={1.5} />
 					</div>
 					<span class="nav-label">{item.label}</span>
 					{#if activeSection === item.id}
@@ -68,7 +68,7 @@
 
 	<!-- Main Content -->
 	<main class="settings-main">
-		<div class="content-wrapper">
+		<div class="content-wrapper" style="animation: contentFadeIn 0.25s ease-out">
 			{@render children()}
 		</div>
 	</main>
@@ -257,5 +257,16 @@
 
 	.settings-main::-webkit-scrollbar-thumb:hover {
 		background: rgba(0, 0, 0, 0.15);
+	}
+
+	@keyframes contentFadeIn {
+		from {
+			opacity: 0;
+			transform: translateY(6px);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
 	}
 </style>

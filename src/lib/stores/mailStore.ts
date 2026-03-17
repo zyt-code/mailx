@@ -6,10 +6,12 @@ import type { Mail, Folder } from '$lib/types.js';
 const _mails = writable<Mail[]>([]);
 const _isLoading = writable(false);
 const _activeFolder = writable<Folder>('inbox');
+const _error = writable<string | null>(null);
 
 export const mails = derived(_mails, $mails => $mails);
 export const isLoading = derived(_isLoading, $loading => $loading);
 export const activeFolder = derived(_activeFolder, $f => $f);
+export const mailError = derived(_error, $e => $e);
 
 export const folderMails = derived(
   [_mails, _activeFolder],
@@ -33,13 +35,15 @@ export function initMailStore(): void {
 
 export async function loadMails(folder?: Folder): Promise<void> {
   _isLoading.set(true);
+  _error.set(null);
   try {
     const targetFolder = folder || 'inbox';
     const data = await db.getMails(targetFolder);
     _mails.set(data);
   } catch (e) {
-    console.error('Failed to load mails:', e);
-    throw e;
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error('Failed to load mails:', msg);
+    _error.set(msg);
   } finally {
     _isLoading.set(false);
   }

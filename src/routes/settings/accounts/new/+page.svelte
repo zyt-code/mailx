@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { ArrowLeft, Check, Loader2, Mail, Lock, Server } from 'lucide-svelte';
+	import { page } from '$app/stores';
+	import { ArrowLeft, Check, Loader2, Mail, Lock, Server, Eye, EyeOff } from 'lucide-svelte';
 	import * as accounts from '$lib/accounts/index.js';
 	import { syncAccount } from '$lib/sync/index.js';
 
@@ -10,6 +11,15 @@
 	let smtpServer = $state('');
 	let isSubmitting = $state(false);
 	let error = $state<string | null>(null);
+	let showPassword = $state(false);
+
+	// Pre-fill email domain from quick connect
+	$effect(() => {
+		const provider = $page.url.searchParams.get('provider');
+		if (provider && !email) {
+			email = `@${provider}`;
+		}
+	});
 
 	function goBack() {
 		goto('/settings');
@@ -123,15 +133,27 @@
 							Password / App Password
 							<span class="required">*</span>
 						</label>
-						<div class="input-wrapper">
+						<div class="input-wrapper input-with-action">
 							<input
 								id="password"
-								type="password"
+								type={showPassword ? 'text' : 'password'}
 								bind:value={password}
 								placeholder="Enter your password or app password"
 								required
-								class="field-input"
+								class="field-input field-input-padded"
 							/>
+							<button
+								type="button"
+								onclick={() => showPassword = !showPassword}
+								class="toggle-password-button"
+								title={showPassword ? 'Hide password' : 'Show password'}
+							>
+								{#if showPassword}
+									<EyeOff class="size-4" strokeWidth={1.5} />
+								{:else}
+									<Eye class="size-4" strokeWidth={1.5} />
+								{/if}
+							</button>
 						</div>
 						<p class="field-hint">
 							For Gmail, use an <a href="https://support.google.com/accounts/answer/185833" target="_blank" class="text-violet-600 hover:underline">App Password</a>.
@@ -218,13 +240,7 @@
 	</div>
 
 	<!-- Security Note -->
-	<div class="security-note">
-		<div class="note-icon">🔒</div>
-		<div class="note-content">
-			<p class="note-title">Secure & Private</p>
-			<p class="note-text">Your credentials are encrypted and stored locally on your device.</p>
-		</div>
-	</div>
+	<p class="security-hint">Your credentials are encrypted and stored locally on your device</p>
 </div>
 
 <style>
@@ -400,6 +416,38 @@
 		box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.1);
 	}
 
+	/* Input with action button */
+	.input-with-action {
+		display: flex;
+		align-items: center;
+	}
+
+	.field-input-padded {
+		padding-right: 3rem;
+	}
+
+	.toggle-password-button {
+		position: absolute;
+		right: 0.625rem;
+		top: 50%;
+		transform: translateY(-50%);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 30px;
+		height: 30px;
+		background: transparent;
+		border: none;
+		border-radius: 7px;
+		cursor: pointer;
+		color: #a1a1aa;
+		transition: all 0.15s ease;
+	}
+
+	.toggle-password-button:hover {
+		color: #52525b;
+	}
+
 	.field-hint {
 		font-size: 0.75rem;
 		color: #9ca3af;
@@ -484,32 +532,12 @@
 		color: #1d1d1f;
 	}
 
-	/* Security Note */
-	.security-note {
-		display: flex;
-		align-items: center;
-		gap: 0.875rem;
-		padding: 1rem 1.25rem;
-		background: linear-gradient(135deg, rgba(139, 92, 246, 0.06) 0%, rgba(124, 58, 237, 0.04) 100%);
-		border: 1px solid rgba(139, 92, 246, 0.15);
-		border-radius: 12px;
-	}
-
-	.note-icon {
-		font-size: 1.25rem;
-		flex-shrink: 0;
-	}
-
-	.note-title {
-		font-size: 0.875rem;
-		font-weight: 560;
-		color: #5b21b6;
-		margin-bottom: 0.125rem;
-	}
-
-	.note-text {
-		font-size: 0.8125rem;
-		color: #7c3aed;
+	/* Security Hint */
+	.security-hint {
+		font-size: 11px;
+		color: #a1a1aa;
+		text-align: center;
+		margin-top: 0.25rem;
 	}
 
 	/* Animations */

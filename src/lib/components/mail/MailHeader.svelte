@@ -111,9 +111,9 @@
 			>
 				Details
 				{#if showDetails}
-					<ChevronDown class="size-3" />
+					<ChevronDown strokeWidth={1.5} class="size-3" />
 				{:else}
-					<ChevronRight class="size-3" />
+					<ChevronRight strokeWidth={1.5} class="size-3" />
 				{/if}
 			</button>
 		{/if}

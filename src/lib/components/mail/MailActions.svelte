@@ -66,7 +66,7 @@
 	const isArchive = mail.folder === 'archive';
 </script>
 
-<div class="flex items-center gap-1 border-b border-border bg-bg-secondary px-2 py-1">
+<div class="flex items-center gap-1 border-b border-zinc-200/80 bg-white/80 backdrop-blur-md px-2 py-1 sticky top-0 z-10">
 	<!-- Primary actions -->
 	<Button
 		variant="ghost"
@@ -75,7 +75,7 @@
 		aria-label="Reply"
 		title="Reply (R)"
 	>
-		<Reply class="size-4" />
+		<Reply strokeWidth={1.5} class="size-4" />
 		<span class="ml-1.5 hidden sm:inline">Reply</span>
 	</Button>
 
@@ -86,7 +86,7 @@
 		aria-label="Reply all"
 		title="Reply All (A)"
 	>
-		<ReplyAll class="size-4" />
+		<ReplyAll strokeWidth={1.5} class="size-4" />
 		<span class="ml-1.5 hidden sm:inline">Reply All</span>
 	</Button>
 
@@ -97,12 +97,12 @@
 		aria-label="Forward"
 		title="Forward (F)"
 	>
-		<Forward class="size-4" />
+		<Forward strokeWidth={1.5} class="size-4" />
 		<span class="ml-1.5 hidden sm:inline">Forward</span>
 	</Button>
 
 	<!-- Divider -->
-	<div class="mx-1 h-4 w-px bg-border" />
+	<div class="mx-1 h-4 w-px bg-zinc-200" />
 
 	<!-- Archive/Unarchive -->
 	<Button
@@ -113,10 +113,10 @@
 		title={isArchive ? 'Unarchive (E)' : 'Archive (E)'}
 	>
 		{#if isArchive}
-			<ArchiveRestore class="size-4" />
+			<ArchiveRestore strokeWidth={1.5} class="size-4" />
 			<span class="ml-1.5 hidden sm:inline">Unarchive</span>
 		{:else}
-			<Archive class="size-4" />
+			<Archive strokeWidth={1.5} class="size-4" />
 			<span class="ml-1.5 hidden sm:inline">Archive</span>
 		{/if}
 	</Button>
@@ -131,10 +131,10 @@
 		class={mail.starred ? 'text-yellow-500' : ''}
 	>
 		{#if mail.starred}
-			<Star class="size-4 fill-yellow-500" />
+			<Star strokeWidth={1.5} class="size-4 fill-yellow-500" />
 			<span class="ml-1.5 hidden sm:inline">Starred</span>
 		{:else}
-			<Star class="size-4" />
+			<Star strokeWidth={1.5} class="size-4" />
 			<span class="ml-1.5 hidden sm:inline">Star</span>
 		{/if}
 	</Button>
@@ -148,64 +148,64 @@
 		title="Delete"
 		class="text-red-600 hover:text-red-700 hover:bg-red-50"
 	>
-		<Trash2 class="size-4" />
+		<Trash2 strokeWidth={1.5} class="size-4" />
 		<span class="ml-1.5 hidden sm:inline">Delete</span>
 	</Button>
 
 	<!-- More dropdown (for mobile) -->
 	<div class="relative sm:hidden">
 		<Button variant="ghost" size="icon-sm" onclick={() => (showDropdown = !showDropdown)} aria-label="More actions">
-			<MoreHorizontal class="size-4" />
+			<MoreHorizontal strokeWidth={1.5} class="size-4" />
 		</Button>
 
 		{#if showDropdown}
 			<div
-				class="absolute right-0 top-full z-10 w-48 rounded-lg border border-border bg-bg-primary shadow-lg"
+				class="absolute right-0 top-full z-10 w-48 rounded-lg border border-zinc-200 bg-white shadow-lg"
 				onclick={(e) => e.stopPropagation()}
 			>
 				<button
 					onclick={handleReply}
-					class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-text hover:bg-bg-hover"
+					class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-zinc-700 hover:bg-zinc-50"
 				>
-					<Reply class="size-4" />
+					<Reply strokeWidth={1.5} class="size-4" />
 					Reply
 				</button>
 				<button
 					onclick={handleReplyAll}
-					class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-text hover:bg-bg-hover"
+					class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-zinc-700 hover:bg-zinc-50"
 				>
-					<ReplyAll class="size-4" />
+					<ReplyAll strokeWidth={1.5} class="size-4" />
 					Reply All
 				</button>
 				<button
 					onclick={handleForward}
-					class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-text hover:bg-bg-hover"
+					class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-zinc-700 hover:bg-zinc-50"
 				>
-					<Forward class="size-4" />
+					<Forward strokeWidth={1.5} class="size-4" />
 					Forward
 				</button>
-				<div class="border-t border-border" />
+				<div class="border-t border-zinc-200" />
 				<button
 					onclick={handleArchive}
-					class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-text hover:bg-bg-hover"
+					class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-zinc-700 hover:bg-zinc-50"
 				>
 					{#if isArchive}
-						<ArchiveRestore class="size-4" />
+						<ArchiveRestore strokeWidth={1.5} class="size-4" />
 						Unarchive
 					{:else}
-						<Archive class="size-4" />
+						<Archive strokeWidth={1.5} class="size-4" />
 						Archive
 					{/if}
 				</button>
 				<button
 					onclick={handleToggleStar}
-					class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-text hover:bg-bg-hover"
+					class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-zinc-700 hover:bg-zinc-50"
 				>
 					{#if mail.starred}
-						<StarOff class="size-4" />
+						<StarOff strokeWidth={1.5} class="size-4" />
 						Unstar
 					{:else}
-						<Star class="size-4" />
+						<Star strokeWidth={1.5} class="size-4" />
 						Star
 					{/if}
 				</button>
@@ -213,7 +213,7 @@
 					onclick={handleDelete}
 					class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
 				>
-					<Trash2 class="size-4" />
+					<Trash2 strokeWidth={1.5} class="size-4" />
 					Delete
 				</button>
 			</div>

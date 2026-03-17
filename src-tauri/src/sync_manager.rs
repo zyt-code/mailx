@@ -94,11 +94,16 @@ impl SyncManager {
 
     /// Trigger an immediate sync for a specific account
     pub async fn sync_account(&self, account_id: &str) -> Result<SyncStatus> {
+        println!("[Sync] Starting sync for account '{}'", account_id);
+
         // Get the account
         let account = self
             .account_manager
             .get(account_id)
-            .map_err(|e| SyncError::Account(e.to_string()))?;
+            .map_err(|e| {
+                println!("[Sync] Failed to get account '{}': {}", account_id, e);
+                SyncError::Account(e.to_string())
+            })?;
 
         // Emit sync started event
         let _ = self.app_handle.emit("sync:started", json!({
@@ -106,47 +111,94 @@ impl SyncManager {
             "email": account.email,
         }));
 
+        // Run the actual sync, catch errors to emit sync:failed
+        match self.sync_account_inner(account_id, &account).await {
+            Ok(status) => Ok(status),
+            Err(e) => {
+                let error_msg = e.to_string();
+                println!("[Sync] FAILED for '{}': {}", account.email, error_msg);
+
+                // Emit sync:failed so the frontend can show the error
+                let _ = self.app_handle.emit("sync:failed", json!({
+                    "account_id": account_id,
+                    "error": error_msg,
+                }));
+
+                Err(e)
+            }
+        }
+    }
+
+    /// Inner sync logic — separated so sync_account can wrap errors
+    async fn sync_account_inner(&self, account_id: &str, account: &Account) -> Result<SyncStatus> {
         // Get credentials
+        println!("[Sync] Getting credentials for '{}'...", account.email);
         let password = self
             .credential_manager
             .get_password(account_id)
-            .map_err(|e| SyncError::Credential(e.to_string()))?;
+            .map_err(|e| {
+                println!("[Sync] Credential error for '{}': {}", account.email, e);
+                SyncError::Credential(e.to_string())
+            })?;
 
         // Get IMAP config
         let imap_config = self
             .account_manager
             .get_imap_config(account_id)
-            .map_err(|e| SyncError::Account(e.to_string()))?;
+            .map_err(|e| {
+                println!("[Sync] IMAP config error for '{}': {}", account.email, e);
+                SyncError::Account(e.to_string())
+            })?;
 
-        // Create IMAP client
+        println!(
+            "[Sync] IMAP config: {}:{} (SSL={})",
+            imap_config.server, imap_config.port, imap_config.use_ssl
+        );
+
+        // Create IMAP client and fetch
         let imap_client = ImapClient::new(imap_config, account.email.clone(), password);
 
-        // Fetch emails (last 100)
         let mails = imap_client
             .fetch_emails("INBOX", 100)
             .await
-            .map_err(|e| SyncError::Imap(e.to_string()))?;
+            .map_err(|e| {
+                println!("[Sync] IMAP fetch error for '{}': {}", account.email, e);
+                SyncError::Imap(e.to_string())
+            })?;
+
+        println!("[Sync] Fetched {} mails for '{}'", mails.len(), account.email);
 
         // Store emails in database
+        let mut inserted = 0u32;
+        let mut skipped = 0u32;
         for mail in mails {
-            // Check if email already exists
             match self.database.get_mail(&mail.id) {
-                Ok(Some(_)) => continue, // Email exists, skip
+                Ok(Some(_)) => {
+                    skipped += 1;
+                    continue;
+                }
                 _ => {}
             }
 
-            // Insert new email
             self.database
                 .insert_mail(&mail)
-                .map_err(|e| SyncError::Database(e.to_string()))?;
+                .map_err(|e| {
+                    println!("[Sync] DB insert error: {}", e);
+                    SyncError::Database(e.to_string())
+                })?;
+            inserted += 1;
         }
+
+        println!(
+            "[Sync] DB: {} inserted, {} skipped (already existed) for '{}'",
+            inserted, skipped, account.email
+        );
 
         let now = chrono::Utc::now().timestamp_millis();
 
-        // Emit sync completed event
         let status = SyncStatus {
             account_id: account_id.to_string(),
-            account_email: account.email,
+            account_email: account.email.clone(),
             status: SyncState::Idle,
             last_sync: Some(now),
             error_message: None,
@@ -154,10 +206,9 @@ impl SyncManager {
         };
 
         let _ = self.app_handle.emit("sync:completed", json!(status));
-
-        // Emit mails updated event
         let _ = self.app_handle.emit("mails:updated", ());
 
+        println!("[Sync] Sync COMPLETED for '{}'", account.email);
         Ok(status)
     }
 

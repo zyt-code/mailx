@@ -101,6 +101,8 @@
 		align-items: center;
 		user-select: none;
 		-webkit-user-select: none;
+		position: relative;
+		overflow: hidden;
 	}
 
 	.titlebar-drag-region {

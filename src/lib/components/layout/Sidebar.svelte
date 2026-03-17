@@ -72,6 +72,7 @@
 	});
 
 	async function handleFolderClick(folder: Folder) {
+		console.log('[Sidebar] Folder clicked:', folder, 'configured:', isAccountConfigured);
 		if (!isAccountConfigured) {
 			showDisabledFeedback();
 			return;
@@ -139,7 +140,7 @@
 
 <aside
 	class={cn(
-		'flex h-full flex-col bg-white transition-all duration-200 ease-out',
+		'flex h-full flex-col bg-white',
 		isMobile && 'fixed inset-y-0 left-0 z-40 shadow-lg',
 		isMobile && collapsed && '-translate-x-full',
 		!isMobile && 'border-r border-zinc-100'
@@ -175,7 +176,7 @@
 		<!-- Account Header -->
 		<div
 			class={cn(
-				"flex items-center gap-2 px-3 py-2 rounded-md mx-2 mt-1 transition-colors duration-150",
+				"flex items-center gap-2 px-3 py-2 rounded-md mx-2 mt-1 relative z-10",
 				isAccountConfigured ? "hover:bg-zinc-100/50 cursor-pointer" : "opacity-60"
 			)}
 		>
@@ -232,12 +233,12 @@
 				{#each navItems as item}
 					<button
 						class={cn(
-							'group flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] transition-all duration-150',
+							'group flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] relative z-10',
 							isAccountConfigured && item.folder === activeFolder
 								? 'bg-zinc-100 text-zinc-900 font-semibold'
 								: '',
 							isAccountConfigured
-								? 'text-zinc-500 hover:bg-zinc-50 hover:text-zinc-700'
+								? 'text-zinc-500 hover:bg-zinc-50 hover:text-zinc-700 cursor-pointer'
 								: 'text-zinc-300 cursor-not-allowed'
 						)}
 						onclick={() => handleFolderClick(item.folder)}
@@ -262,14 +263,14 @@
 			<div class="space-y-0.5">
 				<button
 					onclick={navigateToSettings}
-					class="group flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] text-zinc-500 hover:bg-zinc-50 hover:text-zinc-700 transition-all duration-150"
+					class="group flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] text-zinc-500 hover:bg-zinc-50 hover:text-zinc-700 relative z-10 cursor-pointer"
 				>
 					<Settings class="size-[18px] shrink-0" strokeWidth={1.5} />
 					<span class="flex-1 text-left">Settings</span>
 				</button>
 				<button
 					onclick={openHelp}
-					class="group flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] text-zinc-500 hover:bg-zinc-50 hover:text-zinc-700 transition-all duration-150"
+					class="group flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] text-zinc-500 hover:bg-zinc-50 hover:text-zinc-700 relative z-10 cursor-pointer"
 				>
 					<CircleHelp class="size-[18px] shrink-0" strokeWidth={1.5} />
 					<span class="flex-1 text-left">Help & Support</span>
@@ -283,9 +284,9 @@
 				onclick={openCompose}
 				disabled={!isAccountConfigured}
 				class={cn(
-					"flex size-8 items-center justify-center rounded-lg transition-colors duration-150",
+					"flex size-8 items-center justify-center rounded-lg relative z-10",
 					isAccountConfigured
-						? "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700"
+						? "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700 cursor-pointer"
 						: "text-zinc-300 cursor-not-allowed"
 				)}
 				aria-label="Compose"
@@ -304,12 +305,12 @@
 				{#each navItems as item}
 					<button
 						class={cn(
-							'group flex size-8 items-center justify-center rounded-md transition-all duration-150',
+							'group flex size-8 items-center justify-center rounded-md relative z-10',
 							isAccountConfigured && item.folder === activeFolder
 								? 'bg-zinc-100 text-zinc-900'
 								: '',
 							isAccountConfigured
-								? 'text-zinc-500 hover:bg-zinc-50 hover:text-zinc-700'
+								? 'text-zinc-500 hover:bg-zinc-50 hover:text-zinc-700 cursor-pointer'
 								: 'text-zinc-300 cursor-not-allowed'
 						)}
 						onclick={() => handleFolderClick(item.folder)}
@@ -327,14 +328,14 @@
 			<div class="flex flex-col items-center gap-1">
 				<button
 					onclick={navigateToSettings}
-					class="flex size-8 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-50 hover:text-zinc-700 transition-colors duration-150"
+					class="flex size-8 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-50 hover:text-zinc-700 relative z-10 cursor-pointer"
 					aria-label="Settings"
 				>
 					<Settings class="size-[18px]" strokeWidth={1.5} />
 				</button>
 				<button
 					onclick={openHelp}
-					class="flex size-8 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-50 hover:text-zinc-700 transition-colors duration-150"
+					class="flex size-8 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-50 hover:text-zinc-700 relative z-10 cursor-pointer"
 					aria-label="Help"
 				>
 					<CircleHelp class="size-[18px]" strokeWidth={1.5} />

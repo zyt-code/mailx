@@ -12,6 +12,13 @@
 		is_active: boolean;
 	}
 
+	const providers = [
+		{ id: 'gmail', name: 'Gmail', domain: 'gmail.com', color: '#EA4335', logo: 'G' },
+		{ id: 'outlook', name: 'Outlook', domain: 'outlook.com', color: '#0078D4', logo: 'O' },
+		{ id: 'qq', name: 'QQ Mail', domain: 'qq.com', color: '#12B7F5', logo: 'Q' },
+		{ id: '163', name: '163 Mail', domain: '163.com', color: '#D93B30', logo: 'N' }
+	];
+
 	let accounts = $state<Account[]>([]);
 	let isLoading = $state(true);
 	let error = $state<string | null>(null);
@@ -35,6 +42,10 @@
 
 	function openAddForm() {
 		goto('/settings/accounts/new');
+	}
+
+	function quickConnect(domain: string) {
+		goto(`/settings/accounts/new?provider=${domain}`);
 	}
 
 	function editAccount(id: string) {
@@ -113,9 +124,26 @@
 			<Plus class="size-5" />
 			<span>Add Your First Account</span>
 		</button>
-		<div class="empty-hint">
-			<p>🔒 Your credentials are stored securely</p>
+
+		<!-- Quick Connect Grid -->
+		<div class="quick-connect">
+			<p class="quick-connect-label">Quick connect</p>
+			<div class="quick-connect-grid">
+				{#each providers as provider}
+					<button
+						onclick={() => quickConnect(provider.domain)}
+						class="provider-card"
+					>
+						<div class="provider-logo" style="background: {provider.color}">
+							<span>{provider.logo}</span>
+						</div>
+						<span class="provider-name">{provider.name}</span>
+					</button>
+				{/each}
+			</div>
 		</div>
+
+		<p class="empty-hint-text">Your credentials are stored securely on this device</p>
 	</div>
 {:else}
 	<!-- Accounts List -->
@@ -335,17 +363,75 @@
 		transform: translateY(0);
 	}
 
-	.empty-hint {
-		margin-top: 2rem;
-		padding: 0.75rem 1.25rem;
-		background: rgba(139, 92, 246, 0.06);
-		border-radius: 10px;
+	/* Quick Connect Grid */
+	.quick-connect {
+		margin-top: 2.5rem;
+		width: 100%;
+		max-width: 400px;
 	}
 
-	.empty-hint p {
-		font-size: 0.8125rem;
-		color: #7c3aed;
+	.quick-connect-label {
+		font-size: 0.75rem;
 		font-weight: 500;
+		color: #a1a1aa;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		margin-bottom: 0.75rem;
+		text-align: center;
+	}
+
+	.quick-connect-grid {
+		display: grid;
+		grid-template-columns: repeat(4, 1fr);
+		gap: 0.625rem;
+	}
+
+	.provider-card {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.875rem 0.5rem;
+		background: white;
+		border: 1px solid #e4e4e7;
+		border-radius: 12px;
+		cursor: pointer;
+		transition: all 0.2s ease;
+	}
+
+	.provider-card:hover {
+		border-color: #d4d4d8;
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+		transform: translateY(-1px);
+	}
+
+	.provider-card:active {
+		transform: translateY(0);
+	}
+
+	.provider-logo {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 36px;
+		height: 36px;
+		border-radius: 10px;
+		color: white;
+		font-size: 0.9375rem;
+		font-weight: 700;
+		flex-shrink: 0;
+	}
+
+	.provider-name {
+		font-size: 0.6875rem;
+		font-weight: 500;
+		color: #52525b;
+	}
+
+	.empty-hint-text {
+		margin-top: 1.5rem;
+		font-size: 11px;
+		color: #a1a1aa;
 	}
 
 	/* Accounts Grid */

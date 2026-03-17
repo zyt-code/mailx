@@ -105,7 +105,7 @@
 </script>
 
 <div
-	class="flex h-full flex-col bg-white"
+	class="flex h-full flex-col bg-white select-none"
 	style:width={width !== undefined ? `${width}px` : undefined}
 	class:w-full={width === undefined}
 >
@@ -154,12 +154,17 @@
 										'group relative flex w-full items-start gap-3 text-left transition-colors duration-150 border-b border-zinc-50',
 										'px-5 py-4',
 										mail.id === selectedMailId
-											? 'bg-zinc-50'
-											: 'hover:bg-zinc-50/50'
+											? 'bg-zinc-100/80 shadow-inner'
+											: 'hover:bg-zinc-50'
 									)}
 									onclick={() => onSelectMail(mail.id)}
 								>
-									<!-- Unread blue border indicator - absolute positioned -->
+									<!-- Selected blue border indicator - absolute positioned -->
+									{#if mail.id === selectedMailId}
+										<div class="absolute left-0 top-0 bottom-0 w-[2px] bg-blue-500"></div>
+									{/if}
+
+									<!-- Unread blue dot indicator -->
 									{#if mail.unread && mail.id !== selectedMailId}
 										<div class="absolute left-0 top-0 bottom-0 w-[2px] bg-blue-500"></div>
 									{/if}
@@ -178,7 +183,7 @@
 											>
 												{mail.from_name}
 											</span>
-											<span class="text-[11px] text-zinc-400 font-normal tabular-nums shrink-0">
+											<span class="text-[10px] text-zinc-400 font-normal uppercase tracking-tight tabular-nums shrink-0">
 												{formatMailTime(mail.timestamp)}
 											</span>
 										</div>
@@ -194,7 +199,7 @@
 										</div>
 
 										<!-- Row 3: Preview -->
-										<p class="line-clamp-1 text-[12px] text-zinc-400 leading-relaxed">
+										<p class="line-clamp-2 text-[12px] text-zinc-500 leading-relaxed">
 											{mail.preview}
 										</p>
 									</div>
