@@ -113,7 +113,7 @@
 
 			<!-- Email body -->
 			<ScrollArea class="flex-1">
-				<div class="px-8 py-6 max-w-3xl">
+				<div class="px-8 py-6 max-w-3xl" data-allow-context-menu>
 					{#if mail.html_body}
 						<div class="prose prose-sm prose-zinc max-w-none prose-p:text-zinc-600 prose-p:leading-relaxed prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline">
 							{@html DOMPurify.sanitize(mail.html_body)}

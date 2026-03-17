@@ -1,10 +1,11 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { ArrowLeft, Check, Loader2, Mail, Lock, Server } from 'lucide-svelte';
-	import { invoke } from '@tauri-apps/api/core';
+	import * as accounts from '$lib/accounts/index.js';
+	import { syncAccount } from '$lib/sync/index.js';
 
 	let email = $state('');
-	let	password = $state('');
+	let password = $state('');
 	let imapServer = $state('');
 	let smtpServer = $state('');
 	let isSubmitting = $state(false);
@@ -20,24 +21,37 @@
 			return;
 		}
 
+		// Validate email format
+		if (!accounts.validateEmail(email)) {
+			error = 'Please enter a valid email address';
+			return;
+		}
+
 		isSubmitting = true;
 		error = null;
 
 		try {
-			await invoke('create_account', {
-				account: {
-					email,
-					name: email.split('@')[0],
-					imap_server: imapServer || 'imap.example.com',
-					smtp_server: smtpServer || 'smtp.example.com',
-					imap_port: 993,
-					smtp_port: 587,
-					use_ssl: true
-				},
-				password
+			// Use the API helper which handles ID generation and proper structure
+			const result = await accounts.createAccount({
+				email,
+				name: email.split('@')[0],
+				password,
+				imap_server: imapServer || '',
+				imap_port: 993,
+				imap_use_ssl: true,
+				smtp_server: smtpServer || '',
+				smtp_port: 587,
+				smtp_use_ssl: true
 			});
 
-			goto('/settings');
+			// Trigger sync for the new account
+			if (result && typeof result === 'object' && 'id' in result) {
+				syncAccount((result as { id: string }).id).catch(e => {
+					console.error('Auto-sync after account creation failed:', e);
+				});
+			}
+
+			goto('/');
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to add account';
 		} finally {
@@ -106,7 +120,7 @@
 					<!-- Password -->
 					<div class="field-group">
 						<label for="password" class="field-label">
-							Password
+							Password / App Password
 							<span class="required">*</span>
 						</label>
 						<div class="input-wrapper">
@@ -114,12 +128,15 @@
 								id="password"
 								type="password"
 								bind:value={password}
-								placeholder="Enter your password"
+								placeholder="Enter your password or app password"
 								required
 								class="field-input"
 							/>
 						</div>
-						<p class="field-hint">Your password is stored securely and encrypted</p>
+						<p class="field-hint">
+							For Gmail, use an <a href="https://support.google.com/accounts/answer/185833" target="_blank" class="text-violet-600 hover:underline">App Password</a>.
+							For QQ/163/126, use the 16-character Authorization Code.
+						</p>
 					</div>
 				</div>
 			</div>
@@ -137,7 +154,7 @@
 					</div>
 					<div>
 						<h3 class="section-title">Server Settings</h3>
-						<p class="section-subtitle">Custom server configuration</p>
+						<p class="section-subtitle">Auto-configured for popular providers</p>
 					</div>
 				</div>
 
@@ -150,11 +167,11 @@
 								id="imap"
 								type="text"
 								bind:value={imapServer}
-								placeholder="imap.example.com"
+								placeholder="Auto-detected from email"
 								class="field-input"
 							/>
 						</div>
-						<p class="field-hint">Leave empty to auto-detect from email domain</p>
+						<p class="field-hint">Leave empty to auto-detect (supports Gmail, Outlook, QQ, 163, 126, etc.)</p>
 					</div>
 
 					<!-- SMTP Server -->
@@ -165,11 +182,11 @@
 								id="smtp"
 								type="text"
 								bind:value={smtpServer}
-								placeholder="smtp.example.com"
+								placeholder="Auto-detected from email"
 								class="field-input"
 							/>
 						</div>
-						<p class="field-hint">Leave empty to auto-detect from email domain</p>
+						<p class="field-hint">Leave empty to auto-detect (supports Gmail, Outlook, QQ, 163, 126, etc.)</p>
 					</div>
 				</div>
 			</div>
@@ -387,6 +404,7 @@
 		font-size: 0.75rem;
 		color: #9ca3af;
 		margin-top: -0.25rem;
+		line-height: 1.4;
 	}
 
 	/* Form Divider */

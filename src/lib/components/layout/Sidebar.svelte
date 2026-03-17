@@ -1,6 +1,11 @@
 <script lang="ts">
 	import { cn } from '$lib/utils.js';
-	import type { Folder } from '$lib/types.js';
+	import { Avatar } from '$lib/components/ui/avatar/index.js';
+	import ScrollArea from '$lib/components/ui/scroll-area/scroll-area.svelte';
+	import type { Folder, Account } from '$lib/types.js';
+	import { hasAccounts, activeAccount } from '$lib/stores/accountStore.js';
+	import { isSyncing } from '$lib/stores/syncStore.js';
+	import { syncAllAccounts } from '$lib/sync/index.js';
 	import {
 		Inbox,
 		Send,
@@ -10,7 +15,10 @@
 		PanelLeftOpen,
 		SquarePen,
 		Archive,
-		RefreshCw
+		RefreshCw,
+		Settings,
+		CircleHelp,
+		Lock
 	} from 'lucide-svelte';
 	import { ComposeModal } from '$lib/components/compose/index.js';
 
@@ -22,9 +30,10 @@
 		onSelectFolder: (folder: Folder) => void;
 		onRefresh?: () => void;
 		currentRoute?: string;
+		onOpenSettings?: () => void;
 	}
 
-	let { collapsed, isMobile, activeFolder, onToggle, onSelectFolder, onRefresh, currentRoute = '/' }: Props = $props();
+	let { collapsed, isMobile, activeFolder, onToggle, onSelectFolder, onRefresh, currentRoute = '/', onOpenSettings }: Props = $props();
 
 	const navItems: { icon: typeof Inbox; label: string; folder: Folder; count: number }[] = [
 		{ icon: Inbox, label: 'Inbox', folder: 'inbox', count: 12 },
@@ -36,13 +45,46 @@
 
 	let showCompose = $state(false);
 	let isRefreshing = $state(false);
+	let showDisabledTooltip = $state(false);
+	let tooltipTimer = $state<number | null>(null);
+
+	// Account state from store - subscribe to stores
+	let currentAccount = $state<Account | null>(null);
+	let isAccountConfigured = $state(false);
+
+	// Subscribe to store changes
+	$effect(() => {
+		const unsubActive = activeAccount.subscribe((value) => {
+			currentAccount = value;
+		});
+		const unsubHas = hasAccounts.subscribe((value) => {
+			isAccountConfigured = value;
+		});
+		const unsubSync = isSyncing.subscribe((value) => {
+			isRefreshing = value;
+		});
+
+		return () => {
+			unsubActive();
+			unsubHas();
+			unsubSync();
+		};
+	});
 
 	async function handleFolderClick(folder: Folder) {
+		if (!isAccountConfigured) {
+			showDisabledFeedback();
+			return;
+		}
 		onSelectFolder(folder);
 		if (isMobile) onToggle();
 	}
 
 	function openCompose() {
+		if (!isAccountConfigured) {
+			showDisabledFeedback();
+			return;
+		}
 		showCompose = true;
 	}
 
@@ -58,13 +100,32 @@
 	}
 
 	async function handleRefresh() {
-		if (!onRefresh || isRefreshing) return;
-		isRefreshing = true;
+		if (!isAccountConfigured || isRefreshing) return;
 		try {
-			await onRefresh();
-		} finally {
-			isRefreshing = false;
+			await syncAllAccounts();
+		} catch (e) {
+			console.error('Refresh failed:', e);
+			if (onRefresh) await onRefresh();
 		}
+	}
+
+	function navigateToSettings() {
+		onOpenSettings?.();
+		if (isMobile) onToggle();
+	}
+
+	function openHelp() {
+		// TODO: Implement help dialog
+		console.log('Open help');
+	}
+
+	function showDisabledFeedback() {
+		// Show brief feedback
+		showDisabledTooltip = true;
+		if (tooltipTimer) clearTimeout(tooltipTimer);
+		tooltipTimer = window.setTimeout(() => {
+			showDisabledTooltip = false;
+		}, 2000);
 	}
 </script>
 
@@ -101,8 +162,8 @@
 		{#if !collapsed && onRefresh}
 			<button
 				onclick={handleRefresh}
-				disabled={isRefreshing}
-				class="flex size-7 items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-100/60 hover:text-zinc-600 disabled:opacity-30"
+				disabled={!isAccountConfigured}
+				class="flex size-7 items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-100/60 hover:text-zinc-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors duration-150"
 				aria-label="Refresh"
 			>
 				<RefreshCw class={cn('size-[15px]', isRefreshing && 'animate-spin')} strokeWidth={1.5} />
@@ -110,51 +171,177 @@
 		{/if}
 	</div>
 
-	<!-- Compose Button - Notion Mail subtle style -->
-	<div class="px-3 pb-4 pt-1">
-		<button
+	{#if !collapsed || isMobile}
+		<!-- Account Header -->
+		<div
 			class={cn(
-				'group flex w-full items-center justify-center gap-2 rounded-lg bg-white border border-zinc-200 shadow-sm px-3 py-2 text-[13px] font-medium text-zinc-700 hover:bg-zinc-50 hover:border-zinc-300 active:scale-[0.98] transition-all duration-150',
-				collapsed && !isMobile && 'px-0'
+				"flex items-center gap-2 px-3 py-2 rounded-md mx-2 mt-1 transition-colors duration-150",
+				isAccountConfigured ? "hover:bg-zinc-100/50 cursor-pointer" : "opacity-60"
 			)}
-			onclick={openCompose}
 		>
-			<SquarePen class="size-4 shrink-0 text-zinc-500" strokeWidth={1.5} />
-			{#if !collapsed || isMobile}
-				<span class="text-zinc-700">Compose</span>
-			{/if}
-		</button>
-	</div>
+			<div class={cn(
+				isAccountConfigured ? "" : "grayscale opacity-50"
+			)}>
+				<Avatar
+					src={undefined}
+					alt={currentAccount?.name || 'User'}
+					fallback={currentAccount?.name}
+					size="sm"
+				/>
+			</div>
+			<div class="flex-1 min-w-0">
+				<p class={cn(
+					"text-sm truncate",
+					isAccountConfigured ? "font-medium text-zinc-900" : "font-medium text-zinc-400"
+				)}>
+					{currentAccount?.name || 'No account'}
+				</p>
+				<p class="text-xs text-zinc-500 truncate">
+					{currentAccount?.email || 'Add an account to get started'}
+				</p>
+			</div>
+			<button
+				onclick={openCompose}
+				disabled={!isAccountConfigured}
+				class={cn(
+					"flex size-7 rounded-md transition-all duration-150",
+					isAccountConfigured
+						? "text-zinc-400 hover:bg-zinc-200 hover:text-zinc-700 opacity-0 group-hover:opacity-100"
+						: "text-zinc-300 cursor-not-allowed"
+				)}
+				aria-label="Compose"
+			>
+				{#if isAccountConfigured}
+					<SquarePen class="size-[15px]" strokeWidth={1.5} />
+				{:else}
+					<Lock class="size-[15px]" strokeWidth={1.5} />
+				{/if}
+			</button>
+		</div>
 
-	<!-- Navigation -->
-	<nav class="flex-1 overflow-y-auto px-2">
-		<div class="space-y-0.5">
-			{#each navItems as item}
-				<button
-					class={cn(
-						'group flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] transition-all duration-150',
-						item.folder === activeFolder
-							? 'bg-zinc-100 text-zinc-900 font-semibold'
-							: 'text-zinc-500 hover:bg-zinc-50 hover:text-zinc-700',
-						collapsed && !isMobile && 'justify-center px-2'
-					)}
-					onclick={() => handleFolderClick(item.folder)}
-				>
-					<item.icon class="size-[18px] shrink-0" strokeWidth={1.5} />
-					{#if !collapsed || isMobile}
+		<!-- Disabled feedback tooltip -->
+		{#if showDisabledTooltip}
+			<div class="absolute top-20 left-1/2 -translate-x-1/2 z-50 px-3 py-2 bg-zinc-900 text-white text-xs rounded-lg shadow-lg pointer-events-none animate-in fade-in slide-in-from-top-2 duration-200">
+				Please add an account in Settings
+			</div>
+		{/if}
+
+		<!-- Navigation -->
+		<nav class="flex-1 overflow-y-auto px-2 mt-1">
+			<div class="space-y-0.5">
+				{#each navItems as item}
+					<button
+						class={cn(
+							'group flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] transition-all duration-150',
+							isAccountConfigured && item.folder === activeFolder
+								? 'bg-zinc-100 text-zinc-900 font-semibold'
+								: '',
+							isAccountConfigured
+								? 'text-zinc-500 hover:bg-zinc-50 hover:text-zinc-700'
+								: 'text-zinc-300 cursor-not-allowed'
+						)}
+						onclick={() => handleFolderClick(item.folder)}
+						disabled={!isAccountConfigured}
+					>
+						<item.icon class="size-[18px] shrink-0" strokeWidth={1.5} />
 						<span class="flex-1 text-left truncate">
 							{item.label}
 						</span>
-						{#if item.count > 0}
+						{#if item.count > 0 && isAccountConfigured}
 							<span class="text-[11px] font-medium text-zinc-400 tabular-nums">
 								{item.count}
 							</span>
 						{/if}
-					{/if}
+					</button>
+				{/each}
+			</div>
+		</nav>
+
+		<!-- Footer -->
+		<div class="shrink-0 px-2 pb-2">
+			<div class="space-y-0.5">
+				<button
+					onclick={navigateToSettings}
+					class="group flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] text-zinc-500 hover:bg-zinc-50 hover:text-zinc-700 transition-all duration-150"
+				>
+					<Settings class="size-[18px] shrink-0" strokeWidth={1.5} />
+					<span class="flex-1 text-left">Settings</span>
 				</button>
-			{/each}
+				<button
+					onclick={openHelp}
+					class="group flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] text-zinc-500 hover:bg-zinc-50 hover:text-zinc-700 transition-all duration-150"
+				>
+					<CircleHelp class="size-[18px] shrink-0" strokeWidth={1.5} />
+					<span class="flex-1 text-left">Help & Support</span>
+				</button>
+			</div>
 		</div>
-	</nav>
+	{:else}
+		<!-- Collapsed state - show compose icon button -->
+		<div class="flex flex-col items-center gap-1 px-2 mt-2">
+			<button
+				onclick={openCompose}
+				disabled={!isAccountConfigured}
+				class={cn(
+					"flex size-8 items-center justify-center rounded-lg transition-colors duration-150",
+					isAccountConfigured
+						? "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700"
+						: "text-zinc-300 cursor-not-allowed"
+				)}
+				aria-label="Compose"
+			>
+				{#if isAccountConfigured}
+					<SquarePen class="size-[16px]" strokeWidth={1.5} />
+				{:else}
+					<Lock class="size-[16px]" strokeWidth={1.5} />
+				{/if}
+			</button>
+		</div>
+
+		<!-- Collapsed navigation -->
+		<nav class="flex-1 overflow-y-auto px-2 mt-2">
+			<div class="flex flex-col items-center gap-1">
+				{#each navItems as item}
+					<button
+						class={cn(
+							'group flex size-8 items-center justify-center rounded-md transition-all duration-150',
+							isAccountConfigured && item.folder === activeFolder
+								? 'bg-zinc-100 text-zinc-900'
+								: '',
+							isAccountConfigured
+								? 'text-zinc-500 hover:bg-zinc-50 hover:text-zinc-700'
+								: 'text-zinc-300 cursor-not-allowed'
+						)}
+						onclick={() => handleFolderClick(item.folder)}
+						disabled={!isAccountConfigured}
+						aria-label={item.label}
+					>
+						<item.icon class="size-[18px]" strokeWidth={1.5} />
+					</button>
+				{/each}
+			</div>
+		</nav>
+
+		<!-- Collapsed footer -->
+		<div class="shrink-0 px-2 pb-2">
+			<div class="flex flex-col items-center gap-1">
+				<button
+					onclick={navigateToSettings}
+					class="flex size-8 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-50 hover:text-zinc-700 transition-colors duration-150"
+					aria-label="Settings"
+				>
+					<Settings class="size-[18px]" strokeWidth={1.5} />
+				</button>
+				<button
+					onclick={openHelp}
+					class="flex size-8 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-50 hover:text-zinc-700 transition-colors duration-150"
+					aria-label="Help"
+				>
+					<CircleHelp class="size-[18px]" strokeWidth={1.5} />
+				</button>
+			</div>
+		</div>
+	{/if}
 
 	<!-- Compose Modal -->
 	<ComposeModal

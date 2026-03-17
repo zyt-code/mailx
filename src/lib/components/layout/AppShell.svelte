@@ -4,8 +4,16 @@
 	import Resizer from './Resizer.svelte';
 	import ReadingPane from './ReadingPane.svelte';
 	import Titlebar from './Titlebar.svelte';
+	import { GetStarted } from '$lib/components/get-started/index.js';
+	import { Notification } from '$lib/components/ui/notification/index.js';
 	import type { Mail, Folder } from '$lib/types.js';
 	import * as db from '$lib/db/index.js';
+	import { hasAccounts, activeAccount } from '$lib/stores/accountStore.js';
+	import { initSyncStore, isSyncing } from '$lib/stores/syncStore.js';
+	import { initMailStore, loadMails as storeLoadMails, switchFolder } from '$lib/stores/mailStore.js';
+	import { initSyncHandlers } from '$lib/events/index.js';
+	import { syncAccount } from '$lib/sync/index.js';
+	import { goto } from '$app/navigation';
 
 	const STORAGE_KEY = 'mailx-layout';
 	const DEFAULTS = { sidebarCollapsed: false, mailListWidth: 360 };
@@ -29,10 +37,60 @@
 	let isLoading = $state(true);
 	let error = $state<string | null>(null);
 
+	// Account state - subscribe to store
+	let isAccountConfigured = $state(false);
+
+	// Subscribe to hasAccounts store
+	$effect(() => {
+		const unsub = hasAccounts.subscribe((value) => {
+			isAccountConfigured = value;
+		});
+		return unsub;
+	});
+
+	// Initialize event-driven stores
+	initSyncStore();
+	initMailStore();
+	initSyncHandlers();
+
+	// Sync state
+	let syncing = $state(false);
+	$effect(() => {
+		const unsub = isSyncing.subscribe((value) => {
+			syncing = value;
+		});
+		return unsub;
+	});
+
+	// Auto-sync when active account changes
+	let currentAccount = $state<string | null>(null);
+	$effect(() => {
+		const unsub = activeAccount.subscribe(async (acc) => {
+			if (acc && acc.id !== currentAccount) {
+				currentAccount = acc.id;
+				if (isAccountConfigured) {
+					try {
+						await syncAccount(acc.id);
+					} catch (e) {
+						console.error('Auto-sync failed:', e);
+					}
+				}
+			}
+		});
+		return unsub;
+	});
+
 	let sidebarWidth = $derived(sidebarCollapsed ? SIDEBAR_COLLAPSED : SIDEBAR_EXPANDED);
 	let selectedMail = $derived(mails.find((m) => m.id === selectedMailId) ?? null);
 
 	async function loadMails() {
+		if (!isAccountConfigured) {
+			mails = [];
+			isLoading = false;
+			error = null;
+			return;
+		}
+
 		isLoading = true;
 		error = null;
 		try {
@@ -112,10 +170,63 @@
 		activeFolder = folder;
 		selectedMailId = null;
 		mobileView = 'list';
+		switchFolder(folder);
 	}
 
 	function goBackToList() {
 		mobileView = 'list';
+	}
+
+	function openSettings() {
+		// If no accounts configured, go directly to add account page
+		if (!isAccountConfigured) {
+			goto('/settings/accounts/new');
+		} else {
+			goto('/settings');
+		}
+	}
+
+	async function handleMarkRead(mail: Mail, read: boolean) {
+		try {
+			await db.markMailRead(mail.id, read);
+			mail.unread = !read;
+		} catch (e) {
+			console.error('Failed to mark mail:', e);
+		}
+	}
+
+	async function handleContextDelete(mail: Mail) {
+		try {
+			await db.moveToTrash(mail.id, mail.folder);
+			if (selectedMailId === mail.id) selectedMailId = null;
+			await loadMails();
+		} catch (e) {
+			console.error('Failed to delete mail:', e);
+		}
+	}
+
+	async function handleContextArchive(mail: Mail) {
+		try {
+			if (mail.folder === 'archive') {
+				await db.updateMail({ ...mail, folder: 'inbox' });
+			} else {
+				await db.moveToArchive(mail.id);
+			}
+			if (selectedMailId === mail.id) selectedMailId = null;
+			await loadMails();
+		} catch (e) {
+			console.error('Failed to archive mail:', e);
+		}
+	}
+
+	async function handleMoveTo(mail: Mail, folder: Folder) {
+		try {
+			await db.updateMail({ ...mail, folder });
+			if (selectedMailId === mail.id) selectedMailId = null;
+			await loadMails();
+		} catch (e) {
+			console.error('Failed to move mail:', e);
+		}
 	}
 </script>
 
@@ -131,18 +242,29 @@
 			onToggle={toggleSidebar}
 			onSelectFolder={selectFolder}
 			onRefresh={loadMails}
+			onOpenSettings={openSettings}
 		/>
 
 		{#if isMobile}
 			{#if mobileView === 'list'}
-				<MailList {mails} {activeFolder} {selectedMailId} onSelectMail={selectMail} width={undefined} />
+				<MailList {mails} {activeFolder} {selectedMailId} onSelectMail={selectMail} onMarkRead={handleMarkRead} onDelete={handleContextDelete} onArchive={handleContextArchive} onMoveTo={handleMoveTo} width={undefined} {isAccountConfigured} />
 			{:else}
 				<ReadingPane mail={selectedMail} {isMobile} onBack={goBackToList} onRefresh={loadMails} />
 			{/if}
 		{:else}
-			<MailList {mails} {activeFolder} {selectedMailId} onSelectMail={selectMail} width={mailListWidth} />
-			<Resizer {onResize} {onResizeEnd} />
-			<ReadingPane mail={selectedMail} {isMobile} onBack={goBackToList} onRefresh={loadMails} />
+			{#if isAccountConfigured}
+				<MailList {mails} {activeFolder} {selectedMailId} onSelectMail={selectMail} onMarkRead={handleMarkRead} onDelete={handleContextDelete} onArchive={handleContextArchive} onMoveTo={handleMoveTo} width={mailListWidth} {isAccountConfigured} />
+				<Resizer {onResize} {onResizeEnd} />
+				<ReadingPane mail={selectedMail} {isMobile} onBack={goBackToList} onRefresh={loadMails} />
+			{:else}
+				<!-- Get Started View -->
+				<div class="flex-1 pointer-events-auto relative z-10">
+					<GetStarted onOpenSettings={openSettings} />
+				</div>
+			{/if}
 		{/if}
 	</div>
+
+	<!-- Notifications -->
+	<Notification />
 </div>

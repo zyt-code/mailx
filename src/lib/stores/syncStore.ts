@@ -1,0 +1,74 @@
+import { derived, writable } from 'svelte/store';
+import { eventBus } from '$lib/events/index.js';
+import type { SyncStatus } from '$lib/types.js';
+import type { SyncProgress } from '$lib/sync/types.js';
+
+interface SyncStoreState {
+  isSyncing: boolean;
+  currentAccount: string | null;
+  currentAccountEmail: string | null;
+  progress: SyncProgress | null;
+  error: string | null;
+}
+
+const _state = writable<SyncStoreState>({
+  isSyncing: false,
+  currentAccount: null,
+  currentAccountEmail: null,
+  progress: null,
+  error: null
+});
+
+export const syncState = derived(_state, $state => $state);
+export const isSyncing = derived(_state, $state => $state.isSyncing);
+export const syncProgress = derived(_state, $state => $state.progress);
+export const syncError = derived(_state, $state => $state.error);
+
+/**
+ * Initialize SyncStore with Tauri event listeners.
+ * Call once at app startup.
+ */
+export function initSyncStore(): void {
+  eventBus.onTauri<{ account_id: string; email: string }>('sync:started', ({ account_id, email }) => {
+    _state.update(s => ({
+      ...s,
+      isSyncing: true,
+      currentAccount: account_id,
+      currentAccountEmail: email,
+      error: null
+    }));
+  });
+
+  eventBus.onTauri<{ account_id: string; current: number; total: number }>('sync:progress', ({ current, total }) => {
+    _state.update(s => ({
+      ...s,
+      progress: { current, total }
+    }));
+  });
+
+  eventBus.onTauri<SyncStatus>('sync:completed', () => {
+    _state.update(s => ({
+      ...s,
+      isSyncing: false,
+      currentAccount: null,
+      currentAccountEmail: null,
+      progress: null,
+      error: null
+    }));
+  });
+
+  eventBus.onTauri<{ account_id: string; error: string }>('sync:failed', ({ error }) => {
+    _state.update(s => ({
+      ...s,
+      isSyncing: false,
+      currentAccount: null,
+      currentAccountEmail: null,
+      progress: null,
+      error
+    }));
+  });
+}
+
+export function triggerSync(accountId: string): void {
+  eventBus.emit('sync:trigger', { accountId });
+}

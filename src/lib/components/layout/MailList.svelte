@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { cn } from '$lib/utils.js';
 	import ScrollArea from '$lib/components/ui/scroll-area/scroll-area.svelte';
-	import { Search, Paperclip } from 'lucide-svelte';
+	import * as ContextMenu from '$lib/components/ui/context-menu/index.js';
+	import { Search, Paperclip, MailOpen, Mail as MailIcon, Archive, Trash2, FolderInput, Inbox, Send, FileText } from 'lucide-svelte';
 	import type { Mail, Folder } from '$lib/types.js';
 
 	interface Props {
@@ -9,10 +10,15 @@
 		activeFolder: Folder;
 		selectedMailId: string | null;
 		onSelectMail: (id: string) => void;
+		onMarkRead?: (mail: Mail, read: boolean) => void;
+		onDelete?: (mail: Mail) => void;
+		onArchive?: (mail: Mail) => void;
+		onMoveTo?: (mail: Mail, folder: Folder) => void;
 		width: number | undefined;
+		isAccountConfigured?: boolean;
 	}
 
-	let { mails, activeFolder, selectedMailId, onSelectMail, width }: Props = $props();
+	let { mails, activeFolder, selectedMailId, onSelectMail, onMarkRead, onDelete, onArchive, onMoveTo, width, isAccountConfigured = true }: Props = $props();
 
 	let searchQuery = $state('');
 
@@ -105,11 +111,20 @@
 >
 	<!-- Search - Notion Quick Find style -->
 	<div class="flex items-center gap-2 px-4 py-2.5 border-b border-zinc-100">
-		<Search class="size-4 text-zinc-300 shrink-0" strokeWidth={1.5} />
+		<Search class={cn(
+			"size-4 shrink-0",
+			isAccountConfigured ? "text-zinc-300" : "text-zinc-200"
+		)} strokeWidth={1.5} />
 		<input
 			type="text"
 			placeholder="Search {folderLabels[activeFolder].toLowerCase()}..."
-			class="flex-1 bg-transparent text-[13px] text-zinc-900 outline-none placeholder:text-zinc-400 transition-colors duration-150 focus:bg-zinc-100/50 rounded-md px-2 -mx-2"
+			disabled={!isAccountConfigured}
+			class={cn(
+				"flex-1 bg-transparent text-[13px] outline-none placeholder:text-zinc-400 transition-colors duration-150 rounded-md px-2 -mx-2",
+				isAccountConfigured
+					? "text-zinc-900 focus:bg-zinc-100/50"
+					: "text-zinc-300 cursor-not-allowed placeholder:text-zinc-300"
+			)}
 			bind:value={searchQuery}
 		/>
 	</div>
@@ -132,63 +147,138 @@
 
 					<!-- Mails in group -->
 					{#each group.mails as mail}
-						<button
-							class={cn(
-								'group relative flex w-full items-start gap-3 text-left transition-colors duration-150 border-b border-zinc-50',
-								'px-5 py-4',
-								mail.id === selectedMailId
-									? 'bg-zinc-50'
-									: 'hover:bg-zinc-50/50'
-							)}
-							onclick={() => onSelectMail(mail.id)}
-						>
-							<!-- Unread blue border indicator - absolute positioned -->
-							{#if mail.unread && mail.id !== selectedMailId}
-								<div class="absolute left-0 top-0 bottom-0 w-[2px] bg-blue-500"></div>
-							{/if}
+						<ContextMenu.Root>
+							<ContextMenu.Trigger>
+								<button
+									class={cn(
+										'group relative flex w-full items-start gap-3 text-left transition-colors duration-150 border-b border-zinc-50',
+										'px-5 py-4',
+										mail.id === selectedMailId
+											? 'bg-zinc-50'
+											: 'hover:bg-zinc-50/50'
+									)}
+									onclick={() => onSelectMail(mail.id)}
+								>
+									<!-- Unread blue border indicator - absolute positioned -->
+									{#if mail.unread && mail.id !== selectedMailId}
+										<div class="absolute left-0 top-0 bottom-0 w-[2px] bg-blue-500"></div>
+									{/if}
 
-							<!-- Content -->
-							<div class="flex-1 min-w-0 flex flex-col gap-1">
-								<!-- Row 1: Sender + Time -->
-								<div class="flex items-baseline justify-between gap-2">
-									<span
-										class={cn(
+									<!-- Content -->
+									<div class="flex-1 min-w-0 flex flex-col gap-1">
+										<!-- Row 1: Sender + Time -->
+										<div class="flex items-baseline justify-between gap-2">
+											<span
+												class={cn(
+													'truncate text-[13px]',
+													mail.unread && mail.id !== selectedMailId
+														? 'font-semibold text-zinc-900'
+														: 'font-medium text-zinc-600'
+												)}
+											>
+												{mail.from_name}
+											</span>
+											<span class="text-[11px] text-zinc-400 font-normal tabular-nums shrink-0">
+												{formatMailTime(mail.timestamp)}
+											</span>
+										</div>
+
+										<!-- Row 2: Subject -->
+										<div class={cn(
 											'truncate text-[13px]',
 											mail.unread && mail.id !== selectedMailId
-												? 'font-semibold text-zinc-900'
-												: 'font-medium text-zinc-600'
-										)}
-									>
-										{mail.from_name}
-									</span>
-									<span class="text-[11px] text-zinc-400 font-normal tabular-nums shrink-0">
-										{formatMailTime(mail.timestamp)}
-									</span>
-								</div>
+												? 'text-zinc-900'
+												: 'text-zinc-500'
+										)}>
+											{mail.subject}
+										</div>
 
-								<!-- Row 2: Subject -->
-								<div class={cn(
-									'truncate text-[13px]',
-									mail.unread && mail.id !== selectedMailId
-										? 'text-zinc-900'
-										: 'text-zinc-500'
-								)}>
-									{mail.subject}
-								</div>
+										<!-- Row 3: Preview -->
+										<p class="line-clamp-1 text-[12px] text-zinc-400 leading-relaxed">
+											{mail.preview}
+										</p>
+									</div>
 
-								<!-- Row 3: Preview -->
-								<p class="line-clamp-1 text-[12px] text-zinc-400 leading-relaxed">
-									{mail.preview}
-								</p>
-							</div>
+									<!-- Attachment indicator -->
+									{#if mail.has_attachments}
+										<div class="flex-shrink-0 pt-1">
+											<Paperclip class="size-3.5 text-zinc-300" strokeWidth={1.5} />
+										</div>
+									{/if}
+								</button>
+							</ContextMenu.Trigger>
 
-							<!-- Attachment indicator -->
-							{#if mail.has_attachments}
-								<div class="flex-shrink-0 pt-1">
-									<Paperclip class="size-3.5 text-zinc-300" strokeWidth={1.5} />
-								</div>
-							{/if}
-						</button>
+							<ContextMenu.Content>
+								<!-- Mark Read/Unread -->
+								{#if mail.unread}
+									<ContextMenu.Item onclick={() => onMarkRead?.(mail, true)}>
+										<MailOpen class="size-4 text-zinc-500" strokeWidth={1.5} />
+										Mark as Read
+									</ContextMenu.Item>
+								{:else}
+									<ContextMenu.Item onclick={() => onMarkRead?.(mail, false)}>
+										<MailIcon class="size-4 text-zinc-500" strokeWidth={1.5} />
+										Mark as Unread
+									</ContextMenu.Item>
+								{/if}
+
+								<ContextMenu.Separator />
+
+								<!-- Archive -->
+								<ContextMenu.Item onclick={() => onArchive?.(mail)}>
+									<Archive class="size-4 text-zinc-500" strokeWidth={1.5} />
+									{mail.folder === 'archive' ? 'Move to Inbox' : 'Archive'}
+								</ContextMenu.Item>
+
+								<!-- Move to... -->
+								<ContextMenu.Sub>
+									<ContextMenu.SubTrigger>
+										<FolderInput class="size-4 text-zinc-500" strokeWidth={1.5} />
+										Move to...
+									</ContextMenu.SubTrigger>
+									<ContextMenu.SubContent>
+										{#if mail.folder !== 'inbox'}
+											<ContextMenu.Item onclick={() => onMoveTo?.(mail, 'inbox')}>
+												<Inbox class="size-4 text-zinc-500" strokeWidth={1.5} />
+												Inbox
+											</ContextMenu.Item>
+										{/if}
+										{#if mail.folder !== 'sent'}
+											<ContextMenu.Item onclick={() => onMoveTo?.(mail, 'sent')}>
+												<Send class="size-4 text-zinc-500" strokeWidth={1.5} />
+												Sent
+											</ContextMenu.Item>
+										{/if}
+										{#if mail.folder !== 'drafts'}
+											<ContextMenu.Item onclick={() => onMoveTo?.(mail, 'drafts')}>
+												<FileText class="size-4 text-zinc-500" strokeWidth={1.5} />
+												Drafts
+											</ContextMenu.Item>
+										{/if}
+										{#if mail.folder !== 'archive'}
+											<ContextMenu.Item onclick={() => onMoveTo?.(mail, 'archive')}>
+												<Archive class="size-4 text-zinc-500" strokeWidth={1.5} />
+												Archive
+											</ContextMenu.Item>
+										{/if}
+										{#if mail.folder !== 'trash'}
+											<ContextMenu.Item onclick={() => onMoveTo?.(mail, 'trash')}>
+												<Trash2 class="size-4 text-zinc-500" strokeWidth={1.5} />
+												Trash
+											</ContextMenu.Item>
+										{/if}
+									</ContextMenu.SubContent>
+								</ContextMenu.Sub>
+
+								<ContextMenu.Separator />
+
+								<!-- Delete -->
+								<ContextMenu.Item class="text-red-500 data-[highlighted]:text-red-600" onclick={() => onDelete?.(mail)}>
+									<Trash2 class="size-4" strokeWidth={1.5} />
+									Delete
+								</ContextMenu.Item>
+							</ContextMenu.Content>
+						</ContextMenu.Root>
 					{/each}
 				{/each}
 			</div>
