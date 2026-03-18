@@ -15,6 +15,7 @@
     "core:window:allow-set-resizable",
     "core:window:allow-set-always-on-top",
     "core:window:allow-set-skip-taskbar",
-    "opener:default"
+    "opener:default",
+    "notification:default"
   ]
 }

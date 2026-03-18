@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Mail } from '$lib/types.js';
-	import { ChevronDown, ChevronRight } from 'lucide-svelte';
+	import { ChevronDown, ChevronRight, Star } from 'lucide-svelte';
 	import { cn } from '$lib/utils.js';
 
 	interface Props {
@@ -71,9 +71,21 @@
 	const hasReplyTo = mail.reply_to && mail.reply_to.length > 0;
 </script>
 
-<div class="border-b border-border">
+<div class="border-b border-zinc-200">
+	<!-- Notion-style Subject H1 -->
+	<div class="px-8 pt-6 pb-2">
+		<div class="flex items-start gap-3">
+			<h1 class="flex-1 text-2xl font-semibold text-zinc-900 leading-snug tracking-tight">
+				{mail.subject || '(No subject)'}
+			</h1>
+			{#if mail.starred}
+				<Star class="size-5 text-yellow-500 fill-yellow-500 shrink-0" strokeWidth={1.5} />
+			{/if}
+		</div>
+	</div>
+
 	<!-- Main header -->
-	<div class="flex items-start gap-3 p-4">
+	<div class="flex items-start gap-3 px-8 py-3">
 		<!-- Avatar -->
 		<div
 			class={cn(
@@ -87,10 +99,10 @@
 		<!-- Sender info -->
 		<div class="flex min-w-0 flex-1 flex-col">
 			<div class="flex items-center gap-2">
-				<span class="truncate text-sm font-semibold text-text">{mail.from_name}</span>
-				<span class="truncate text-xs text-text-muted">&lt;{mail.from_email}&gt;</span>
+				<span class="truncate text-sm font-semibold text-zinc-900">{mail.from_name}</span>
+				<span class="truncate text-xs text-zinc-500">&lt;{mail.from_email}&gt;</span>
 			</div>
-			<div class="flex items-center gap-2 text-xs text-text-muted">
+			<div class="flex items-center gap-2 text-xs text-zinc-500">
 				<span>to {hasRecipients ? mail.to![0].email : 'me'}</span>
 				<span>·</span>
 				<span>{formatFullDate(mail.timestamp)}</span>
@@ -105,7 +117,7 @@
 		{#if hasRecipients || hasCc || hasBcc || hasReplyTo}
 			<button
 				onclick={() => (showDetails = !showDetails)}
-				class="flex shrink-0 items-center gap-1 rounded px-2 py-1 text-xs text-text-muted transition-colors hover:bg-bg-hover"
+				class="flex shrink-0 items-center gap-1 rounded px-2 py-1 text-xs text-zinc-500 transition-colors hover:bg-zinc-100"
 				aria-label={showDetails ? 'Hide details' : 'Show details'}
 				aria-expanded={showDetails}
 			>
@@ -121,22 +133,22 @@
 
 	<!-- Expanded details -->
 	{#if showDetails && (hasRecipients || hasCc || hasBcc || hasReplyTo)}
-		<div class="border-t border-border bg-bg-secondary px-4 py-2 text-sm">
-			<div class="space-y-1.5">
+		<div class="border-t border-zinc-200 bg-zinc-50 px-8 py-3 text-sm">
+			<div class="space-y-2">
 				<!-- From -->
-				<div class="flex gap-2">
-					<span class="w-12 shrink-0 text-xs text-text-muted">From:</span>
-					<span class="truncate text-text">{formatEmailAddress({ name: mail.from_name, email: mail.from_email })}</span>
+				<div class="flex gap-3">
+					<span class="w-16 shrink-0 text-xs text-zinc-500 font-medium">From:</span>
+					<span class="truncate text-zinc-900">{formatEmailAddress({ name: mail.from_name, email: mail.from_email })}</span>
 				</div>
 
 				<!-- To -->
 				{#if hasRecipients}
-					<div class="flex gap-2">
-						<span class="w-12 shrink-0 text-xs text-text-muted">To:</span>
-						<span class="flex-1 text-text">
+					<div class="flex gap-3">
+						<span class="w-16 shrink-0 text-xs text-zinc-500 font-medium">To:</span>
+						<span class="flex-1 text-zinc-900">
 							{#each mail.to as addr, i}
 								<span class="inline-block">{formatEmailAddress(addr)}</span>
-								{#if i < mail.to!.length - 1}<span class="mx-1 text-text-muted">,</span>{/if}
+								{#if i < mail.to!.length - 1}<span class="mx-1 text-zinc-400">,</span>{/if}
 							{/each}
 						</span>
 					</div>
@@ -144,12 +156,12 @@
 
 				<!-- Cc -->
 				{#if hasCc}
-					<div class="flex gap-2">
-						<span class="w-12 shrink-0 text-xs text-text-muted">Cc:</span>
-						<span class="flex-1 text-text">
+					<div class="flex gap-3">
+						<span class="w-16 shrink-0 text-xs text-zinc-500 font-medium">Cc:</span>
+						<span class="flex-1 text-zinc-900">
 							{#each mail.cc as addr, i}
 								<span class="inline-block">{formatEmailAddress(addr)}</span>
-								{#if i < mail.cc!.length - 1}<span class="mx-1 text-text-muted">,</span>{/if}
+								{#if i < mail.cc!.length - 1}<span class="mx-1 text-zinc-400">,</span>{/if}
 							{/each}
 						</span>
 					</div>
@@ -157,21 +169,21 @@
 
 				<!-- Reply-To -->
 				{#if hasReplyTo}
-					<div class="flex gap-2">
-						<span class="w-12 shrink-0 text-xs text-text-muted">Reply-To:</span>
-						<span class="flex-1 text-text">
+					<div class="flex gap-3">
+						<span class="w-16 shrink-0 text-xs text-zinc-500 font-medium">Reply-To:</span>
+						<span class="flex-1 text-zinc-900">
 							{#each mail.reply_to as addr, i}
 								<span class="inline-block">{formatEmailAddress(addr)}</span>
-								{#if i < mail.reply_to!.length - 1}<span class="mx-1 text-text-muted">,</span>{/if}
+								{#if i < mail.reply_to!.length - 1}<span class="mx-1 text-zinc-400">,</span>{/if}
 							{/each}
 						</span>
 					</div>
 				{/if}
 
 				<!-- Date -->
-				<div class="flex gap-2">
-					<span class="w-12 shrink-0 text-xs text-text-muted">Date:</span>
-					<span class="text-text">{new Date(mail.timestamp).toLocaleString()}</span>
+				<div class="flex gap-3">
+					<span class="w-16 shrink-0 text-xs text-zinc-500 font-medium">Date:</span>
+					<span class="text-zinc-900">{new Date(mail.timestamp).toLocaleString()}</span>
 				</div>
 			</div>
 		</div>

@@ -1,12 +1,9 @@
 <script lang="ts">
-	import ScrollArea from '$lib/components/ui/scroll-area/scroll-area.svelte';
-	import { Button } from '$lib/components/ui/button/index.js';
 	import { ArrowLeft, Mail as MailIcon } from 'lucide-svelte';
 	import type { Mail } from '$lib/types.js';
-	import { MailHeader, MailActions } from '$lib/components/mail/index.js';
+	import { MailHeader, MailActions, EmailRenderer } from '$lib/components/mail/index.js';
 	import { ComposeModal } from '$lib/components/compose/index.js';
 	import * as db from '$lib/db/index.js';
-	import DOMPurify from 'dompurify';
 
 	interface Props {
 		mail: Mail | null;
@@ -85,9 +82,9 @@
 	}
 </script>
 
-<div class="flex flex-1 min-w-0 h-full bg-white">
+<div class="flex flex-1 min-w-0 h-full bg-white overflow-hidden">
 	{#if mail}
-		<div class="flex flex-1 flex-col">
+		<div class="flex flex-1 flex-col min-h-0 overflow-hidden">
 			{#if isMobile}
 				<div class="flex items-center border-b border-zinc-100 px-3 py-2">
 					<button onclick={onBack} class="flex size-7 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-100/60" aria-label="Back to list">
@@ -97,32 +94,30 @@
 			{/if}
 
 			<!-- Mail header -->
-			<MailHeader {mail} />
+			<div class="shrink-0">
+				<MailHeader {mail} />
+			</div>
 
-			<!-- Mail actions -->
-			<MailActions
-				{mail}
-				onReply={handleReply}
-				onReplyAll={handleReplyAll}
-				onForward={handleForward}
-				onArchive={handleArchive}
-				onUnarchive={handleArchive}
-				onDelete={handleDelete}
-				onToggleStar={handleToggleStar}
-			/>
+			<!-- Mail actions toolbar - stays fixed at top -->
+			<div class="shrink-0 border-b border-zinc-100">
+				<MailActions
+					{mail}
+					onReply={handleReply}
+					onReplyAll={handleReplyAll}
+					onForward={handleForward}
+					onArchive={handleArchive}
+					onUnarchive={handleArchive}
+					onDelete={handleDelete}
+					onToggleStar={handleToggleStar}
+				/>
+			</div>
 
-			<!-- Email body -->
-			<ScrollArea class="flex-1">
-				<div class="px-8 pt-8 pb-6 max-w-3xl select-text leading-relaxed" data-allow-context-menu>
-					{#if mail.html_body}
-						<div class="prose prose-sm prose-zinc max-w-none prose-p:text-zinc-600 prose-p:leading-relaxed prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline">
-							{@html DOMPurify.sanitize(mail.html_body)}
-						</div>
-					{:else}
-						<p class="text-[14px] text-zinc-600 leading-relaxed whitespace-pre-wrap">{mail.body}</p>
-					{/if}
+			<!-- Email body - independent scroll, rendered in isolated iframe -->
+			<div class="flex-1 overflow-y-auto min-h-0">
+				<div class="px-8 pt-6 pb-6 max-w-3xl select-text" data-allow-context-menu>
+					<EmailRenderer htmlBody={mail.html_body} plainBody={mail.body} />
 				</div>
-			</ScrollArea>
+			</div>
 		</div>
 	{:else}
 		<!-- Empty State - Linear minimal -->

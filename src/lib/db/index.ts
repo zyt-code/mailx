@@ -83,3 +83,17 @@ export async function unarchiveMail(id: string): Promise<void> {
 export async function toggleStar(id: string, starred: boolean): Promise<void> {
 	await invoke('toggle_star', { id, starred });
 }
+
+/**
+ * Get unread mail count for a folder
+ */
+export async function getUnreadCount(folder: Folder): Promise<number> {
+	return invoke<number>('get_unread_count', { folder });
+}
+
+/**
+ * Clear all mails from the database (for re-syncing clean data)
+ */
+export async function clearDatabase(): Promise<void> {
+	return invoke('clear_database');
+}

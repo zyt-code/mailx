@@ -92,6 +92,7 @@ export interface SyncStatus {
 	last_sync?: number;
 	error_message?: string;
 	retry_count: number;
+	new_count?: number;
 }
 
 export interface OutboxItem {

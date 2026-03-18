@@ -2,12 +2,18 @@ import { eventBus } from './index.js';
 import { syncAccount, syncAllAccounts } from '$lib/sync/index.js';
 import { activeAccount } from '$lib/stores/accountStore.js';
 import { get } from 'svelte/store';
+import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification';
+import { getCurrentWindow } from '@tauri-apps/api/window';
+
+let _initialized = false;
 
 /**
  * Initialize sync event handlers for notifications and trigger wiring.
- * Call once at app startup.
+ * Call once at app startup. Safe to call multiple times (idempotent).
  */
 export function initSyncHandlers(): void {
+  if (_initialized) return;
+  _initialized = true;
   // Wire sync:trigger to actual Tauri invocations
   // This bridges the gap: stores emit 'sync:trigger', this handler calls the backend
   eventBus.on('sync:trigger', async (payload?: { accountId?: string }) => {
@@ -61,7 +67,7 @@ export function initSyncHandlers(): void {
   });
 
   // Show toast on sync success
-  eventBus.onTauri<{ account_email: string }>('sync:completed', ({ account_email }) => {
+  eventBus.onTauri<{ account_email: string; new_count?: number }>('sync:completed', async ({ account_email, new_count }) => {
     if (typeof window !== 'undefined' && (window as any).notification) {
       (window as any).notification.show({
         type: 'success',
@@ -69,6 +75,31 @@ export function initSyncHandlers(): void {
         message: `${account_email} is up to date`,
         duration: 3000
       });
+    }
+
+    // Send system notification for new mail if window is not focused
+    if (new_count && new_count > 0) {
+      try {
+        const window = getCurrentWindow();
+        const focused = await window.isFocused();
+
+        if (!focused) {
+          let permissionGranted = await isPermissionGranted();
+          if (!permissionGranted) {
+            const result = await requestPermission();
+            permissionGranted = result === 'granted';
+          }
+
+          if (permissionGranted) {
+            sendNotification({
+              title: 'New Mail',
+              body: `${new_count} new message${new_count > 1 ? 's' : ''} in ${account_email}`
+            });
+          }
+        }
+      } catch (e) {
+        console.error('[syncHandlers] Failed to send notification:', e);
+      }
     }
   });
 }

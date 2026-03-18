@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { invoke } from '@tauri-apps/api/core';
-	import { Plus, Loader2, AtSign, Sparkles } from 'lucide-svelte';
+	import { Plus, Loader2, AtSign, Trash2 } from 'lucide-svelte';
+	import * as db from '$lib/db/index.js';
 
 	interface Account {
 		id: string;
@@ -12,16 +13,10 @@
 		is_active: boolean;
 	}
 
-	const providers = [
-		{ id: 'gmail', name: 'Gmail', domain: 'gmail.com', color: '#EA4335', logo: 'G' },
-		{ id: 'outlook', name: 'Outlook', domain: 'outlook.com', color: '#0078D4', logo: 'O' },
-		{ id: 'qq', name: 'QQ Mail', domain: 'qq.com', color: '#12B7F5', logo: 'Q' },
-		{ id: '163', name: '163 Mail', domain: '163.com', color: '#D93B30', logo: 'N' }
-	];
-
 	let accounts = $state<Account[]>([]);
 	let isLoading = $state(true);
 	let error = $state<string | null>(null);
+	let isClearing = $state(false);
 
 	async function loadAccounts() {
 		isLoading = true;
@@ -44,10 +39,6 @@
 		goto('/settings/accounts/new');
 	}
 
-	function quickConnect(domain: string) {
-		goto(`/settings/accounts/new?provider=${domain}`);
-	}
-
 	function editAccount(id: string) {
 		goto(`/settings/accounts/${id}`);
 	}
@@ -58,6 +49,21 @@
 
 	function getDisplayName(account: Account) {
 		return account.name || account.email;
+	}
+
+	async function handleClearDatabase() {
+		if (!confirm('Are you sure you want to clear all emails from the database? This will delete all synced emails and cannot be undone.')) {
+			return;
+		}
+		isClearing = true;
+		try {
+			await db.clearDatabase();
+			alert('Database cleared successfully. Please re-sync your accounts to fetch clean emails.');
+		} catch (e) {
+			alert('Failed to clear database: ' + (e instanceof Error ? e.message : String(e)));
+		} finally {
+			isClearing = false;
+		}
 	}
 </script>
 
@@ -87,6 +93,25 @@
 	{/if}
 </header>
 
+<!-- Developer Tools Section -->
+<div class="devtools-section">
+	<h3 class="devtools-title">Developer Tools</h3>
+	<p class="devtools-description">Temporary tools for testing and development</p>
+	<button
+		onclick={handleClearDatabase}
+		disabled={isClearing}
+		class="clear-db-button"
+	>
+		{#if isClearing}
+			<Loader2 class="size-4 animate-spin" />
+		{:else}
+			<Trash2 class="size-4" />
+		{/if}
+		<span>{isClearing ? 'Clearing...' : 'Clear Database'}</span>
+	</button>
+	<p class="devtools-hint">Clears all emails from the database. Re-sync accounts to fetch clean data.</p>
+</div>
+
 <!-- Error State -->
 {#if error}
 	<div class="error-banner">
@@ -109,7 +134,7 @@
 	<div class="empty-state">
 		<div class="empty-illustration">
 			<div class="illustration-circle">
-				<Sparkles class="size-12 text-violet-500" />
+				<AtSign class="size-12 text-violet-500" />
 			</div>
 		</div>
 		<h3 class="empty-title">No accounts yet</h3>
@@ -124,24 +149,6 @@
 			<Plus class="size-5" />
 			<span>Add Your First Account</span>
 		</button>
-
-		<!-- Quick Connect Grid -->
-		<div class="quick-connect">
-			<p class="quick-connect-label">Quick connect</p>
-			<div class="quick-connect-grid">
-				{#each providers as provider}
-					<button
-						onclick={() => quickConnect(provider.domain)}
-						class="provider-card"
-					>
-						<div class="provider-logo" style="background: {provider.color}">
-							<span>{provider.logo}</span>
-						</div>
-						<span class="provider-name">{provider.name}</span>
-					</button>
-				{/each}
-			</div>
-		</div>
 
 		<p class="empty-hint-text">Your credentials are stored securely on this device</p>
 	</div>
@@ -363,71 +370,6 @@
 		transform: translateY(0);
 	}
 
-	/* Quick Connect Grid */
-	.quick-connect {
-		margin-top: 2.5rem;
-		width: 100%;
-		max-width: 400px;
-	}
-
-	.quick-connect-label {
-		font-size: 0.75rem;
-		font-weight: 500;
-		color: #a1a1aa;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-		margin-bottom: 0.75rem;
-		text-align: center;
-	}
-
-	.quick-connect-grid {
-		display: grid;
-		grid-template-columns: repeat(4, 1fr);
-		gap: 0.625rem;
-	}
-
-	.provider-card {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 0.5rem;
-		padding: 0.875rem 0.5rem;
-		background: white;
-		border: 1px solid #e4e4e7;
-		border-radius: 12px;
-		cursor: pointer;
-		transition: all 0.2s ease;
-	}
-
-	.provider-card:hover {
-		border-color: #d4d4d8;
-		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-		transform: translateY(-1px);
-	}
-
-	.provider-card:active {
-		transform: translateY(0);
-	}
-
-	.provider-logo {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		width: 36px;
-		height: 36px;
-		border-radius: 10px;
-		color: white;
-		font-size: 0.9375rem;
-		font-weight: 700;
-		flex-shrink: 0;
-	}
-
-	.provider-name {
-		font-size: 0.6875rem;
-		font-weight: 500;
-		color: #52525b;
-	}
-
 	.empty-hint-text {
 		margin-top: 1.5rem;
 		font-size: 11px;
@@ -603,5 +545,62 @@
 			opacity: 1;
 			transform: translateX(0);
 		}
+	}
+
+	/* Devtools Section */
+	.devtools-section {
+		padding: 1.5rem;
+		margin-bottom: 1.5rem;
+		background: rgba(255, 255, 255, 0.7);
+		backdrop-filter: blur(10px);
+		border: 1px solid rgba(0, 0, 0, 0.06);
+		border-radius: 16px;
+		animation: fadeIn 0.4s ease-out;
+	}
+
+	.devtools-title {
+		font-size: 1rem;
+		font-weight: 560;
+		letter-spacing: -0.01em;
+		color: #1d1d1f;
+		margin-bottom: 0.25rem;
+	}
+
+	.devtools-description {
+		font-size: 0.8125rem;
+		color: #6b6b6b;
+		margin-bottom: 1rem;
+	}
+
+	.clear-db-button {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.625rem 1rem;
+		font-size: 0.8125rem;
+		font-weight: 500;
+		color: #dc2626;
+		background: rgba(220, 38, 38, 0.08);
+		border: 1px solid rgba(220, 38, 38, 0.2);
+		border-radius: 10px;
+		cursor: pointer;
+		transition: all 0.2s ease;
+	}
+
+	.clear-db-button:hover:not(:disabled) {
+		background: rgba(220, 38, 38, 0.12);
+		border-color: rgba(220, 38, 38, 0.3);
+	}
+
+	.clear-db-button:disabled {
+		opacity: 0.6;
+		cursor: not-allowed;
+	}
+
+	.devtools-hint {
+		margin-top: 0.75rem;
+		font-size: 11px;
+		color: #a1a1aa;
+		line-height: 1.4;
 	}
 </style>

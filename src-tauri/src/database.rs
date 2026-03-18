@@ -1,6 +1,7 @@
 use rusqlite::{Connection, Result as SqliteResult, params};
 use std::fs;
 use std::sync::Mutex;
+use std::collections::HashSet;
 use tauri::AppHandle;
 use tauri::Manager;
 
@@ -35,6 +36,8 @@ pub struct Mail {
     pub timestamp: i64,
     pub folder: String,
     pub unread: bool,
+    #[serde(default)]
+    pub account_id: Option<String>,
     #[serde(default)]
     pub to: Option<Vec<EmailAddress>>,
     #[serde(default)]
@@ -123,9 +126,6 @@ impl Database {
 
         // Run any schema migrations BEFORE seeding
         self.run_migrations()?;
-
-        // Seed initial data if database is empty
-        self.seed_initial_data()?;
 
         Ok(())
     }
@@ -235,41 +235,12 @@ impl Database {
         Ok(())
     }
 
-    /// Seed initial test data if the database is empty
-    fn seed_initial_data(&self) -> SqliteResult<()> {
-        let conn = self.conn.lock().unwrap();
-
-        // Check if database is empty
-        let count: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM mails",
-            [],
-            |row| row.get(0)
-        ).unwrap_or(0);
-
-        if count > 0 {
-            return Ok(()); // Database already has data
-        }
-
-        drop(conn); // Release lock before calling insert_mail
-
-        // Insert seed mails one at a time to avoid large stack allocations
-        let now = chrono::Utc::now().timestamp_millis();
-
-        // Create and insert each mail individually (heap allocated)
-        let mails = get_seed_mails(now);
-
-        for mail in mails {
-            self.insert_mail(&mail)?;
-        }
-
-        Ok(())
-    }
 
     /// Get all mails, optionally filtered by folder
     pub fn get_mails(&self, folder: Option<String>) -> SqliteResult<Vec<Mail>> {
         let conn = self.conn.lock().unwrap();
 
-        let mut query = "SELECT id, from_name, from_email, subject, preview, body, timestamp, folder, unread, to_json, cc_json, bcc_json, html_body, reply_to_json, starred, has_attachments FROM mails".to_string();
+        let mut query = "SELECT id, from_name, from_email, subject, preview, body, timestamp, folder, unread, account_id, to_json, cc_json, bcc_json, html_body, reply_to_json, starred, has_attachments FROM mails".to_string();
         let mut mails: Vec<Mail> = Vec::new();
 
         if let Some(folder) = folder {
@@ -286,13 +257,14 @@ impl Database {
                     timestamp: row.get(6)?,
                     folder: row.get(7)?,
                     unread: row.get::<_, i32>(8)? == 1,
-                    to: parse_json_addresses(row.get(9)?),
-                    cc: parse_json_addresses(row.get(10)?),
-                    bcc: parse_json_addresses(row.get(11)?),
-                    html_body: row.get(12)?,
-                    reply_to: parse_json_addresses(row.get(13)?),
-                    starred: Some(row.get::<_, i32>(14).unwrap_or(0) == 1),
-                    has_attachments: Some(row.get::<_, i32>(15).unwrap_or(0) == 1),
+                    account_id: row.get(9)?,
+                    to: parse_json_addresses(row.get(10)?),
+                    cc: parse_json_addresses(row.get(11)?),
+                    bcc: parse_json_addresses(row.get(12)?),
+                    html_body: row.get(13)?,
+                    reply_to: parse_json_addresses(row.get(14)?),
+                    starred: Some(row.get::<_, i32>(15).unwrap_or(0) == 1),
+                    has_attachments: Some(row.get::<_, i32>(16).unwrap_or(0) == 1),
                     attachments: None, // Loaded separately
                 })
             })?;
@@ -313,13 +285,14 @@ impl Database {
                     timestamp: row.get(6)?,
                     folder: row.get(7)?,
                     unread: row.get::<_, i32>(8)? == 1,
-                    to: parse_json_addresses(row.get(9)?),
-                    cc: parse_json_addresses(row.get(10)?),
-                    bcc: parse_json_addresses(row.get(11)?),
-                    html_body: row.get(12)?,
-                    reply_to: parse_json_addresses(row.get(13)?),
-                    starred: Some(row.get::<_, i32>(14).unwrap_or(0) == 1),
-                    has_attachments: Some(row.get::<_, i32>(15).unwrap_or(0) == 1),
+                    account_id: row.get(9)?,
+                    to: parse_json_addresses(row.get(10)?),
+                    cc: parse_json_addresses(row.get(11)?),
+                    bcc: parse_json_addresses(row.get(12)?),
+                    html_body: row.get(13)?,
+                    reply_to: parse_json_addresses(row.get(14)?),
+                    starred: Some(row.get::<_, i32>(15).unwrap_or(0) == 1),
+                    has_attachments: Some(row.get::<_, i32>(16).unwrap_or(0) == 1),
                     attachments: None, // Loaded separately
                 })
             })?;
@@ -376,6 +349,7 @@ impl Database {
         let cc_json = serialize_addresses(&mail.cc);
         let bcc_json = serialize_addresses(&mail.bcc);
         let reply_to_json = serialize_addresses(&mail.reply_to);
+        let clean_preview = strip_html(&mail.preview);
         conn.execute(
             "INSERT INTO mails (id, from_name, from_email, subject, preview, body, timestamp, folder, unread, created_at, to_json, cc_json, bcc_json, html_body, reply_to_json, starred, has_attachments)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)",
@@ -384,7 +358,7 @@ impl Database {
                 &mail.from_name,
                 &mail.from_email,
                 &mail.subject,
-                &mail.preview,
+                clean_preview,
                 &mail.body,
                 &mail.timestamp,
                 &mail.folder,
@@ -409,6 +383,7 @@ impl Database {
         let cc_json = serialize_addresses(&mail.cc);
         let bcc_json = serialize_addresses(&mail.bcc);
         let reply_to_json = serialize_addresses(&mail.reply_to);
+        let clean_preview = strip_html(&mail.preview);
         conn.execute(
             "UPDATE mails SET
              from_name = ?1,
@@ -431,7 +406,7 @@ impl Database {
                 &mail.from_name,
                 &mail.from_email,
                 &mail.subject,
-                &mail.preview,
+                clean_preview,
                 &mail.body,
                 &mail.timestamp,
                 &mail.folder,
@@ -453,6 +428,13 @@ impl Database {
     pub fn delete_mail(&self, id: &str) -> SqliteResult<()> {
         let conn = self.conn.lock().unwrap();
         conn.execute("DELETE FROM mails WHERE id = ?1", params![id])?;
+        Ok(())
+    }
+
+    /// Clear all mails from the database (useful for re-syncing)
+    pub fn clear_all_mails(&self) -> SqliteResult<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute("DELETE FROM mails", [])?;
         Ok(())
     }
 
@@ -511,6 +493,16 @@ impl Database {
         )?;
         Ok(())
     }
+
+    /// Get count of unread mails in a folder
+    pub fn get_unread_count(&self, folder: &str) -> SqliteResult<i64> {
+        let conn = self.conn.lock().unwrap();
+        conn.query_row(
+            "SELECT COUNT(*) FROM mails WHERE folder = ?1 AND unread = 1",
+            params![folder],
+            |row| row.get(0),
+        )
+    }
 }
 
 /// Parse a JSON string into a vector of EmailAddress
@@ -523,154 +515,15 @@ fn serialize_addresses(addresses: &Option<Vec<EmailAddress>>) -> Option<String> 
     addresses.as_ref().and_then(|addrs| serde_json::to_string(addrs).ok())
 }
 
-/// Generate seed mail data for initial database population.
-/// Returns data on the heap to avoid large stack allocations.
-fn get_seed_mails(now: i64) -> Vec<Mail> {
-    vec![
-        Mail {
-            id: "1".to_string(),
-            from_name: "Alice Chen".to_string(),
-            from_email: "alice.chen@example.com".to_string(),
-            subject: "Project update for Q1".to_string(),
-            preview: "Hi team, here is the latest update on our Q1 goals...".to_string(),
-            body: "Hi team,\n\nHere is the latest update on our Q1 goals. We have completed 80% of the planned features and are on track to deliver by the end of March.\n\nKey highlights:\n- Authentication module is complete\n- Dashboard redesign is in review\n- API performance improved by 40%\n\nPlease review the attached report and let me know if you have any questions.\n\nBest,\nAlice".to_string(),
-            html_body: Some("<p>Hi team,</p><p>Here is the latest update on our Q1 goals. We have completed <strong>80%</strong> of the planned features and are on track to deliver by the end of March.</p><p>Key highlights:</p><ul><li>Authentication module is <strong>complete</strong></li><li>Dashboard redesign is in review</li><li>API performance improved by <em>40%</em></li></ul><p>Please review the attached report and let me know if you have any questions.</p><p>Best,<br>Alice</p>".to_string()),
-            timestamp: now - (4 * 60 * 60 * 1000),
-            folder: "inbox".to_string(),
-            unread: true,
-            to: None,
-            cc: None,
-            bcc: None,
-            reply_to: None,
-            attachments: None,
-            starred: Some(false),
-            has_attachments: Some(true),
-        },
-        Mail {
-            id: "2".to_string(),
-            from_name: "Bob Smith".to_string(),
-            from_email: "bob.smith@example.com".to_string(),
-            subject: "Meeting notes".to_string(),
-            preview: "Attached are the meeting notes from yesterday's standup...".to_string(),
-            body: "Hi everyone,\n\nAttached are the meeting notes from yesterday's standup. Here's a quick summary:\n\n1. Sprint progress is at 65%\n2. Two blockers identified — need design review for the new sidebar and API endpoint for mail sync\n3. Next demo is scheduled for Friday\n\nAction items:\n- Alice: Finalize Q1 report\n- Carol: Update mockups\n- David: Send invoices\n\nThanks,\nBob".to_string(),
-            html_body: None,
-            timestamp: now - (5 * 60 * 60 * 1000),
-            folder: "inbox".to_string(),
-            unread: true,
-            to: None,
-            cc: None,
-            bcc: None,
-            reply_to: None,
-            attachments: None,
-            starred: Some(true),
-            has_attachments: Some(false),
-        },
-        Mail {
-            id: "3".to_string(),
-            from_name: "Carol Wang".to_string(),
-            from_email: "carol.wang@example.com".to_string(),
-            subject: "Design review feedback".to_string(),
-            preview: "Great work on the mockups! I have a few suggestions...".to_string(),
-            body: "Great work on the mockups! I have a few suggestions:\n\n1. The sidebar could use more contrast between active and inactive states\n2. Consider adding a subtle animation for the panel resize\n3. The mobile layout should stack vertically rather than hiding the mail list\n\nOverall the direction looks fantastic. Let me know when you have an updated version and I will do another pass.\n\nCheers,\nCarol".to_string(),
-            html_body: None,
-            timestamp: now - (24 * 60 * 60 * 1000),
-            folder: "inbox".to_string(),
-            unread: false,
-            to: None,
-            cc: None,
-            bcc: None,
-            reply_to: None,
-            attachments: None,
-            starred: Some(false),
-            has_attachments: Some(false),
-        },
-        Mail {
-            id: "4".to_string(),
-            from_name: "David Lee".to_string(),
-            from_email: "david.lee@example.com".to_string(),
-            subject: "Invoice #1234".to_string(),
-            preview: "Please find the invoice for March attached...".to_string(),
-            body: "Hi,\n\nPlease find the invoice for March attached. The total amount is $4,500 for the consulting services provided.\n\nPayment terms: Net 30\nDue date: April 15, 2026\n\nLet me know if you need any adjustments.\n\nRegards,\nDavid Lee".to_string(),
-            html_body: None,
-            timestamp: now - (2 * 24 * 60 * 60 * 1000),
-            folder: "inbox".to_string(),
-            unread: false,
-            to: None,
-            cc: None,
-            bcc: None,
-            reply_to: None,
-            attachments: None,
-            starred: Some(false),
-            has_attachments: Some(true),
-        },
-        Mail {
-            id: "5".to_string(),
-            from_name: "Eve Johnson".to_string(),
-            from_email: "eve.johnson@example.com".to_string(),
-            subject: "Welcome to the team!".to_string(),
-            preview: "We are thrilled to have you join us. Here is what...".to_string(),
-            body: "Welcome to the team!\n\nWe are thrilled to have you join us. Here is what you need to get started:\n\n1. Set up your development environment using the README\n2. Join our Slack channels: #general, #engineering, #random\n3. Schedule a 1:1 with your manager\n4. Complete the onboarding checklist in Notion\n\nIf you have any questions, do not hesitate to reach out. We are here to help!\n\nBest,\nEve".to_string(),
-            html_body: None,
-            timestamp: now - (4 * 24 * 60 * 60 * 1000),
-            folder: "inbox".to_string(),
-            unread: false,
-            to: None,
-            cc: None,
-            bcc: None,
-            reply_to: None,
-            attachments: None,
-            starred: Some(false),
-            has_attachments: Some(false),
-        },
-        Mail {
-            id: "6".to_string(),
-            from_name: "Me".to_string(),
-            from_email: "me@example.com".to_string(),
-            subject: "Re: Project update for Q1".to_string(),
-            preview: "Thanks for the update, Alice. Looks great!".to_string(),
-            body: "Thanks for the update, Alice. Looks great!\n\nI reviewed the report and everything is on track. Let us schedule a quick sync on Wednesday to discuss the remaining 20%.\n\nBest regards".to_string(),
-            html_body: None,
-            timestamp: now - (3 * 60 * 60 * 1000),
-            folder: "sent".to_string(),
-            unread: false,
-            to: Some(vec![EmailAddress {
-                name: "Alice Chen".to_string(),
-                email: "alice.chen@example.com".to_string(),
-            }]),
-            cc: None,
-            bcc: None,
-            reply_to: None,
-            attachments: None,
-            starred: Some(false),
-            has_attachments: Some(false),
-        },
-        Mail {
-            id: "7".to_string(),
-            from_name: "Me".to_string(),
-            from_email: "me@example.com".to_string(),
-            subject: "Draft: Team offsite planning".to_string(),
-            preview: "Ideas for the upcoming team offsite in April...".to_string(),
-            body: "Ideas for the upcoming team offsite in April:\n\n- Location: Mountain retreat or coastal venue\n- Duration: 2-3 days\n- Activities: Team building, strategy planning, hackathon\n- Budget: TBD\n\nNeed to finalize by end of month.".to_string(),
-            html_body: None,
-            timestamp: now - (6 * 24 * 60 * 60 * 1000),
-            folder: "drafts".to_string(),
-            unread: false,
-            to: Some(vec![
-                EmailAddress {
-                    name: "Bob Smith".to_string(),
-                    email: "bob.smith@example.com".to_string(),
-                },
-                EmailAddress {
-                    name: "Carol Wang".to_string(),
-                    email: "carol.wang@example.com".to_string(),
-                },
-            ]),
-            cc: None,
-            bcc: None,
-            reply_to: None,
-            attachments: None,
-            starred: Some(false),
-            has_attachments: Some(false),
-        },
-    ]
+/// Strip HTML tags from text, returning plain text only
+/// Uses ammonia to safely remove HTML/CSS while preserving text content
+fn strip_html(html: &str) -> String {
+    // Configure ammonia to allow basic text formatting but remove all styling
+    let clean = ammonia::Builder::default()
+        .tags(HashSet::new()) // Remove all HTML tags
+        .clean(html)
+        .to_string();
+
+    // Clean up extra whitespace that may result from HTML removal
+    clean.split_whitespace().collect::<Vec<_>>().join(" ")
 }

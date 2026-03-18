@@ -1,13 +1,12 @@
 <script lang="ts">
 	import { cn } from '$lib/utils.js';
-	import ScrollArea from '$lib/components/ui/scroll-area/scroll-area.svelte';
 	import * as ContextMenu from '$lib/components/ui/context-menu/index.js';
 	import { Search, Paperclip, MailOpen, Mail as MailIcon, Archive, Trash2, FolderInput, Inbox, Send, FileText } from 'lucide-svelte';
-	import type { Mail, Folder } from '$lib/types.js';
+	import type { Mail, Folder, Account } from '$lib/types.js';
+	import { accounts } from '$lib/stores/accountStore.js';
+	import { displayedEmails, activeFolder as storeActiveFolder } from '$lib/stores/mailStore.js';
 
 	interface Props {
-		mails: Mail[];
-		activeFolder: Folder;
 		selectedMailId: string | null;
 		onSelectMail: (id: string) => void;
 		onMarkRead?: (mail: Mail, read: boolean) => void;
@@ -16,17 +15,46 @@
 		onMoveTo?: (mail: Mail, folder: Folder) => void;
 		width: number | undefined;
 		isAccountConfigured?: boolean;
+		isSyncing?: boolean;
 	}
 
-	let { mails, activeFolder, selectedMailId, onSelectMail, onMarkRead, onDelete, onArchive, onMoveTo, width, isAccountConfigured = true }: Props = $props();
+	let { selectedMailId, onSelectMail, onMarkRead, onDelete, onArchive, onMoveTo, width, isAccountConfigured = true, isSyncing = false }: Props = $props();
+
+	// Get all accounts for account indicators
+	let allAccounts = $state<Account[]>([]);
+
+	$effect(() => {
+		const unsub = accounts.subscribe((accs) => {
+			allAccounts = accs;
+		});
+		return unsub;
+	});
+
+	// Use displayedEmails from mailStore (already filtered by folder and account)
+	let displayedMails = $state<Mail[]>([]);
+
+	$effect(() => {
+		const unsub = displayedEmails.subscribe((mails) => {
+			displayedMails = mails;
+		});
+		return unsub;
+	});
+
+	// Get activeFolder from store for label display
+	let activeFolder: Folder = $state('inbox');
+
+	$effect(() => {
+		const unsub = storeActiveFolder.subscribe((folder) => {
+			activeFolder = folder;
+		});
+		return unsub;
+	});
 
 	let searchQuery = $state('');
 
-	let folderMails = $derived(mails.filter((m) => m.folder === activeFolder));
-
 	let filteredMails = $derived(
 		searchQuery.trim()
-			? folderMails.filter((m) => {
+			? displayedMails.filter((m) => {
 					const q = searchQuery.toLowerCase();
 					return (
 						m.from_name.toLowerCase().includes(q) ||
@@ -35,7 +63,7 @@
 						m.preview.toLowerCase().includes(q)
 					);
 				})
-			: folderMails
+			: displayedMails
 	);
 
 	// Group mails by date category
@@ -102,15 +130,45 @@
 			return mailDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 		}
 	}
+
+	// Get account color for a mail based on account_id
+	function getAccountColor(mail: Mail): string {
+		if (!mail.account_id) return 'bg-zinc-300';
+		const colors = [
+			'bg-blue-500',
+			'bg-green-500',
+			'bg-purple-500',
+			'bg-orange-500',
+			'bg-pink-500',
+			'bg-teal-500',
+			'bg-cyan-500',
+			'bg-red-500'
+		];
+		// Use account_id to generate consistent color
+		let hash = 0;
+		for (let i = 0; i < mail.account_id.length; i++) {
+			hash = mail.account_id.charCodeAt(i) + ((hash << 5) - hash);
+		}
+		return colors[Math.abs(hash) % colors.length];
+	}
+
+	// Get account for a mail
+	function getAccountForMail(mail: Mail): Account | undefined {
+		if (!mail.account_id) return undefined;
+		return allAccounts.find((acc) => acc.id === mail.account_id);
+	}
+
+	// Check if multiple accounts exist
+	let hasMultipleAccounts = $derived(allAccounts.length > 1);
 </script>
 
 <div
-	class="flex h-full flex-col bg-white select-none"
+	class="flex h-full flex-col bg-white select-none overflow-hidden shrink-0 border-r border-zinc-100"
 	style:width={width !== undefined ? `${width}px` : undefined}
 	class:w-full={width === undefined}
 >
 	<!-- Search - Notion Quick Find style -->
-	<div class="flex items-center gap-2 px-4 py-2.5 border-b border-zinc-100">
+	<div class="flex items-center gap-2 px-4 py-2.5 border-b border-zinc-100 shrink-0">
 		<Search class={cn(
 			"size-4 shrink-0",
 			isAccountConfigured ? "text-zinc-300" : "text-zinc-200"
@@ -129,8 +187,15 @@
 		/>
 	</div>
 
-	<!-- Mail items -->
-	<ScrollArea class="flex-1">
+	<!-- Sync loading bar -->
+	{#if isSyncing}
+		<div class="shrink-0 h-[2px] w-full bg-zinc-100 overflow-hidden">
+			<div class="h-full w-1/3 bg-blue-500 rounded-full animate-[shimmer_1.5s_ease-in-out_infinite]"></div>
+		</div>
+	{/if}
+
+	<!-- Mail items - independent scroll -->
+	<div class="flex-1 overflow-y-auto min-h-0">
 		{#if filteredMails.length === 0}
 			<div class="flex flex-col items-center justify-center px-6 py-16">
 				<p class="text-[13px] text-zinc-400">No emails found</p>
@@ -167,6 +232,16 @@
 									<!-- Unread blue dot indicator -->
 									{#if mail.unread && mail.id !== selectedMailId}
 										<div class="absolute left-0 top-0 bottom-0 w-[2px] bg-blue-500"></div>
+									{/if}
+
+									<!-- Account indicator dot (when multiple accounts) -->
+									{#if hasMultipleAccounts && mail.account_id}
+										<div class="flex-shrink-0 pt-1">
+											<div
+												class="size-2.5 rounded-full {getAccountColor(mail)}"
+												title={getAccountForMail(mail)?.email || 'Unknown account'}
+											></div>
+										</div>
 									{/if}
 
 									<!-- Content -->
@@ -288,5 +363,5 @@
 				{/each}
 			</div>
 		{/if}
-	</ScrollArea>
+	</div>
 </div>

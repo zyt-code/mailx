@@ -3,6 +3,7 @@ use crate::credentials::CredentialManager;
 use crate::database::Database;
 use crate::imap_client::ImapClient;
 use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use tauri::{AppHandle, Emitter};
 use thiserror::Error;
@@ -28,6 +29,9 @@ pub enum SyncError {
     #[error("Sync cancelled")]
     Cancelled,
 
+    #[error("Already syncing")]
+    AlreadySyncing,
+
     #[error("Network error: {0}")]
     Network(String),
 }
@@ -44,6 +48,8 @@ pub struct SyncStatus {
     pub last_sync: Option<i64>,
     pub error_message: Option<String>,
     pub retry_count: u32,
+    #[serde(default)]
+    pub new_count: u32,
 }
 
 /// Sync state enum
@@ -62,6 +68,7 @@ pub struct SyncManager {
     credential_manager: Arc<CredentialManager>,
     database: Arc<Database>,
     sync_handles: Arc<Mutex<Vec<tokio::task::JoinHandle<()>>>>,
+    is_syncing: Arc<AtomicBool>,
 }
 
 unsafe impl Send for SyncManager {}
@@ -81,6 +88,7 @@ impl SyncManager {
             credential_manager,
             database,
             sync_handles: Arc::new(Mutex::new(Vec::new())),
+            is_syncing: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -94,6 +102,11 @@ impl SyncManager {
 
     /// Trigger an immediate sync for a specific account
     pub async fn sync_account(&self, account_id: &str) -> Result<SyncStatus> {
+        // Acquire atomic lock — prevents concurrent syncs
+        if self.is_syncing.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst).is_err() {
+            return Err(SyncError::AlreadySyncing);
+        }
+
         println!("[Sync] Starting sync for account '{}'", account_id);
 
         // Get the account
@@ -101,6 +114,7 @@ impl SyncManager {
             .account_manager
             .get(account_id)
             .map_err(|e| {
+                self.is_syncing.store(false, Ordering::SeqCst);
                 println!("[Sync] Failed to get account '{}': {}", account_id, e);
                 SyncError::Account(e.to_string())
             })?;
@@ -112,7 +126,7 @@ impl SyncManager {
         }));
 
         // Run the actual sync, catch errors to emit sync:failed
-        match self.sync_account_inner(account_id, &account).await {
+        let result = match self.sync_account_inner(account_id, &account).await {
             Ok(status) => Ok(status),
             Err(e) => {
                 let error_msg = e.to_string();
@@ -126,7 +140,11 @@ impl SyncManager {
 
                 Err(e)
             }
-        }
+        };
+
+        // Always release lock
+        self.is_syncing.store(false, Ordering::SeqCst);
+        result
     }
 
     /// Inner sync logic — separated so sync_account can wrap errors
@@ -159,7 +177,7 @@ impl SyncManager {
         let imap_client = ImapClient::new(imap_config, account.email.clone(), password);
 
         let mails = imap_client
-            .fetch_emails("INBOX", 100)
+            .fetch_emails("INBOX", 50)
             .await
             .map_err(|e| {
                 println!("[Sync] IMAP fetch error for '{}': {}", account.email, e);
@@ -171,7 +189,10 @@ impl SyncManager {
         // Store emails in database
         let mut inserted = 0u32;
         let mut skipped = 0u32;
-        for mail in mails {
+        for mut mail in mails {
+            // Tag each mail with the account that owns it
+            mail.account_id = Some(account_id.to_string());
+
             match self.database.get_mail(&mail.id) {
                 Ok(Some(_)) => {
                     skipped += 1;
@@ -203,10 +224,15 @@ impl SyncManager {
             last_sync: Some(now),
             error_message: None,
             retry_count: 0,
+            new_count: inserted,
         };
 
         let _ = self.app_handle.emit("sync:completed", json!(status));
-        let _ = self.app_handle.emit("mails:updated", ());
+
+        // Only trigger UI reload when new emails were actually inserted
+        if inserted > 0 {
+            let _ = self.app_handle.emit("mails:updated", ());
+        }
 
         println!("[Sync] Sync COMPLETED for '{}'", account.email);
         Ok(status)
@@ -232,6 +258,7 @@ impl SyncManager {
                         last_sync: None,
                         error_message: Some(e.to_string()),
                         retry_count: 0,
+                        new_count: 0,
                     });
                 }
             }
@@ -303,6 +330,7 @@ mod tests {
             last_sync: Some(123456789),
             error_message: None,
             retry_count: 0,
+            new_count: 0,
         };
 
         let json = serde_json::to_string(&status).unwrap();

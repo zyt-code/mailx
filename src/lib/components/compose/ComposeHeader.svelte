@@ -41,6 +41,11 @@
 	}
 
 	function handleKeyDown(event: KeyboardEvent, list: EmailAddress[], inputValue: string): void {
+		// Allow paste shortcuts (Cmd+V / Ctrl+V) to pass through
+		if ((event.metaKey || event.ctrlKey) && event.key === 'v') {
+			return; // Let the default paste behavior happen
+		}
+
 		if (event.key === 'Enter' || event.key === ',') {
 			event.preventDefault();
 			addRecipient(list, inputValue);
@@ -77,6 +82,7 @@
 				type="text"
 				placeholder={values.to.length === 0 ? "Recipients" : ""}
 				class="flex-1 min-w-[100px] bg-transparent text-[13px] text-zinc-900 outline-none placeholder:text-zinc-300"
+				onpaste={(e) => { /* Allow paste */ }}
 			/>
 		</div>
 		<div class="flex gap-1">
@@ -109,6 +115,7 @@
 					type="text"
 					placeholder=""
 					class="flex-1 min-w-[100px] bg-transparent text-[13px] text-zinc-900 outline-none placeholder:text-zinc-300"
+					onpaste={(e) => { /* Allow paste */ }}
 				/>
 			</div>
 		</div>
@@ -134,6 +141,7 @@
 					type="text"
 					placeholder=""
 					class="flex-1 min-w-[100px] bg-transparent text-[13px] text-zinc-900 outline-none placeholder:text-zinc-300"
+					onpaste={(e) => { /* Allow paste */ }}
 				/>
 			</div>
 		</div>
@@ -147,6 +155,7 @@
 			bind:value={values.subject}
 			placeholder="Subject"
 			class="flex-1 bg-transparent text-[13px] text-zinc-900 outline-none placeholder:text-zinc-300 font-medium"
+			onpaste={(e) => { /* Allow paste */ }}
 		/>
 	</div>
 </div>

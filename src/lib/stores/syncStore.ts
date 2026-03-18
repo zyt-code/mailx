@@ -9,6 +9,7 @@ interface SyncStoreState {
   currentAccountEmail: string | null;
   progress: SyncProgress | null;
   error: string | null;
+  lastSyncTime: number | null;
 }
 
 const _state = writable<SyncStoreState>({
@@ -16,19 +17,25 @@ const _state = writable<SyncStoreState>({
   currentAccount: null,
   currentAccountEmail: null,
   progress: null,
-  error: null
+  error: null,
+  lastSyncTime: null
 });
 
 export const syncState = derived(_state, $state => $state);
 export const isSyncing = derived(_state, $state => $state.isSyncing);
 export const syncProgress = derived(_state, $state => $state.progress);
 export const syncError = derived(_state, $state => $state.error);
+export const lastSyncTime = derived(_state, $state => $state.lastSyncTime);
+
+let _initialized = false;
 
 /**
  * Initialize SyncStore with Tauri event listeners.
- * Call once at app startup.
+ * Call once at app startup. Safe to call multiple times (idempotent).
  */
 export function initSyncStore(): void {
+  if (_initialized) return;
+  _initialized = true;
   eventBus.onTauri<{ account_id: string; email: string }>('sync:started', ({ account_id, email }) => {
     _state.update(s => ({
       ...s,
@@ -53,7 +60,8 @@ export function initSyncStore(): void {
       currentAccount: null,
       currentAccountEmail: null,
       progress: null,
-      error: null
+      error: null,
+      lastSyncTime: Date.now()
     }));
   });
 

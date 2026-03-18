@@ -6,7 +6,7 @@ use crate::imap_client::ImapClient;
 use crate::smtp_client::SmtpClient;
 use crate::sync_manager::{SyncManager, SyncStatus};
 use serde_json::json;
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 use std::sync::{Arc, Mutex};
 
 /// Sanitize html_body field on a Mail if present
@@ -122,6 +122,16 @@ pub fn toggle_star(
 ) -> Result<(), String> {
     db.inner().toggle_star(&id, starred)
         .map_err(|e| format!("Failed to toggle star: {}", e))
+}
+
+/// Get unread mail count for a folder
+#[tauri::command]
+pub fn get_unread_count(
+    folder: String,
+    db: State<'_, Database>,
+) -> Result<i64, String> {
+    db.inner().get_unread_count(&folder)
+        .map_err(|e| format!("Failed to get unread count: {}", e))
 }
 
 // ============================================================================
@@ -321,6 +331,7 @@ pub fn get_sync_status(
             last_sync: None,
             error_message: None,
             retry_count: 0,
+            new_count: 0,
         })
         .collect();
 
@@ -411,4 +422,22 @@ pub async fn send_mail(
     let _ = app_handle.emit("mail:sent", json!({ "id": mail_id, "account_id": account_id }));
 
     Ok(())
+}
+
+/// Open developer tools
+#[tauri::command]
+pub fn open_devtools(app_handle: AppHandle) -> Result<(), String> {
+    if let Some(window) = app_handle.get_webview_window("main") {
+        window.open_devtools();
+        Ok(())
+    } else {
+        Err("Main window not found".to_string())
+    }
+}
+
+/// Clear all mails from the database (for re-syncing clean data)
+#[tauri::command]
+pub fn clear_database(db: State<'_, Database>) -> Result<(), String> {
+    db.inner().clear_all_mails()
+        .map_err(|e| format!("Failed to clear database: {}", e))
 }

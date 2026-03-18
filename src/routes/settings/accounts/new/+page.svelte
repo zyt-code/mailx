@@ -13,13 +13,24 @@
 	let error = $state<string | null>(null);
 	let showPassword = $state(false);
 
-	// Pre-fill email domain from quick connect
-	$effect(() => {
-		const provider = $page.url.searchParams.get('provider');
-		if (provider && !email) {
-			email = `@${provider}`;
+	// Password input ref for manual paste handling
+	let passwordInputElement: HTMLInputElement;
+
+	function handlePasswordInput(e: Event) {
+		const target = e.target as HTMLInputElement;
+		password = target.value;
+	}
+
+	// Auto-fill server settings when email changes
+	function handleEmailChange() {
+		if (email && accounts.validateEmail(email)) {
+			const imapDefaults = accounts.getDefaultImapSettings(email);
+			const smtpDefaults = accounts.getDefaultSmtpSettings(email);
+
+			imapServer = imapDefaults.server;
+			smtpServer = smtpDefaults.server;
 		}
-	});
+	}
 
 	function goBack() {
 		goto('/settings');
@@ -120,6 +131,7 @@
 								id="email"
 								type="email"
 								bind:value={email}
+								onblur={handleEmailChange}
 								placeholder="you@example.com"
 								required
 								class="field-input"
@@ -135,11 +147,14 @@
 						</label>
 						<div class="input-wrapper input-with-action">
 							<input
+								bind:this={passwordInputElement}
 								id="password"
 								type={showPassword ? 'text' : 'password'}
-								bind:value={password}
+								value={password}
+								oninput={handlePasswordInput}
 								placeholder="Enter your password or app password"
 								required
+								autocomplete="off"
 								class="field-input field-input-padded"
 							/>
 							<button

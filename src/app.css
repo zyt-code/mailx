@@ -117,6 +117,14 @@ button, a, input, textarea, select {
   transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease, opacity 150ms ease;
 }
 
+/* Ensure all input fields allow text selection and copy/paste */
+input, textarea {
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  -moz-user-select: text !important;
+  -ms-user-select: text !important;
+}
+
 /* Line clamping */
 .line-clamp-1 {
   overflow: hidden;
@@ -145,4 +153,10 @@ button, a, input, textarea, select {
 /* Prevent text selection flash on right-click in list areas */
 .select-none {
   -webkit-touch-callout: none;
+}
+
+/* Sync loading bar animation */
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
 }

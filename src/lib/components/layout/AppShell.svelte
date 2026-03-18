@@ -10,10 +10,13 @@
 	import * as db from '$lib/db/index.js';
 	import { hasAccounts, activeAccount } from '$lib/stores/accountStore.js';
 	import { initSyncStore, isSyncing } from '$lib/stores/syncStore.js';
-	import { initMailStore, loadMails as storeLoadMails, switchFolder } from '$lib/stores/mailStore.js';
+	import { initMailStore, loadMails as storeLoadMails, switchFolder, setSelectedAccount } from '$lib/stores/mailStore.js';
 	import { initSyncHandlers } from '$lib/events/index.js';
-	import { syncAccount } from '$lib/sync/index.js';
+	import { initUnreadStore } from '$lib/stores/unreadStore.js';
+	import { syncAccount, syncAllAccounts } from '$lib/sync/index.js';
+	import { listen } from '@tauri-apps/api/event';
 	import { goto } from '$app/navigation';
+	import { get } from 'svelte/store';
 
 	const STORAGE_KEY = 'mailx-layout';
 	const DEFAULTS = { sidebarCollapsed: false, mailListWidth: 360 };
@@ -52,6 +55,14 @@
 	initSyncStore();
 	initMailStore();
 	initSyncHandlers();
+	initUnreadStore();
+
+	// Reload local mails when backend signals new data (e.g. after sync)
+	$effect(() => {
+		let unlisten: (() => void) | null = null;
+		listen('mails:updated', () => { loadMails(); }).then(fn => { unlisten = fn; });
+		return () => { unlisten?.(); };
+	});
 
 	// Sync state
 	let syncing = $state(false);
@@ -64,20 +75,42 @@
 
 	// Auto-sync when active account changes
 	let currentAccount = $state<string | null>(null);
+	let syncIntervalId: ReturnType<typeof setInterval> | null = null;
+
 	$effect(() => {
 		const unsub = activeAccount.subscribe(async (acc) => {
 			if (acc && acc.id !== currentAccount) {
 				currentAccount = acc.id;
 				if (isAccountConfigured) {
 					try {
+						// Initial sync when account changes
 						await syncAccount(acc.id);
+
+						// Start auto-sync interval (15 minutes)
+						if (syncIntervalId) clearInterval(syncIntervalId);
+						syncIntervalId = setInterval(() => {
+							// Only sync if not already syncing
+							if (!get(isSyncing)) {
+								syncAllAccounts().catch((e) => {
+									console.error('[AppShell] Auto-sync failed:', e);
+								});
+							}
+						}, 15 * 60 * 1000); // 15 minutes
 					} catch (e) {
 						console.error('Auto-sync failed:', e);
 					}
 				}
 			}
 		});
-		return unsub;
+
+		// Cleanup interval when effect is disposed
+		return () => {
+			unsub();
+			if (syncIntervalId) {
+				clearInterval(syncIntervalId);
+				syncIntervalId = null;
+			}
+		};
 	});
 
 	let sidebarWidth = $derived(sidebarCollapsed ? SIDEBAR_COLLAPSED : SIDEBAR_EXPANDED);
@@ -228,6 +261,17 @@
 			console.error('Failed to move mail:', e);
 		}
 	}
+
+	// Handle account selection from sidebar
+	function handleSelectAccount(accountId: string | null) {
+		setSelectedAccount(accountId);
+		// Reset to inbox when switching accounts
+		activeFolder = 'inbox';
+		selectedMailId = null;
+		switchFolder('inbox');
+		// Trigger reload for the new account
+		loadMails();
+	}
 </script>
 
 <div class="flex flex-col h-screen w-screen overflow-hidden bg-white">
@@ -243,17 +287,18 @@
 			onSelectFolder={selectFolder}
 			onRefresh={loadMails}
 			onOpenSettings={openSettings}
+			onSelectAccount={handleSelectAccount}
 		/>
 
 		{#if isMobile}
 			{#if mobileView === 'list'}
-				<MailList {mails} {activeFolder} {selectedMailId} onSelectMail={selectMail} onMarkRead={handleMarkRead} onDelete={handleContextDelete} onArchive={handleContextArchive} onMoveTo={handleMoveTo} width={undefined} {isAccountConfigured} />
+				<MailList {selectedMailId} onSelectMail={selectMail} onMarkRead={handleMarkRead} onDelete={handleContextDelete} onArchive={handleContextArchive} onMoveTo={handleMoveTo} width={undefined} {isAccountConfigured} isSyncing={syncing} />
 			{:else}
 				<ReadingPane mail={selectedMail} {isMobile} onBack={goBackToList} onRefresh={loadMails} />
 			{/if}
 		{:else}
 			{#if isAccountConfigured}
-				<MailList {mails} {activeFolder} {selectedMailId} onSelectMail={selectMail} onMarkRead={handleMarkRead} onDelete={handleContextDelete} onArchive={handleContextArchive} onMoveTo={handleMoveTo} width={mailListWidth} {isAccountConfigured} />
+				<MailList {selectedMailId} onSelectMail={selectMail} onMarkRead={handleMarkRead} onDelete={handleContextDelete} onArchive={handleContextArchive} onMoveTo={handleMoveTo} width={mailListWidth} {isAccountConfigured} isSyncing={syncing} />
 				<Resizer {onResize} {onResizeEnd} />
 				<ReadingPane mail={selectedMail} {isMobile} onBack={goBackToList} onRefresh={loadMails} />
 			{:else}

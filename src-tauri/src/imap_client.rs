@@ -88,7 +88,10 @@ impl ImapClient {
         .map_err(|e| ImapError::ConnectionFailed(format!("Connection task panicked: {}", e)))?
     }
 
-    /// Establish TLS connection and login — shared by test_connection and fetch
+    /// Establish TLS connection and login — shared by test_connection and fetch.
+    /// For servers requiring an IMAP ID command (163.com, etc.), the ID is sent
+    /// *before* the imap crate takes over to avoid its parser choking on the
+    /// `* ID (...)` untagged response.
     fn connect_and_login(
         config: &ImapConfig,
         email: &str,
@@ -102,14 +105,31 @@ impl ImapClient {
         println!("[IMAP] TLS connector: OK");
 
         let addr = (config.server.as_str(), config.port);
-        println!("[IMAP] Connecting to {}:{}...", config.server, config.port);
 
-        let client = imap::connect(addr, &config.server, &tls)
+        if Self::needs_id_command(&config.server) {
+            // ── Manual flow: TLS → greeting → ID → hand off to imap crate ──
+            Self::connect_with_id(&tls, &config.server, addr, email, password)
+        } else {
+            // ── Standard flow via imap::connect ──
+            Self::connect_standard(&tls, &config.server, addr, email, password)
+        }
+    }
+
+    /// Standard connection flow for servers that don't need an ID command.
+    fn connect_standard(
+        tls: &native_tls::TlsConnector,
+        server: &str,
+        addr: (&str, u16),
+        email: &str,
+        password: &str,
+    ) -> Result<imap::Session<native_tls::TlsStream<std::net::TcpStream>>> {
+        println!("[IMAP] Connecting to {}:{}...", addr.0, addr.1);
+        let client = imap::connect(addr, server, tls)
             .map_err(|e| {
                 println!("[IMAP] Connection FAILED: {}", e);
                 ImapError::ConnectionFailed(format!(
                     "Failed to connect to {}:{} — {}",
-                    config.server, config.port, e
+                    addr.0, addr.1, e
                 ))
             })?;
         println!("[IMAP] Connected OK");
@@ -125,8 +145,107 @@ impl ImapClient {
                 ))
             })?;
         println!("[IMAP] Login OK");
-
         Ok(session)
+    }
+
+    /// Connection flow for Chinese email providers that require an IMAP ID command.
+    ///
+    /// The imap crate's response parser cannot handle the `* ID (...)` untagged
+    /// response, so we handle the connection manually up to and including the ID
+    /// exchange, then hand the clean TLS stream to `imap::Client::new()`.
+    fn connect_with_id(
+        tls: &native_tls::TlsConnector,
+        server: &str,
+        addr: (&str, u16),
+        email: &str,
+        password: &str,
+    ) -> Result<imap::Session<native_tls::TlsStream<std::net::TcpStream>>> {
+        use std::io::{BufRead, Write};
+
+        println!("[IMAP] Connecting to {}:{} (with ID)...", addr.0, addr.1);
+        let tcp = std::net::TcpStream::connect(addr)
+            .map_err(|e| {
+                println!("[IMAP] TCP connect FAILED: {}", e);
+                ImapError::ConnectionFailed(format!(
+                    "Failed to connect to {}:{} — {}",
+                    addr.0, addr.1, e
+                ))
+            })?;
+        let tls_stream = tls.connect(server, tcp)
+            .map_err(|e| {
+                println!("[IMAP] TLS handshake FAILED: {}", e);
+                ImapError::Tls(format!("TLS handshake failed for {}: {}", server, e))
+            })?;
+        println!("[IMAP] Connected OK");
+
+        // Wrap in BufReader for reliable line-by-line reading.
+        // We'll unwrap it before handing the stream to the imap crate.
+        let mut reader = std::io::BufReader::new(tls_stream);
+
+        // 1. Read server greeting (e.g. "* OK Coremail ... ready")
+        let mut greeting = String::new();
+        reader.read_line(&mut greeting)
+            .map_err(|e| ImapError::Protocol(format!("Failed to read greeting: {}", e)))?;
+        println!("[IMAP] Greeting: {}", greeting.trim());
+
+        // 2. Send ID command with a tag that won't collide with the imap crate
+        //    (the crate starts its tag counter at "a1").
+        println!("[IMAP] Sending ID command...");
+        let id_cmd = b"a0 ID (\"name\" \"mailx\" \"version\" \"1.0.0\" \"vendor\" \"Mailx\")\r\n";
+        reader.get_mut().write_all(id_cmd)
+            .map_err(|e| ImapError::Protocol(format!("Failed to send ID: {}", e)))?;
+        reader.get_mut().flush()
+            .map_err(|e| ImapError::Protocol(format!("Failed to flush ID: {}", e)))?;
+
+        // 3. Read until the tagged response "a0 OK/NO/BAD ..."
+        loop {
+            let mut line = String::new();
+            reader.read_line(&mut line)
+                .map_err(|e| ImapError::Protocol(format!("Failed to read ID response: {}", e)))?;
+            let trimmed = line.trim();
+            println!("[IMAP] ID response: {}", trimmed);
+            if trimmed.starts_with("a0 ") {
+                break;
+            }
+        }
+        println!("[IMAP] ID command OK");
+
+        // 4. Brief pause to ensure 163.com has fully flushed its response
+        //    before the imap crate sends LOGIN (prevents tag mismatch panic).
+        std::thread::sleep(std::time::Duration::from_millis(250));
+
+        // 6. Unwrap BufReader → raw TLS stream, then hand to the imap crate.
+        //    At this point the stream is clean (no pending server data).
+        let tls_stream = reader.into_inner();
+        let client = imap::Client::new(tls_stream);
+        // Skip read_greeting() — we already consumed it above.
+
+        // 7. Login normally via the imap crate
+        println!("[IMAP] Logging in as '{}'...", email);
+        let session = client
+            .login(email, password)
+            .map_err(|(e, _)| {
+                println!("[IMAP] Login FAILED: {}", e);
+                ImapError::AuthenticationFailed(format!(
+                    "Login failed for '{}': {}",
+                    email, e
+                ))
+            })?;
+        println!("[IMAP] Login OK");
+        Ok(session)
+    }
+
+    /// Check if the IMAP server requires an ID command to allow folder selection.
+    /// Chinese email providers (163, 126, QQ, etc.) reject SELECT without prior ID.
+    fn needs_id_command(server: &str) -> bool {
+        let s = server.to_lowercase();
+        s.contains("163.com")
+            || s.contains("126.com")
+            || s.contains("yeah.net")
+            || s.contains("qq.com")
+            || s.contains("foxmail.com")
+            || s.contains("sina.com")
+            || s.contains("sohu.com")
     }
 
     /// Fetch emails from a folder
@@ -184,7 +303,7 @@ impl ImapClient {
         println!("[IMAP] Fetching sequence range {} ({} messages)...", range, exists - start + 1);
 
         let fetch_results = session
-            .fetch(&range, "(RFC822 UID FLAGS)")
+            .fetch(&range, "(UID FLAGS INTERNALDATE BODY.PEEK[])")
             .map_err(|e| {
                 println!("[IMAP] Fetch FAILED: {}", e);
                 ImapError::FetchFailed(format!("Fetch range {} failed: {}", range, e))
@@ -231,14 +350,29 @@ impl ImapClient {
             ImapError::ParseError("No UID in fetch response".to_string())
         })?;
 
-        // Get the raw email body
+        // Get the raw email body - now using BODY.PEEK[] from the fetch query
         let body = fetch.body().ok_or_else(|| {
-            ImapError::ParseError(format!("No body in fetch response (UID={})", uid))
+            ImapError::ParseError(format!("No body in fetch response (UID={}). Ensure fetch query includes BODY.PEEK[].", uid))
         })?;
+
+        // Log the body size for diagnostics
+        println!("[IMAP] UID={} body size={} bytes", uid, body.len());
 
         // Parse the email using mail-parser. If parsing completely fails,
         // create a minimal fallback mail so the sync continues.
+        println!("[IMAP] UID={} parsing email ({} bytes)...", uid, body.len());
         let message = MessageParser::default().parse(body);
+
+        // Log parsing result for diagnostics
+        if message.is_none() {
+            println!(
+                "[IMAP] UID={} mail-parser returned None - body may be corrupted or incomplete. First 200 chars: {}",
+                uid,
+                String::from_utf8_lossy(&body[..body.len().min(200)])
+            );
+        } else {
+            println!("[IMAP] UID={} mail-parser OK - parsed successfully", uid);
+        }
 
         let (from_name, from_email, subject, body_text, html_body, preview, timestamp, to, cc, bcc, reply_to, attachment_count) =
             if let Some(ref msg) = message {
@@ -248,13 +382,26 @@ impl ImapClient {
                 let bt = Self::extract_body_text(msg);
                 let hb = msg.body_html(0).map(|h| h.to_string());
                 let pv = Self::create_preview(&bt);
-                let ts = msg
-                    .date()
-                    .and_then(|d| {
-                        chrono::DateTime::from_timestamp(d.to_timestamp(), 0)
-                            .map(|dt| dt.timestamp_millis())
+
+                // Parse timestamp from email Date header
+                // to_timestamp() returns seconds since epoch — multiply by 1000 for milliseconds
+                let ts = msg.date()
+                    .map(|d| {
+                        let secs = d.to_timestamp();
+                        if secs > 0 {
+                            let ms = secs * 1000;
+                            println!("[IMAP] UID={} Date header: {:?}, timestamp: {}ms", uid, d, ms);
+                            ms
+                        } else {
+                            println!("[IMAP] UID={} Date header parsed to invalid timestamp: {:?}, using current time", uid, d);
+                            chrono::Utc::now().timestamp_millis()
+                        }
                     })
-                    .unwrap_or_else(|| chrono::Utc::now().timestamp_millis());
+                    .unwrap_or_else(|| {
+                        println!("[IMAP] UID={} no Date header found, using current time", uid);
+                        chrono::Utc::now().timestamp_millis()
+                    });
+
                 let to_ = Self::extract_from_address(msg.to());
                 let cc_ = Self::extract_from_address(msg.cc());
                 let bcc_ = Self::extract_from_address(msg.bcc());
@@ -299,8 +446,9 @@ impl ImapClient {
             body: body_text,
             html_body,
             timestamp,
-            folder: folder.to_string(),
+            folder: folder.to_lowercase(),
             unread: !is_seen,
+            account_id: None, // Set by SyncManager before DB insert
             to,
             cc,
             bcc,
@@ -346,12 +494,36 @@ impl ImapClient {
         }
     }
 
-    /// Strip HTML tags from a string
+    /// Strip HTML tags from a string, removing <style> and <script> blocks entirely
     fn strip_html(html: &str) -> String {
+        // First remove <style>...</style> and <script>...</script> blocks entirely
+        let lowered = html.to_lowercase();
+        let mut cleaned = String::with_capacity(html.len());
+        let mut i = 0;
+        let bytes = html.as_bytes();
+        let low_bytes = lowered.as_bytes();
+
+        while i < bytes.len() {
+            // Check for <style or <script tags
+            if low_bytes[i] == b'<' && i + 7 < low_bytes.len() {
+                let rest = &lowered[i..];
+                if rest.starts_with("<style") || rest.starts_with("<script") {
+                    let end_tag = if rest.starts_with("<style") { "</style>" } else { "</script>" };
+                    if let Some(end_pos) = lowered[i..].find(end_tag) {
+                        i += end_pos + end_tag.len();
+                        continue;
+                    }
+                }
+            }
+            cleaned.push(bytes[i] as char);
+            i += 1;
+        }
+
+        // Now strip remaining HTML tags
         let mut result = String::new();
         let mut in_tag = false;
 
-        for ch in html.chars() {
+        for ch in cleaned.chars() {
             match ch {
                 '<' => in_tag = true,
                 '>' => in_tag = false,
@@ -368,7 +540,22 @@ impl ImapClient {
         result = result.replace("&quot;", "\"");
         result = result.replace("&#39;", "'");
 
-        result
+        // Collapse excessive whitespace
+        let mut collapsed = String::new();
+        let mut prev_ws = false;
+        for ch in result.chars() {
+            if ch.is_whitespace() {
+                if !prev_ws {
+                    collapsed.push(if ch == '\n' { '\n' } else { ' ' });
+                }
+                prev_ws = true;
+            } else {
+                collapsed.push(ch);
+                prev_ws = false;
+            }
+        }
+
+        collapsed.trim().to_string()
     }
 
     /// Extract the first address from an Address enum

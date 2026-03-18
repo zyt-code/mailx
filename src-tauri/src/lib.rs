@@ -18,6 +18,7 @@ use tauri::{Manager, Emitter, menu::{Menu, MenuItem, PredefinedMenuItem, Submenu
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_notification::init())
         .setup(|app| {
             // Initialize database
             let db = Database::new(app.handle())
@@ -73,6 +74,15 @@ pub fn run() {
                 // Create File menu
                 let close_item = MenuItem::with_id(app, "close", "Close Window", true, Some("Cmd+W"))?;
 
+                // Create Edit menu with standard editing shortcuts
+                let undo_item = PredefinedMenuItem::undo(app, None)?;
+                let redo_item = PredefinedMenuItem::redo(app, None)?;
+                let edit_separator1 = MenuItem::new(app, "-", true, None::<&str>)?;
+                let cut_item = PredefinedMenuItem::cut(app, None)?;
+                let copy_item = PredefinedMenuItem::copy(app, None)?;
+                let paste_item = PredefinedMenuItem::paste(app, None)?;
+                let select_all_item = PredefinedMenuItem::select_all(app, None)?;
+
                 let app_menu = Submenu::with_items(
                     app,
                     "Mailx",
@@ -85,8 +95,14 @@ pub fn run() {
                     true,
                     &[&close_item]
                 )?;
+                let edit_menu = Submenu::with_items(
+                    app,
+                    "Edit",
+                    true,
+                    &[&undo_item, &redo_item, &edit_separator1, &cut_item, &copy_item, &paste_item, &select_all_item]
+                )?;
 
-                let menu = Menu::with_items(app, &[&app_menu, &file_menu])?;
+                let menu = Menu::with_items(app, &[&app_menu, &file_menu, &edit_menu])?;
                 app.set_menu(menu)?;
 
                 // Handle menu events
@@ -109,12 +125,38 @@ pub fn run() {
 
             #[cfg(not(target_os = "macos"))]
             {
-                // Windows: Use empty menu to hide menu bar
-                // macOS: Keep menu for native app menu experience
-                use tauri::menu::Menu;
+                // Windows/Linux: Create minimal menu with Settings
+                use tauri::menu::{Menu, MenuItem, Submenu};
 
-                let menu = Menu::new(app)?;
+                // Create Tools menu with Settings
+                let settings_item = MenuItem::with_id(app, "settings", "Settings...", true, Some("Ctrl+,"))?;
+
+                let tools_menu = Submenu::with_items(
+                    app,
+                    "Tools",
+                    true,
+                    &[&settings_item]
+                )?;
+
+                let menu = Menu::with_items(app, &[&tools_menu])?;
                 app.set_menu(menu)?;
+
+                // Handle menu events for Windows/Linux
+                app.on_menu_event(|app, event| {
+                    match event.id.as_ref() {
+                        "settings" => {
+                            if let Some(window) = app.get_webview_window("main") {
+                                let _ = window.emit("navigate", "/settings");
+                            }
+                        }
+                        "about" => {
+                            if let Some(window) = app.get_webview_window("main") {
+                                let _ = window.emit("navigate", "/about");
+                            }
+                        }
+                        _ => {}
+                    }
+                });
             }
 
             Ok(())
@@ -131,6 +173,8 @@ pub fn run() {
             commands::archive_mail,
             commands::unarchive_mail,
             commands::toggle_star,
+            commands::get_unread_count,
+            commands::clear_database,
             // Account commands
             commands::get_accounts,
             commands::get_account,
@@ -145,6 +189,8 @@ pub fn run() {
             commands::test_imap_connection,
             // Send mail command
             commands::send_mail,
+            // Devtools command
+            commands::open_devtools,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -172,6 +172,10 @@ export function getDefaultImapSettings(email: string): { server: string; port: n
 		'hotmail.com': { server: 'outlook.office365.com', port: 993, use_ssl: true },
 		'yahoo.com': { server: 'imap.mail.yahoo.com', port: 993, use_ssl: true },
 		'icloud.com': { server: 'imap.mail.me.com', port: 993, use_ssl: true },
+		'163.com': { server: 'imap.163.com', port: 993, use_ssl: true },
+		'126.com': { server: 'imap.126.com', port: 993, use_ssl: true },
+		'qq.com': { server: 'imap.qq.com', port: 993, use_ssl: true },
+		'foxmail.com': { server: 'imap.foxmail.com', port: 993, use_ssl: true },
 	};
 
 	return defaults[domain || ''] || { server: 'imap.' + domain, port: 993, use_ssl: true };
@@ -189,6 +193,10 @@ export function getDefaultSmtpSettings(email: string): { server: string; port: n
 		'hotmail.com': { server: 'smtp-mail.outlook.com', port: 587, use_ssl: true },
 		'yahoo.com': { server: 'smtp.mail.yahoo.com', port: 587, use_ssl: true },
 		'icloud.com': { server: 'smtp.mail.me.com', port: 587, use_ssl: true },
+		'163.com': { server: 'smtp.163.com', port: 465, use_ssl: true },
+		'126.com': { server: 'smtp.126.com', port: 465, use_ssl: true },
+		'qq.com': { server: 'smtp.qq.com', port: 465, use_ssl: true },
+		'foxmail.com': { server: 'smtp.foxmail.com', port: 465, use_ssl: true },
 	};
 
 	return defaults[domain || ''] || { server: 'smtp.' + domain, port: 587, use_ssl: true };

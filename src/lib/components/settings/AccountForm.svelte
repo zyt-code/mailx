@@ -28,6 +28,15 @@
 	let testResult = $state<{ imap: boolean; smtp: boolean; error?: string } | null>(null);
 	let saving = $state(false);
 
+	// Allow paste on all inputs
+	function handlePaste(event: ClipboardEvent) {
+		// Let the default paste behavior happen
+	}
+
+	function handleKeyDown(event: KeyboardEvent) {
+		// Allow all keyboard shortcuts including Cmd+V / Ctrl+V
+	}
+
 	async function handleEmailChange() {
 		if (accounts.validateEmail(formData.email)) {
 			const imapDefaults = accounts.getDefaultImapSettings(formData.email);
@@ -192,6 +201,8 @@
 				onblur={handleEmailChange}
 				class={getFieldClass('email')}
 				placeholder="you@example.com"
+				onpaste={handlePaste}
+				onkeydown={handleKeyDown}
 			/>
 			{#if errors.email}
 				<span class="text-sm text-red-600">{errors.email}</span>
@@ -205,6 +216,8 @@
 				bind:value={formData.name}
 				class={getFieldClass('name')}
 				placeholder="Your Name"
+				onpaste={handlePaste}
+				onkeydown={handleKeyDown}
 			/>
 			{#if errors.name}
 				<span class="text-sm text-red-600">{errors.name}</span>
@@ -212,13 +225,15 @@
 		</div>
 
 		{#if !account}
-			<div class="space-y-2">
+			<div class="space-y-2" data-allow-context-menu>
 				<label class="block text-sm font-medium text-gray-700">Password</label>
 				<input
 					type="password"
 					bind:value={formData.password}
 					class={getFieldClass('password')}
 					placeholder="••••••••"
+					onpaste={handlePaste}
+					onkeydown={handleKeyDown}
 				/>
 				{#if errors.password}
 					<span class="text-sm text-red-600">{errors.password}</span>
@@ -237,6 +252,8 @@
 						bind:value={formData.imap_server}
 						class={getFieldClass('imap_server')}
 						placeholder="imap.example.com"
+						onpaste={handlePaste}
+						onkeydown={handleKeyDown}
 					/>
 				</div>
 				<div class="space-y-2">
@@ -247,6 +264,8 @@
 						class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
 						min="1"
 						max="65535"
+						onpaste={handlePaste}
+						onkeydown={handleKeyDown}
 					/>
 				</div>
 			</div>
@@ -272,6 +291,8 @@
 						bind:value={formData.smtp_server}
 						class={getFieldClass('smtp_server')}
 						placeholder="smtp.example.com"
+						onpaste={handlePaste}
+						onkeydown={handleKeyDown}
 					/>
 				</div>
 				<div class="space-y-2">
@@ -282,6 +303,8 @@
 						class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
 						min="1"
 						max="65535"
+						onpaste={handlePaste}
+						onkeydown={handleKeyDown}
 					/>
 				</div>
 			</div>
