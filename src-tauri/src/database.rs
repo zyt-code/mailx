@@ -784,14 +784,37 @@ impl Database {
     /// Delete a mail by ID
     pub fn delete_mail(&self, id: &str) -> SqliteResult<()> {
         let conn = self.conn.lock().unwrap();
+        conn.execute("DELETE FROM mail_attachments WHERE mail_id = ?1", params![id])?;
         conn.execute("DELETE FROM mails WHERE id = ?1", params![id])?;
+        drop(conn);
+
+        let mail_dir = self.attachments_root.join(id);
+        if let Err(e) = fs::remove_dir_all(&mail_dir) {
+            if e.kind() != std::io::ErrorKind::NotFound {
+                eprintln!(
+                    "[DB] Failed to remove attachment directory for mail {}: {}",
+                    id, e
+                );
+            }
+        }
         Ok(())
     }
 
     /// Clear all mails from the database (useful for re-syncing)
     pub fn clear_all_mails(&self) -> SqliteResult<()> {
         let conn = self.conn.lock().unwrap();
+        conn.execute("DELETE FROM mail_attachments", [])?;
         conn.execute("DELETE FROM mails", [])?;
+        drop(conn);
+
+        if let Err(e) = fs::remove_dir_all(&self.attachments_root) {
+            if e.kind() != std::io::ErrorKind::NotFound {
+                eprintln!("[DB] Failed to clear attachment storage: {}", e);
+            }
+        }
+        if let Err(e) = fs::create_dir_all(&self.attachments_root) {
+            eprintln!("[DB] Failed to recreate attachment storage directory: {}", e);
+        }
         Ok(())
     }
 
@@ -807,12 +830,12 @@ impl Database {
 
     /// Move a mail to trash (or permanent delete if already in trash)
     pub fn move_to_trash(&self, id: &str, current_folder: &str) -> SqliteResult<()> {
-        let conn = self.conn.lock().unwrap();
         if current_folder == "trash" {
             // Permanent delete
-            conn.execute("DELETE FROM mails WHERE id = ?1", params![id])?;
+            return self.delete_mail(id);
         } else {
             // Move to trash
+            let conn = self.conn.lock().unwrap();
             conn.execute(
                 "UPDATE mails SET folder = 'trash' WHERE id = ?1",
                 params![id],
