@@ -232,17 +232,17 @@
 							<ContextMenu.Trigger>
 								<button
 									class={cn(
-										'group relative flex w-full items-start gap-3 text-left transition-colors duration-150 border-b border-zinc-50',
+										'group relative flex w-full items-start gap-3 text-left transition-[background-color] duration-150 border-b border-zinc-50',
 										'px-5 py-4',
 										mail.id === selectedMailId
-											? 'bg-zinc-100/80 shadow-inner'
+											? 'bg-zinc-100 border-transparent'
 											: 'hover:bg-zinc-50'
 									)}
 									onclick={() => handleSelectMail(mail.id)}
 								>
 									<!-- Selected blue border indicator - absolute positioned -->
 									{#if mail.id === selectedMailId}
-										<div class="absolute left-0 top-0 bottom-0 w-[2px] bg-blue-500"></div>
+										<div class="absolute left-0 top-2 bottom-2 w-[2px] bg-blue-500 rounded-full"></div>
 									{/if}
 
 									<!-- Unread blue dot indicator -->
