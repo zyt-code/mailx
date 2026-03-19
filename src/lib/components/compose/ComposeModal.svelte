@@ -104,6 +104,7 @@
 			timestamp: Date.now(),
 			folder: draft.folder,
 			unread: false,
+			is_read: true,
 			to: draft.to.length > 0 ? draft.to : undefined,
 			cc: draft.cc.length > 0 ? draft.cc : undefined,
 			bcc: draft.bcc.length > 0 ? draft.bcc : undefined,

@@ -10,7 +10,7 @@
 	import * as db from '$lib/db/index.js';
 	import { hasAccounts, activeAccount } from '$lib/stores/accountStore.js';
 	import { initSyncStore, isSyncing } from '$lib/stores/syncStore.js';
-	import { initMailStore, loadMails as storeLoadMails, switchFolder, setSelectedAccount } from '$lib/stores/mailStore.js';
+import { initMailStore, switchFolder, setSelectedAccount, markMailReadLocally, markMailUnreadLocally } from '$lib/stores/mailStore.js';
 	import { initSyncHandlers } from '$lib/events/index.js';
 	import { initUnreadStore } from '$lib/stores/unreadStore.js';
 	import { syncAccount, syncAllAccounts } from '$lib/sync/index.js';
@@ -187,16 +187,6 @@
 	async function selectMail(id: string) {
 		selectedMailId = id;
 		if (isMobile) mobileView = 'reading';
-
-		const mail = mails.find(m => m.id === id);
-		if (mail?.unread) {
-			try {
-				await db.markMailRead(id, true);
-				mail.unread = false;
-			} catch (e) {
-				console.error('Failed to mark mail as read:', e);
-			}
-		}
 	}
 
 	function selectFolder(folder: Folder) {
@@ -222,7 +212,14 @@
 	async function handleMarkRead(mail: Mail, read: boolean) {
 		try {
 			await db.markMailRead(mail.id, read);
-			mail.unread = !read;
+			if (read) {
+				markMailReadLocally(mail.id);
+			} else {
+				markMailUnreadLocally(mail.id);
+			}
+			mails = mails.map((existing) =>
+				existing.id === mail.id ? { ...existing, is_read: read, unread: !read } : existing
+			);
 		} catch (e) {
 			console.error('Failed to mark mail:', e);
 		}

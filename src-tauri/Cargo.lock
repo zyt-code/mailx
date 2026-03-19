@@ -2341,6 +2341,7 @@ dependencies = [
  "lettre",
  "mail-parser",
  "native-tls",
+ "once_cell",
  "regex",
  "rusqlite",
  "serde",

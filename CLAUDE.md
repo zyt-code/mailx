@@ -183,3 +183,7 @@ npm run format
 - Drafts are stored in SQLite with folder='drafts'
 - Sent emails move to folder='sent' after sending
 - Discarded drafts move to folder='trash'
+
+## Testing Governance
+
+- Tests, integration utilities, and mock data injectors live under `/tests`. Keep `src/` and `src-tauri/src/` strictly production-ready with no local-environment hacks.

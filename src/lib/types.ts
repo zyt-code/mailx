@@ -19,7 +19,8 @@ export interface Mail {
 	body: string;
 	timestamp: number; // Unix milliseconds
 	folder: Folder;
-	unread: boolean;
+	unread?: boolean;
+	is_read: boolean;
 	// Compose functionality fields
 	to?: EmailAddress[];
 	cc?: EmailAddress[];

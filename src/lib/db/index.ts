@@ -20,6 +20,7 @@ export async function getMail(id: string): Promise<Mail> {
  */
 export async function createMail(mail: Omit<Mail, 'id'> & { id?: string }): Promise<string> {
 	const id = mail.id || crypto.randomUUID();
+	const isRead = mail.is_read ?? !(mail.unread ?? true);
 	const fullMail: Mail = {
 		id,
 		from_name: mail.from_name,
@@ -29,7 +30,8 @@ export async function createMail(mail: Omit<Mail, 'id'> & { id?: string }): Prom
 		body: mail.body || '',
 		timestamp: mail.timestamp || Date.now(),
 		folder: mail.folder || 'inbox',
-		unread: mail.unread ?? true,
+		unread: isRead ? false : true,
+		is_read: isRead
 	};
 	await invoke('create_mail', { mail: fullMail });
 	return id;
@@ -57,10 +59,10 @@ export async function markMailRead(id: string, read: boolean): Promise<void> {
 }
 
 /**
- * Mark a mail as read on the IMAP server (syncs \Seen flag)
+ * Mark a mail as read on the IMAP server (syncs \Seen flag via UID)
  */
-export async function markMailReadOnServer(id: string, accountId: string): Promise<void> {
-	await invoke('mark_mail_read_on_server', { id, account_id: accountId });
+export async function markMailAsRead(uid: number, accountId: string): Promise<void> {
+	await invoke('mark_as_read', { uid, account_id: accountId });
 }
 
 /**

@@ -40,6 +40,8 @@ pub struct Mail {
     pub folder: String,
     pub unread: bool,
     #[serde(default)]
+    pub is_read: bool,
+    #[serde(default)]
     pub account_id: Option<String>,
     #[serde(default)]
     pub to: Option<Vec<EmailAddress>>,
@@ -122,6 +124,11 @@ impl Database {
 
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_mails_unread ON mails(unread, folder)",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_mails_account_uid ON mails(account_id, uid)",
             [],
         )?;
 
@@ -265,6 +272,7 @@ impl Database {
 
         let mut stmt = conn.prepare(&query)?;
         let mail_iter = stmt.query_map(rusqlite::params_from_iter(params), |row| {
+            let unread_flag = row.get::<_, i32>(9)? == 1;
             Ok(Mail {
                 id: row.get(0)?,
                 uid: row.get(1)?,
@@ -275,7 +283,8 @@ impl Database {
                 body: row.get(6)?,
                 timestamp: row.get(7)?,
                 folder: row.get(8)?,
-                unread: row.get::<_, i32>(9)? == 1,
+                unread: unread_flag,
+                is_read: !unread_flag,
                 account_id: row.get(10)?,
                 to: parse_json_addresses(row.get(11)?),
                 cc: parse_json_addresses(row.get(12)?),
@@ -305,6 +314,7 @@ impl Database {
         )?;
 
         let mail = stmt.query_row(params![id], |row| {
+            let unread_flag = row.get::<_, i32>(9)? == 1;
             Ok(Mail {
                 id: row.get(0)?,
                 uid: row.get(1)?,
@@ -315,7 +325,8 @@ impl Database {
                 body: row.get(6)?,
                 timestamp: row.get(7)?,
                 folder: row.get(8)?,
-                unread: row.get::<_, i32>(9)? == 1,
+                unread: unread_flag,
+                is_read: !unread_flag,
                 account_id: row.get(10)?,
                 to: parse_json_addresses(row.get(11)?),
                 cc: parse_json_addresses(row.get(12)?),
@@ -332,6 +343,44 @@ impl Database {
             Ok(m) => Ok(Some(m)),
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
             Err(e) => Err(e),
+        }
+    }
+
+    /// Get a single mail by account and UID
+    pub fn get_mail_by_account_and_uid(&self, account_id: &str, uid: u32) -> SqliteResult<Option<Mail>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, uid, from_name, from_email, subject, preview, body, timestamp, folder, unread, account_id, to_json, cc_json, bcc_json, html_body, reply_to_json, starred, has_attachments
+             FROM mails WHERE account_id = ?1 AND uid = ?2 LIMIT 1"
+        )?;
+
+        let mut rows = stmt.query(params![account_id, uid])?;
+        if let Some(row) = rows.next()? {
+            let unread_flag = row.get::<_, i32>(9)? == 1;
+            Ok(Some(Mail {
+                id: row.get(0)?,
+                uid: row.get(1)?,
+                from_name: row.get(2)?,
+                from_email: row.get(3)?,
+                subject: row.get(4)?,
+                preview: row.get(5)?,
+                body: row.get(6)?,
+                timestamp: row.get(7)?,
+                folder: row.get(8)?,
+                unread: unread_flag,
+                is_read: !unread_flag,
+                account_id: row.get(10)?,
+                to: parse_json_addresses(row.get(11)?),
+                cc: parse_json_addresses(row.get(12)?),
+                bcc: parse_json_addresses(row.get(13)?),
+                html_body: row.get(14)?,
+                reply_to: parse_json_addresses(row.get(15)?),
+                starred: Some(row.get::<_, i32>(16).unwrap_or(0) == 1),
+                has_attachments: Some(row.get::<_, i32>(17).unwrap_or(0) == 1),
+                attachments: None,
+            }))
+        } else {
+            Ok(None)
         }
     }
 
@@ -357,7 +406,7 @@ impl Database {
                 &mail.body,
                 &mail.timestamp,
                 &mail.folder,
-                if mail.unread { 1 } else { 0 },
+                if mail.is_read { 0 } else { 1 },
                 &mail.account_id,
                 now,
                 to_json,
@@ -409,7 +458,7 @@ impl Database {
                 &mail.body,
                 &mail.timestamp,
                 &mail.folder,
-                if mail.unread { 1 } else { 0 },
+                if mail.is_read { 0 } else { 1 },
                 &mail.account_id,
                 to_json,
                 cc_json,

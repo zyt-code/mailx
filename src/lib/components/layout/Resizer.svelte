@@ -58,7 +58,7 @@
 		'w-px shrink-0 cursor-col-resize relative group',
 		dragging ? 'bg-zinc-200' : 'bg-zinc-100 hover:bg-zinc-200'
 	)}
-	style="transition: background-color 150ms ease;"
+	style="transition: background-color 75ms ease;"
 	onpointerdown={onPointerDown}
 	onpointermove={onPointerMove}
 	onpointerup={onPointerUp}

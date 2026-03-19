@@ -254,22 +254,6 @@ impl SmtpClient {
         format!("{:x}", hasher.finish())
     }
 }
-
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_generate_message_id() {
-        let id1 = SmtpClient::generate_message_id("test@example.com");
-        let id2 = SmtpClient::generate_message_id("test@example.com");
-        let id3 = SmtpClient::generate_message_id("other@example.com");
-
-        // IDs should be different due to timestamp
-        assert_ne!(id1, id2);
-
-        // IDs should be non-empty
-        assert!(!id1.is_empty());
-        assert!(!id3.is_empty());
-    }
-}
+#[path = "../test/smtp_client_tests.rs"]
+mod smtp_client_tests;

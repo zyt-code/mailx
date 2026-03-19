@@ -114,7 +114,7 @@
 
 			<!-- Email body - independent scroll, rendered in isolated iframe -->
 			<div class="flex-1 overflow-y-auto min-h-0">
-				<div class="px-8 pt-6 pb-6 max-w-3xl select-text" data-allow-context-menu>
+				<div class="px-8 pt-6 pb-6 max-w-3xl select-text cursor-text" data-allow-context-menu>
 					<EmailRenderer htmlBody={mail.html_body} plainBody={mail.body} />
 				</div>
 			</div>

@@ -4,8 +4,8 @@
 	import { Search, Paperclip, MailOpen, Mail as MailIcon, Archive, Trash2, FolderInput, Inbox, Send, FileText } from 'lucide-svelte';
 	import type { Mail, Folder, Account } from '$lib/types.js';
 	import { accounts } from '$lib/stores/accountStore.js';
-	import { displayedEmails, activeFolder as storeActiveFolder } from '$lib/stores/mailStore.js';
-	import { markMailReadOnServer } from '$lib/db/index.js';
+	import { displayedEmails, activeFolder as storeActiveFolder, markMailReadLocally } from '$lib/stores/mailStore.js';
+	import { markMailAsRead } from '$lib/db/index.js';
 
 	interface Props {
 		selectedMailId: string | null;
@@ -67,44 +67,8 @@
 			: displayedMails
 	);
 
-	// Group mails by date category
-	interface MailGroup {
-		label: string;
-		mails: Mail[];
-	}
-
-	let groupedMails = $derived.by(() => {
-		const now = new Date();
-		const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-		const yesterday = new Date(today.getTime() - 86400000);
-		const weekAgo = new Date(today.getTime() - 7 * 86400000);
-		const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-
-		const groups: Map<string, Mail[]> = new Map();
-		const order: string[] = [];
-
-		function getGroup(mail: Mail): string {
-			const d = new Date(mail.timestamp);
-			const mailDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-
-			if (mailDay.getTime() >= today.getTime()) return 'Today';
-			if (mailDay.getTime() >= yesterday.getTime()) return 'Yesterday';
-			if (mailDay.getTime() >= weekAgo.getTime()) return 'Last 7 Days';
-			if (mailDay.getTime() >= thisMonth.getTime()) return 'This Month';
-			return d.toLocaleDateString('en-US', { month: 'long', year: d.getFullYear() !== now.getFullYear() ? 'numeric' : undefined });
-		}
-
-		for (const mail of filteredMails) {
-			const label = getGroup(mail);
-			if (!groups.has(label)) {
-				groups.set(label, []);
-				order.push(label);
-			}
-			groups.get(label)!.push(mail);
-		}
-
-		return order.map((label) => ({ label, mails: groups.get(label)! }));
-	});
+	// No date grouping - flat list like Apple Mail
+	let flatMails = $derived(filteredMails);
 
 	const folderLabels: Record<Folder, string> = {
 		inbox: 'Inbox',
@@ -164,22 +128,35 @@
 
 	// Handle mail selection with server read sync
 	function handleSelectMail(mailId: string) {
-		// Immediately update UI for instant feedback
+		// Step 1: UI feedback — highlight immediately
 		onSelectMail(mailId);
 
-		// Sync read status to server in background for unread mails
 		const mail = displayedMails.find((m) => m.id === mailId);
-		if (mail?.unread && mail.account_id) {
-			markMailReadOnServer(mailId, mail.account_id).catch((error) => {
-				// Silently handle errors - UI already updated
-				console.warn('Failed to mark as read on server:', error);
-			});
+		if (!mail) return;
+
+		const wasUnread = !(mail.is_read ?? false);
+
+		if (wasUnread) {
+			// Step 2: Local optimistic update
+			markMailReadLocally(mailId);
+
+			// Step 3: Background sync — fire and forget
+			if (mail.account_id && typeof mail.uid === 'number') {
+				markMailAsRead(mail.uid, mail.account_id).catch((error) => {
+					console.error('[MailList] Failed to sync read status:', error);
+				});
+			} else {
+				console.warn('[MailList] Missing account_id or uid, skipping server sync', {
+					accountId: mail.account_id,
+					uid: mail.uid
+				});
+			}
 		}
 	}
 </script>
 
 <div
-	class="flex h-full flex-col bg-white select-none overflow-hidden shrink-0 border-r border-zinc-100"
+	class="flex h-full flex-col bg-white select-none overflow-hidden shrink-0 border-r border-zinc-100 [-webkit-user-select:none] [user-select:none]"
 	style:width={width !== undefined ? `${width}px` : undefined}
 	class:w-full={width === undefined}
 >
@@ -194,7 +171,7 @@
 			placeholder="Search {folderLabels[activeFolder].toLowerCase()}..."
 			disabled={!isAccountConfigured}
 			class={cn(
-				"flex-1 bg-transparent text-[13px] outline-none placeholder:text-zinc-400 transition-colors duration-150 rounded-md px-2 -mx-2",
+				"flex-1 bg-transparent text-[13px] outline-none placeholder:text-zinc-400 transition-colors duration-75 rounded-md px-2 -mx-2",
 				isAccountConfigured
 					? "text-zinc-900 focus:bg-zinc-100/50"
 					: "text-zinc-300 cursor-not-allowed placeholder:text-zinc-300"
@@ -218,87 +195,96 @@
 			</div>
 		{:else}
 			<div class="px-2 py-1">
-				{#each groupedMails as group}
-					<!-- Date group header - Linear style -->
-					<div class="px-3 pt-6 pb-2">
-						<span class="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
-							{group.label}
-						</span>
-					</div>
-
-					<!-- Mails in group -->
-					{#each group.mails as mail}
-						<ContextMenu.Root>
-							<ContextMenu.Trigger>
-								<button
-									class={cn(
-										'group relative flex w-full items-start gap-3 text-left transition-[background-color] duration-150 border-b border-zinc-50',
-										'px-5 py-4',
-										mail.id === selectedMailId
-											? 'bg-zinc-100 border-transparent'
-											: 'hover:bg-zinc-50'
-									)}
-									onclick={() => handleSelectMail(mail.id)}
-								>
-									<!-- Selected blue border indicator - absolute positioned -->
-									{#if mail.id === selectedMailId}
-										<div class="absolute left-0 top-2 bottom-2 w-[2px] bg-blue-500 rounded-full"></div>
-									{/if}
-
-									<!-- Unread blue dot indicator -->
-									{#if mail.unread && mail.id !== selectedMailId}
-										<div class="absolute left-0 top-0 bottom-0 w-[2px] bg-blue-500"></div>
-									{/if}
+				{#each flatMails as mail}
+					{@const isSelected = mail.id === selectedMailId}
+					{@const isUnread = !(mail.is_read ?? false)}
+					<ContextMenu.Root>
+						<ContextMenu.Trigger>
+							<button
+								class={cn(
+									'relative flex w-full items-center text-left select-none [-webkit-user-select:none] [user-select:none] cursor-default mx-2 my-1 rounded-lg',
+									isSelected
+										? 'bg-[#007AFF] text-white'
+										: 'bg-white hover:bg-zinc-50'
+								)}
+								style="height: 92px; padding-left: 2.5rem; padding-right: 1rem; padding-top: 0.5rem; padding-bottom: 0.5rem;"
+								onclick={() => handleSelectMail(mail.id)}
+							>
+								<!-- Unread blue dot - only show when not selected -->
+								{#if isUnread && !isSelected}
+									<div class="absolute left-3 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-[#007AFF]"></div>
+								{/if}
 
 									<!-- Account indicator dot (when multiple accounts) -->
 									{#if hasMultipleAccounts && mail.account_id}
-										<div class="flex-shrink-0 pt-1">
+										<div class="flex-shrink-0 mr-2">
 											<div
-												class="size-2.5 rounded-full {getAccountColor(mail)}"
+												class={cn(
+													'size-2 rounded-full',
+													getAccountColor(mail),
+													isSelected && 'opacity-70'
+												)}
 												title={getAccountForMail(mail)?.email || 'Unknown account'}
 											></div>
 										</div>
 									{/if}
 
-									<!-- Content -->
-									<div class="flex-1 min-w-0 flex flex-col gap-1">
-										<!-- Row 1: Sender + Time -->
-										<div class="flex items-baseline justify-between gap-2">
+									<!-- Content - fixed height container -->
+									<div class="flex-1 min-w-0 flex flex-col justify-center h-full overflow-hidden">
+										<!-- Top: Sender + Time -->
+										<div class="flex items-baseline justify-between gap-2 overflow-hidden">
 											<span
 												class={cn(
 													'truncate text-[13px]',
-													mail.unread && mail.id !== selectedMailId
-														? 'font-semibold text-zinc-900'
-														: 'font-medium text-zinc-600'
+													isSelected
+														? 'text-white font-bold'
+														: isUnread
+															? 'font-bold text-zinc-900'
+															: 'font-normal text-zinc-500'
 												)}
 											>
 												{mail.from_name}
 											</span>
-											<span class="text-[10px] text-zinc-400 font-normal uppercase tracking-tight tabular-nums shrink-0">
+											<span class={cn(
+												'text-[11px] tabular-nums shrink-0',
+												isSelected ? 'text-white' : 'text-zinc-400'
+											)}>
 												{formatMailTime(mail.timestamp)}
 											</span>
 										</div>
 
-										<!-- Row 2: Subject -->
-										<div class={cn(
-											'truncate text-[13px]',
-											mail.unread && mail.id !== selectedMailId
-												? 'text-zinc-900'
-												: 'text-zinc-500'
-										)}>
-											{mail.subject}
+										<!-- Middle: Subject - single line truncate -->
+										<div class="overflow-hidden">
+											<span class={cn(
+												'block truncate text-[13px]',
+												isSelected
+													? 'text-white font-bold'
+													: isUnread
+														? 'font-bold text-zinc-900'
+														: 'font-normal text-zinc-500'
+											)}>
+												{mail.subject}
+											</span>
 										</div>
 
-										<!-- Row 3: Preview -->
-										<p class="line-clamp-2 text-[12px] text-zinc-500 leading-relaxed">
-											{mail.preview}
-										</p>
+										<!-- Bottom: Preview snippet - always 2 lines height -->
+										<div class="overflow-hidden">
+											<p class={cn(
+												'line-clamp-2 text-[12px] leading-tight',
+												isSelected ? 'text-white' : 'text-zinc-400'
+											)}>
+												{mail.preview || ' '}
+											</p>
+										</div>
 									</div>
 
 									<!-- Attachment indicator -->
 									{#if mail.has_attachments}
-										<div class="flex-shrink-0 pt-1">
-											<Paperclip class="size-3.5 text-zinc-300" strokeWidth={1.5} />
+										<div class="flex-shrink-0 mx-3">
+											<Paperclip class={cn(
+												'size-3.5',
+												isSelected ? 'text-white' : 'text-zinc-300'
+											)} strokeWidth={1.5} />
 										</div>
 									{/if}
 								</button>
@@ -306,7 +292,7 @@
 
 							<ContextMenu.Content>
 								<!-- Mark Read/Unread -->
-								{#if mail.unread}
+								{#if !(mail.is_read ?? false)}
 									<ContextMenu.Item onclick={() => onMarkRead?.(mail, true)}>
 										<MailOpen class="size-4 text-zinc-500" strokeWidth={1.5} />
 										Mark as Read
@@ -375,7 +361,6 @@
 								</ContextMenu.Item>
 							</ContextMenu.Content>
 						</ContextMenu.Root>
-					{/each}
 				{/each}
 			</div>
 		{/if}

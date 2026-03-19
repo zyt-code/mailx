@@ -5,9 +5,17 @@ use crate::html_sanitize;
 use crate::imap_client::ImapClient;
 use crate::smtp_client::SmtpClient;
 use crate::sync_manager::{SyncManager, SyncStatus};
+use crate::provider_defaults;
 use serde_json::json;
 use tauri::{AppHandle, Emitter, Manager, State};
 use std::sync::Arc;
+
+#[derive(Debug, serde::Serialize)]
+pub struct ProviderDefaultsResponse {
+    pub domain: String,
+    pub imap: Option<provider_defaults::ProviderServerConfig>,
+    pub smtp: Option<provider_defaults::ProviderServerConfig>,
+}
 
 /// Sanitize html_body field on a Mail if present
 fn sanitize_mail_html(mut mail: Mail) -> Mail {
@@ -83,24 +91,25 @@ pub fn mark_mail_read(
         .map_err(|e| format!("Failed to mark mail: {}", e))
 }
 
-/// Mark a mail as read on the IMAP server
+/// Mark a mail as read on the IMAP server using UID
 #[tauri::command]
-pub async fn mark_mail_read_on_server(
-    id: String,
+pub async fn mark_as_read(
+    uid: u32,
     account_id: String,
     db: State<'_, Database>,
     account_manager: State<'_, Arc<AccountManager>>,
     credential_manager: State<'_, Arc<CredentialManager>>,
 ) -> Result<(), String> {
-    // 1. Get the mail from database to retrieve UID and folder
-    let mail = db.inner().get_mail(&id)
-        .map_err(|e| format!("Failed to get mail: {}", e))?
-        .ok_or_else(|| format!("Mail with id '{}' not found", id))?;
+    println!("[CMD] mark_as_read: uid={}, account_id={}", uid, account_id);
 
-    // 2. Get the UID from the mail
-    let uid = mail.uid.ok_or_else(|| format!("Mail {} has no UID", id))?;
+    // 1. Locate the mail to obtain folder + primary key
+    let mail = db.inner().get_mail_by_account_and_uid(&account_id, uid)
+        .map_err(|e| format!("Failed to get mail by UID: {}", e))?
+        .ok_or_else(|| format!("Mail with uid '{}' not found for account {}", uid, account_id))?;
 
-    // 3. Get account credentials
+    println!("[CMD] mark_as_read: mail found, id={}, folder={}", mail.id, mail.folder);
+
+    // 2. Fetch credentials + IMAP config
     let account = account_manager.get(&account_id)
         .map_err(|e| format!("Failed to get account: {}", e))?;
     let password = credential_manager.get_password(&account_id)
@@ -108,16 +117,22 @@ pub async fn mark_mail_read_on_server(
     let imap_config = account_manager.get_imap_config(&account_id)
         .map_err(|e| format!("Failed to get IMAP config: {}", e))?;
 
-    // 4. Create IMAP client and store the flag
+    println!("[CMD] mark_as_read: connecting to {}:{}", imap_config.server, imap_config.port);
+
+    // 3. Store the Seen flag via UID STORE
     let imap_client = ImapClient::new(imap_config, account.email, password);
+    println!("[CMD] mark_as_read: UID STORE {}, folder={}, flags=+FLAGS (\\Seen)", uid, mail.folder);
     imap_client.store_flags(&mail.folder, uid, "+FLAGS (\\Seen)")
         .await
         .map_err(|e| format!("Failed to store flags on server: {}", e))?;
 
-    // 5. Update local database
-    db.inner().mark_mail_read(&id, true)
+    println!("[CMD] mark_as_read: remote flag synced");
+
+    // 4. Update local DB copy
+    db.inner().mark_mail_read(&mail.id, true)
         .map_err(|e| format!("Failed to mark mail as read in database: {}", e))?;
 
+    println!("[CMD] mark_as_read: SUCCESS");
     Ok(())
 }
 
@@ -479,4 +494,23 @@ pub fn open_devtools(app_handle: AppHandle) -> Result<(), String> {
 pub fn clear_database(db: State<'_, Database>) -> Result<(), String> {
     db.inner().clear_all_mails()
         .map_err(|e| format!("Failed to clear database: {}", e))
+}
+
+/// Lookup provider defaults shared with the frontend configuration.
+#[tauri::command]
+pub fn provider_defaults_for_email(email: String) -> Result<Option<ProviderDefaultsResponse>, String> {
+    let domain = email
+        .split('@')
+        .nth(1)
+        .map(|d| d.to_lowercase())
+        .ok_or_else(|| format!("Invalid email '{}'", email))?;
+
+    let imap = provider_defaults::imap_for_domain(&domain);
+    let smtp = provider_defaults::smtp_for_domain(&domain);
+
+    if imap.is_none() && smtp.is_none() {
+        return Ok(None);
+    }
+
+    Ok(Some(ProviderDefaultsResponse { domain, imap, smtp }))
 }

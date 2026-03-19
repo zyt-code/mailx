@@ -222,7 +222,7 @@
 
 {#if isMobile && !collapsed}
 	<div
-		class="fixed inset-0 z-30 bg-black/5 backdrop-blur-[2px] transition-opacity duration-200"
+		class="fixed inset-0 z-30 bg-black/5 backdrop-blur-[2px] transition-opacity duration-100"
 		onclick={onToggle}
 		aria-label="Close sidebar"
 	></div>
@@ -230,7 +230,7 @@
 
 <aside
 	class={cn(
-		'flex h-full flex-col bg-white shrink-0',
+		'flex h-full flex-col bg-white shrink-0 select-none [-webkit-user-select:none] [user-select:none]',
 		isMobile && 'fixed inset-y-0 left-0 z-40 shadow-lg',
 		isMobile && collapsed && '-translate-x-full',
 		!isMobile && 'border-r border-zinc-100'
@@ -254,7 +254,7 @@
 			<button
 				onclick={handleRefresh}
 				disabled={!isAccountConfigured}
-				class="flex size-7 items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-100/60 hover:text-zinc-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors duration-150"
+				class="flex size-7 items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-100/60 hover:text-zinc-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors duration-75"
 				aria-label="Refresh"
 			>
 				<RefreshCw class={cn('size-[15px]', isRefreshing && 'animate-spin')} strokeWidth={1.5} />
@@ -269,7 +269,7 @@
 				onclick={openCompose}
 				disabled={!isAccountConfigured}
 				class={cn(
-					"flex items-center justify-center gap-2 w-full px-3 py-2.5 rounded-lg transition-all duration-200",
+					"flex items-center justify-center gap-2 w-full px-3 py-2.5 rounded-lg transition-all duration-75",
 					isAccountConfigured
 						? "bg-zinc-900 text-white hover:bg-zinc-800 shadow-sm"
 						: "bg-zinc-200 text-zinc-400 cursor-not-allowed"
@@ -297,7 +297,7 @@
 					toggleAccountsCollapse();
 				}}
 				class={cn(
-					"flex items-center gap-2 px-3 py-2 rounded-md mx-2 mt-1 relative z-10 transition-[background-color] duration-150",
+					"flex items-center gap-2 px-3 py-2 rounded-md mx-2 mt-1 relative z-10 transition-[background-color] duration-75",
 					selectedAccountId === null
 						? "bg-zinc-100 text-zinc-900"
 						: "hover:bg-zinc-50 text-zinc-600"
@@ -333,7 +333,7 @@
 				id="account-list"
 				role="region"
 				class={cn(
-					"overflow-hidden transition-[max-height] duration-200 ease-in-out",
+					"overflow-hidden transition-[max-height] duration-100 ease-in-out",
 					accountsCollapsed ? "max-h-0" : "max-h-[800px]"
 				)}
 				aria-hidden={accountsCollapsed}
@@ -342,7 +342,7 @@
 					<button
 						onclick={() => handleAccountClick(account.id)}
 						class={cn(
-							"flex items-center gap-2 px-3 py-2 rounded-md mx-1 relative z-10 transition-[background-color] duration-150",
+							"flex items-center gap-2 px-3 py-2 rounded-md mx-1 relative z-10 transition-[background-color] duration-75",
 							selectedAccountId === account.id
 								? "bg-zinc-100 text-zinc-900"
 								: "hover:bg-zinc-50 text-zinc-600"
@@ -417,7 +417,7 @@
 						class={cn(
 							'group flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] relative z-10',
 							isAccountConfigured && item.folder === activeFolder
-								? 'bg-zinc-100 text-zinc-900 font-semibold'
+								? 'bg-[#007AFF] text-white font-semibold'
 								: '',
 							isAccountConfigured
 								? 'text-zinc-500 hover:bg-zinc-50 hover:text-zinc-700 cursor-pointer'
@@ -444,10 +444,10 @@
 		<div class="shrink-0 px-2 pb-2">
 			<button
 				onclick={navigateToSettings}
-				class="settings-icon group flex items-center justify-center w-9 h-9 rounded-md text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 transition-all duration-200 relative z-10 cursor-pointer"
+				class="settings-icon group flex items-center justify-center w-9 h-9 rounded-md text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 transition-all duration-75 relative z-10 cursor-pointer"
 				aria-label="Settings"
 			>
-				<Settings class="size-[18px] transition-transform duration-500 group-hover:rotate-45" strokeWidth={1.5} />
+				<Settings class="size-[18px] transition-transform duration-100 group-hover:rotate-45" strokeWidth={1.5} />
 			</button>
 		</div>
 	{:else}
@@ -504,13 +504,13 @@
 		<!-- Collapsed footer -->
 		<div class="shrink-0 px-2 pb-2">
 			<div class="flex flex-col items-center gap-1">
-				<button
-					onclick={navigateToSettings}
-					class="settings-icon group flex size-8 items-center justify-center rounded-md text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 transition-all duration-200 relative z-10 cursor-pointer"
-					aria-label="Settings"
-				>
-					<Settings class="size-[18px] transition-transform duration-500 group-hover:rotate-45" strokeWidth={1.5} />
-				</button>
+			<button
+				onclick={navigateToSettings}
+				class="settings-icon group flex size-8 items-center justify-center rounded-md text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 transition-all duration-75 relative z-10 cursor-pointer"
+				aria-label="Settings"
+			>
+				<Settings class="size-[18px] transition-transform duration-100 group-hover:rotate-45" strokeWidth={1.5} />
+			</button>
 			</div>
 		</div>
 	{/if}

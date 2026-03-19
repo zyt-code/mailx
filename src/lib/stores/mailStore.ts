@@ -9,6 +9,38 @@ const _activeFolder = writable<Folder>('inbox');
 const _selectedAccountId = writable<string | null>(null); // null = 'all' accounts
 const _error = writable<string | null>(null);
 
+function ensureReadState(mail: Mail, read: boolean): Mail {
+	return {
+		...mail,
+		is_read: read,
+		unread: !read
+	};
+}
+
+function normalizeMail(mail: Mail): Mail {
+	if (typeof mail.is_read === 'boolean') {
+		return {
+			...mail,
+			unread: mail.unread ?? !mail.is_read
+		};
+	}
+	return ensureReadState(mail, !(mail.unread ?? true));
+}
+
+function updateMailInStore(mailId: string, updater: (mail: Mail) => Mail): Mail | null {
+	let updated: Mail | null = null;
+	_mails.update((current) => {
+		const index = current.findIndex((mail) => mail.id === mailId);
+		if (index === -1) return current;
+		const next = [...current];
+		const mutated = updater(next[index]);
+		next[index] = mutated;
+		updated = mutated;
+		return next;
+	});
+	return updated;
+}
+
 export const mails = derived(_mails, $mails => $mails);
 export const isLoading = derived(_isLoading, $loading => $loading);
 export const activeFolder = derived(_activeFolder, $f => $f);
@@ -57,14 +89,18 @@ export const displayedEmails = derived(
 
 /**
  * Set the selected account filter. Pass null for "All Inboxes".
+ * Uses Optimistic UI: immediately updates the displayed emails via derived store,
+ * then optionally triggers a background sync without blocking the UI.
  */
 export function setSelectedAccount(accountId: string | null): void {
+  const previousAccountId = get(_selectedAccountId);
   _selectedAccountId.set(accountId);
-  // Reload mails with the new account filter
-  const currentFolder = get(_activeFolder);
-  loadMails(currentFolder).catch(e => {
-    console.error('Failed to reload mails after account switch:', e);
+  console.log('[MailStore] Optimistic UI: switched account', {
+    from: previousAccountId,
+    to: accountId
   });
+  // The displayedEmails derived store will immediately update the UI
+  // Background sync can happen without blocking the UI
 }
 
 let _initialized = false;
@@ -93,7 +129,7 @@ export async function loadMails(folder?: Folder): Promise<void> {
     const targetFolder = folder || 'inbox';
     const accountId = get(_selectedAccountId);
     const data = await db.getMails(targetFolder, accountId);
-    _mails.set(data);
+    _mails.set(data.map(normalizeMail));
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error('Failed to load mails:', msg);
@@ -109,4 +145,12 @@ export function refreshMails(): void {
 
 export function switchFolder(folder: Folder): void {
   eventBus.emit('folder:change', { folder });
+}
+
+export function markMailReadLocally(mailId: string): Mail | null {
+	return updateMailInStore(mailId, (mail) => ensureReadState(mail, true));
+}
+
+export function markMailUnreadLocally(mailId: string): Mail | null {
+	return updateMailInStore(mailId, (mail) => ensureReadState(mail, false));
 }

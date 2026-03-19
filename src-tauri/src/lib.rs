@@ -7,6 +7,7 @@ mod imap_client;
 mod mail_provider;
 mod smtp_client;
 mod sync_manager;
+mod provider_defaults;
 
 use accounts::AccountManager;
 use credentials::CredentialManager;
@@ -170,7 +171,7 @@ pub fn run() {
             commands::update_mail,
             commands::delete_mail,
             commands::mark_mail_read,
-            commands::mark_mail_read_on_server,
+            commands::mark_as_read,
             commands::move_to_trash,
             commands::archive_mail,
             commands::unarchive_mail,
@@ -184,6 +185,7 @@ pub fn run() {
             commands::update_account,
             commands::delete_account,
             commands::test_account_connection,
+            commands::provider_defaults_for_email,
             // Sync commands
             commands::sync_account,
             commands::sync_all_accounts,

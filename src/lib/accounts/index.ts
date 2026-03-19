@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
+import providerDefaults from '../config/provider-defaults.json';
 import type {
 	Account,
 	AccountFormData,
@@ -7,6 +8,34 @@ import type {
 	Mail,
 	SyncStatus,
 } from '$lib/types';
+
+type ProviderServerConfig = {
+	server: string;
+	port: number;
+	use_ssl: boolean;
+};
+
+type ProviderDefaultsFile = {
+	imap: Record<string, ProviderServerConfig>;
+	smtp: Record<string, ProviderServerConfig>;
+};
+
+const PROVIDER_DEFAULTS = providerDefaults as ProviderDefaultsFile;
+
+function extractDomain(email: string): string | undefined {
+	return email.split('@')[1]?.toLowerCase();
+}
+
+function resolveDefault(
+	type: 'imap' | 'smtp',
+	email: string,
+	fallback: () => ProviderServerConfig,
+): ProviderServerConfig {
+	const domain = extractDomain(email);
+	if (!domain) return fallback();
+	const bucket = PROVIDER_DEFAULTS[type];
+	return bucket[domain] ?? fallback();
+}
 
 /**
  * Get all accounts
@@ -164,42 +193,22 @@ export function onMailsUpdated(callback: () => void): Promise<UnlistenFn> {
  * Get default IMAP settings for common email providers
  */
 export function getDefaultImapSettings(email: string): { server: string; port: number; use_ssl: boolean } {
-	const domain = email.split('@')[1]?.toLowerCase();
-
-	const defaults: Record<string, { server: string; port: number; use_ssl: boolean }> = {
-		'gmail.com': { server: 'imap.gmail.com', port: 993, use_ssl: true },
-		'outlook.com': { server: 'outlook.office365.com', port: 993, use_ssl: true },
-		'hotmail.com': { server: 'outlook.office365.com', port: 993, use_ssl: true },
-		'yahoo.com': { server: 'imap.mail.yahoo.com', port: 993, use_ssl: true },
-		'icloud.com': { server: 'imap.mail.me.com', port: 993, use_ssl: true },
-		'163.com': { server: 'imap.163.com', port: 993, use_ssl: true },
-		'126.com': { server: 'imap.126.com', port: 993, use_ssl: true },
-		'qq.com': { server: 'imap.qq.com', port: 993, use_ssl: true },
-		'foxmail.com': { server: 'imap.foxmail.com', port: 993, use_ssl: true },
-	};
-
-	return defaults[domain || ''] || { server: 'imap.' + domain, port: 993, use_ssl: true };
+	return resolveDefault('imap', email, () => {
+		const domain = extractDomain(email);
+		const fallbackDomain = domain ? `imap.${domain}` : 'imap.local';
+		return { server: fallbackDomain, port: 993, use_ssl: true };
+	});
 }
 
 /**
  * Get default SMTP settings for common email providers
  */
 export function getDefaultSmtpSettings(email: string): { server: string; port: number; use_ssl: boolean } {
-	const domain = email.split('@')[1]?.toLowerCase();
-
-	const defaults: Record<string, { server: string; port: number; use_ssl: boolean }> = {
-		'gmail.com': { server: 'smtp.gmail.com', port: 587, use_ssl: true },
-		'outlook.com': { server: 'smtp-mail.outlook.com', port: 587, use_ssl: true },
-		'hotmail.com': { server: 'smtp-mail.outlook.com', port: 587, use_ssl: true },
-		'yahoo.com': { server: 'smtp.mail.yahoo.com', port: 587, use_ssl: true },
-		'icloud.com': { server: 'smtp.mail.me.com', port: 587, use_ssl: true },
-		'163.com': { server: 'smtp.163.com', port: 465, use_ssl: true },
-		'126.com': { server: 'smtp.126.com', port: 465, use_ssl: true },
-		'qq.com': { server: 'smtp.qq.com', port: 465, use_ssl: true },
-		'foxmail.com': { server: 'smtp.foxmail.com', port: 465, use_ssl: true },
-	};
-
-	return defaults[domain || ''] || { server: 'smtp.' + domain, port: 587, use_ssl: true };
+	return resolveDefault('smtp', email, () => {
+		const domain = extractDomain(email);
+		const fallbackDomain = domain ? `smtp.${domain}` : 'smtp.local';
+		return { server: fallbackDomain, port: 587, use_ssl: true };
+	});
 }
 
 /**
