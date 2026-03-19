@@ -2,10 +2,10 @@ import { invoke } from '@tauri-apps/api/core';
 import type { Mail, Folder } from '$lib/types.js';
 
 /**
- * Get all mails, optionally filtered by folder
+ * Get all mails, optionally filtered by folder and account
  */
-export async function getMails(folder?: Folder): Promise<Mail[]> {
-	return invoke<Mail[]>('get_mails', { folder });
+export async function getMails(folder?: Folder, accountId?: string | null): Promise<Mail[]> {
+	return invoke<Mail[]>('get_mails', { folder, account_id: accountId });
 }
 
 /**
@@ -54,6 +54,13 @@ export async function deleteMail(id: string): Promise<void> {
  */
 export async function markMailRead(id: string, read: boolean): Promise<void> {
 	await invoke('mark_mail_read', { id, read });
+}
+
+/**
+ * Mark a mail as read on the IMAP server (syncs \Seen flag)
+ */
+export async function markMailReadOnServer(id: string, accountId: string): Promise<void> {
+	await invoke('mark_mail_read_on_server', { id, account_id: accountId });
 }
 
 /**
