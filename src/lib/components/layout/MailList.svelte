@@ -5,6 +5,7 @@
 	import type { Mail, Folder, Account } from '$lib/types.js';
 	import { accounts } from '$lib/stores/accountStore.js';
 	import { displayedEmails, activeFolder as storeActiveFolder } from '$lib/stores/mailStore.js';
+	import { markMailReadOnServer } from '$lib/db/index.js';
 
 	interface Props {
 		selectedMailId: string | null;
@@ -160,6 +161,21 @@
 
 	// Check if multiple accounts exist
 	let hasMultipleAccounts = $derived(allAccounts.length > 1);
+
+	// Handle mail selection with server read sync
+	function handleSelectMail(mailId: string) {
+		// Immediately update UI for instant feedback
+		onSelectMail(mailId);
+
+		// Sync read status to server in background for unread mails
+		const mail = displayedMails.find((m) => m.id === mailId);
+		if (mail?.unread && mail.account_id) {
+			markMailReadOnServer(mailId, mail.account_id).catch((error) => {
+				// Silently handle errors - UI already updated
+				console.warn('Failed to mark as read on server:', error);
+			});
+		}
+	}
 </script>
 
 <div
@@ -168,7 +184,7 @@
 	class:w-full={width === undefined}
 >
 	<!-- Search - Notion Quick Find style -->
-	<div class="flex items-center gap-2 px-4 py-2.5 border-b border-zinc-100 shrink-0">
+	<div class="flex items-center gap-2 px-4 py-2.5 border-b border-zinc-100 shrink-0 sticky top-0 bg-white z-10">
 		<Search class={cn(
 			"size-4 shrink-0",
 			isAccountConfigured ? "text-zinc-300" : "text-zinc-200"
@@ -222,7 +238,7 @@
 											? 'bg-zinc-100/80 shadow-inner'
 											: 'hover:bg-zinc-50'
 									)}
-									onclick={() => onSelectMail(mail.id)}
+									onclick={() => handleSelectMail(mail.id)}
 								>
 									<!-- Selected blue border indicator - absolute positioned -->
 									{#if mail.id === selectedMailId}
