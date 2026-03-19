@@ -11,16 +11,39 @@
 
 	let { account, onSave, onCancel }: Props = $props();
 
+	function createFormData(currentAccount?: Account): AccountFormData {
+		return {
+			email: currentAccount?.email || '',
+			name: currentAccount?.name || '',
+			password: '',
+			imap_server: currentAccount?.imap_server || '',
+			imap_port: currentAccount?.imap_port || 993,
+			imap_use_ssl: currentAccount?.imap_use_ssl ?? true,
+			smtp_server: currentAccount?.smtp_server || '',
+			smtp_port: currentAccount?.smtp_port || 587,
+			smtp_use_ssl: currentAccount?.smtp_use_ssl ?? true
+		};
+	}
+
 	let formData = $state<AccountFormData>({
-		email: account?.email || '',
-		name: account?.name || '',
+		email: '',
+		name: '',
 		password: '',
-		imap_server: account?.imap_server || '',
-		imap_port: account?.imap_port || 993,
-		imap_use_ssl: account?.imap_use_ssl ?? true,
-		smtp_server: account?.smtp_server || '',
-		smtp_port: account?.smtp_port || 587,
-		smtp_use_ssl: account?.smtp_use_ssl ?? true,
+		imap_server: '',
+		imap_port: 993,
+		imap_use_ssl: true,
+		smtp_server: '',
+		smtp_port: 587,
+		smtp_use_ssl: true
+	});
+	let initializedAccountId = $state<string | null>(null);
+
+	$effect(() => {
+		const nextAccountId = account?.id ?? null;
+		if (nextAccountId !== initializedAccountId) {
+			formData = createFormData(account);
+			initializedAccountId = nextAccountId;
+		}
 	});
 
 	let errors = $state<Record<string, string>>({});
@@ -65,15 +88,6 @@
 		}
 
 		try {
-			// Create a temporary account to test
-			const tempAccount: Account = {
-				id: account?.id || crypto.randomUUID(),
-				...formData,
-				is_active: true,
-				created_at: account?.created_at || Date.now(),
-				updated_at: Date.now(),
-			};
-
 			if (account) {
 				// Update existing account temporarily for testing
 				await accounts.updateAccount(account.id, formData);
@@ -194,8 +208,9 @@
 	<form onsubmit={(e) => e.preventDefault()} class="space-y-4">
 		<!-- Basic Info -->
 		<div class="space-y-2">
-			<label class="block text-sm font-medium text-gray-700">Email</label>
+			<label for="account-email" class="block text-sm font-medium text-gray-700">Email</label>
 			<input
+				id="account-email"
 				type="email"
 				bind:value={formData.email}
 				onblur={handleEmailChange}
@@ -210,8 +225,9 @@
 		</div>
 
 		<div class="space-y-2">
-			<label class="block text-sm font-medium text-gray-700">Name</label>
+			<label for="account-name" class="block text-sm font-medium text-gray-700">Name</label>
 			<input
+				id="account-name"
 				type="text"
 				bind:value={formData.name}
 				class={getFieldClass('name')}
@@ -226,8 +242,9 @@
 
 		{#if !account}
 			<div class="space-y-2" data-allow-context-menu>
-				<label class="block text-sm font-medium text-gray-700">Password</label>
+				<label for="account-password" class="block text-sm font-medium text-gray-700">Password</label>
 				<input
+					id="account-password"
 					type="password"
 					bind:value={formData.password}
 					class={getFieldClass('password')}
@@ -246,8 +263,9 @@
 			<h3 class="text-sm font-medium text-gray-700 mb-2">IMAP Settings</h3>
 			<div class="grid grid-cols-2 gap-4">
 				<div class="space-y-2">
-					<label class="block text-sm font-medium text-gray-700">Server</label>
+					<label for="imap-server" class="block text-sm font-medium text-gray-700">Server</label>
 					<input
+						id="imap-server"
 						type="text"
 						bind:value={formData.imap_server}
 						class={getFieldClass('imap_server')}
@@ -257,8 +275,9 @@
 					/>
 				</div>
 				<div class="space-y-2">
-					<label class="block text-sm font-medium text-gray-700">Port</label>
+					<label for="imap-port" class="block text-sm font-medium text-gray-700">Port</label>
 					<input
+						id="imap-port"
 						type="number"
 						bind:value={formData.imap_port}
 						class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -285,8 +304,9 @@
 			<h3 class="text-sm font-medium text-gray-700 mb-2">SMTP Settings</h3>
 			<div class="grid grid-cols-2 gap-4">
 				<div class="space-y-2">
-					<label class="block text-sm font-medium text-gray-700">Server</label>
+					<label for="smtp-server" class="block text-sm font-medium text-gray-700">Server</label>
 					<input
+						id="smtp-server"
 						type="text"
 						bind:value={formData.smtp_server}
 						class={getFieldClass('smtp_server')}
@@ -296,8 +316,9 @@
 					/>
 				</div>
 				<div class="space-y-2">
-					<label class="block text-sm font-medium text-gray-700">Port</label>
+					<label for="smtp-port" class="block text-sm font-medium text-gray-700">Port</label>
 					<input
+						id="smtp-port"
 						type="number"
 						bind:value={formData.smtp_port}
 						class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"

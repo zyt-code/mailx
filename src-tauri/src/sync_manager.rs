@@ -2,13 +2,14 @@ use crate::accounts::{Account, AccountManager};
 use crate::credentials::CredentialManager;
 use crate::database::Database;
 use crate::imap_client::ImapClient;
-use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter};
 use thiserror::Error;
 
 /// Sync manager errors
 #[derive(Debug, Error)]
+#[allow(dead_code)]
 pub enum SyncError {
     #[error("Account error: {0}")]
     Account(String),
@@ -66,6 +67,7 @@ pub struct SyncManager {
     account_manager: Arc<AccountManager>,
     credential_manager: Arc<CredentialManager>,
     database: Arc<Database>,
+    #[allow(dead_code)]
     sync_handles: Arc<Mutex<Vec<tokio::task::JoinHandle<()>>>>,
     is_syncing: Arc<AtomicBool>,
 }
@@ -102,27 +104,31 @@ impl SyncManager {
     /// Trigger an immediate sync for a specific account
     pub async fn sync_account(&self, account_id: &str) -> Result<SyncStatus> {
         // Acquire atomic lock — prevents concurrent syncs
-        if self.is_syncing.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst).is_err() {
+        if self
+            .is_syncing
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .is_err()
+        {
             return Err(SyncError::AlreadySyncing);
         }
 
         println!("[Sync] Starting sync for account '{}'", account_id);
 
         // Get the account
-        let account = self
-            .account_manager
-            .get(account_id)
-            .map_err(|e| {
-                self.is_syncing.store(false, Ordering::SeqCst);
-                println!("[Sync] Failed to get account '{}': {}", account_id, e);
-                SyncError::Account(e.to_string())
-            })?;
+        let account = self.account_manager.get(account_id).map_err(|e| {
+            self.is_syncing.store(false, Ordering::SeqCst);
+            println!("[Sync] Failed to get account '{}': {}", account_id, e);
+            SyncError::Account(e.to_string())
+        })?;
 
         // Emit sync started event
-        let _ = self.app_handle.emit("sync:started", json!({
-            "account_id": account_id,
-            "email": account.email,
-        }));
+        let _ = self.app_handle.emit(
+            "sync:started",
+            json!({
+                "account_id": account_id,
+                "email": account.email,
+            }),
+        );
 
         // Run the actual sync, catch errors to emit sync:failed
         let result = match self.sync_account_inner(account_id, &account).await {
@@ -132,10 +138,13 @@ impl SyncManager {
                 println!("[Sync] FAILED for '{}': {}", account.email, error_msg);
 
                 // Emit sync:failed so the frontend can show the error
-                let _ = self.app_handle.emit("sync:failed", json!({
-                    "account_id": account_id,
-                    "error": error_msg,
-                }));
+                let _ = self.app_handle.emit(
+                    "sync:failed",
+                    json!({
+                        "account_id": account_id,
+                        "error": error_msg,
+                    }),
+                );
 
                 Err(e)
             }
@@ -175,43 +184,51 @@ impl SyncManager {
         // Create IMAP client and fetch
         let imap_client = ImapClient::new(imap_config, account.email.clone(), password);
 
-        let mails = imap_client
-            .fetch_emails("INBOX", 50)
-            .await
-            .map_err(|e| {
-                println!("[Sync] IMAP fetch error for '{}': {}", account.email, e);
-                SyncError::Imap(e.to_string())
-            })?;
+        let mails = imap_client.fetch_emails("INBOX", 50).await.map_err(|e| {
+            println!("[Sync] IMAP fetch error for '{}': {}", account.email, e);
+            SyncError::Imap(e.to_string())
+        })?;
 
-        println!("[Sync] Fetched {} mails for '{}'", mails.len(), account.email);
+        println!(
+            "[Sync] Fetched {} mails for '{}'",
+            mails.len(),
+            account.email
+        );
 
         // Store emails in database
+        // IMPORTANT: Use upsert_mail_preserving_read_status to preserve local read/unread status
+        // This ensures that emails marked as read locally stay read, even if the server
+        // still shows them as unread (which can happen due to sync timing)
         let mut inserted = 0u32;
-        let mut skipped = 0u32;
+        let mut updated = 0u32;
         for mut mail in mails {
             // Tag each mail with the account that owns it
             mail.account_id = Some(account_id.to_string());
 
-            match self.database.get_mail(&mail.id) {
-                Ok(Some(_)) => {
-                    skipped += 1;
-                    continue;
-                }
-                _ => {}
-            }
+            // Check if this is a new mail or an existing one
+            let is_new = match self.database.get_mail(&mail.id) {
+                Ok(Some(_)) => false,
+                _ => true,
+            };
 
+            // Use upsert which preserves local read/unread status
             self.database
-                .insert_mail(&mail)
+                .upsert_mail_preserving_read_status(&mail)
                 .map_err(|e| {
-                    println!("[Sync] DB insert error: {}", e);
+                    println!("[Sync] DB upsert error: {}", e);
                     SyncError::Database(e.to_string())
                 })?;
-            inserted += 1;
+
+            if is_new {
+                inserted += 1;
+            } else {
+                updated += 1;
+            }
         }
 
         println!(
-            "[Sync] DB: {} inserted, {} skipped (already existed) for '{}'",
-            inserted, skipped, account.email
+            "[Sync] DB: {} inserted (new), {} updated (existing, local read status preserved) for '{}'",
+            inserted, updated, account.email
         );
 
         let now = chrono::Utc::now().timestamp_millis();
@@ -228,8 +245,13 @@ impl SyncManager {
 
         let _ = self.app_handle.emit("sync:completed", json!(status));
 
-        // Only trigger UI reload when new emails were actually inserted
-        if inserted > 0 {
+        // Trigger UI reload if there were any changes (new or updated emails)
+        // This ensures the UI reflects the latest data from the server
+        if inserted > 0 || updated > 0 {
+            println!(
+                "[Sync] Triggering mails:updated event ({} new, {} updated)",
+                inserted, updated
+            );
             let _ = self.app_handle.emit("mails:updated", ());
         }
 
@@ -267,6 +289,7 @@ impl SyncManager {
     }
 
     /// Test connection for an account
+    #[allow(dead_code)]
     pub async fn test_account_connection(&self, account_id: &str) -> Result<()> {
         // Get the account
         let account = self
@@ -297,6 +320,7 @@ impl SyncManager {
     }
 
     /// Stop all background sync tasks
+    #[allow(dead_code)]
     pub fn stop_all(&self) {
         let mut handles = self.sync_handles.lock().unwrap();
 

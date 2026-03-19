@@ -2,10 +2,11 @@
 	import * as db from '$lib/db/index.js';
 	import * as accounts from '$lib/accounts/index.js';
 	import { ChevronDown, X } from 'lucide-svelte';
+	import { fade, scale } from 'svelte/transition';
 	import ComposeHeader from './ComposeHeader.svelte';
 	import ComposeEditor from './ComposeEditor.svelte';
 	import ComposeActions from './ComposeActions.svelte';
-	import type { Account, EmailAddress, Folder, Mail } from '$lib/types.js';
+	import type { Account, Attachment, EmailAddress, Folder, Mail } from '$lib/types.js';
 	import { onMount } from 'svelte';
 
 	interface Props {
@@ -20,6 +21,14 @@
 
 	let availableAccounts = $state<Account[]>([]);
 	let selectedAccountId = $state<string | null>(null);
+	let showAccountDropdown = $state(false);
+	let highlightedAccountIndex = $state(-1);
+	let accountMenuRef = $state<HTMLDivElement | null>(null);
+	let draftId = $state<string | null>(null);
+	let lastSaved = $state<Date | null>(null);
+	let isSending = $state(false);
+	let fileInputRef = $state<HTMLInputElement | null>(null);
+	let draftAttachments = $state<Attachment[]>([]);
 
 	let draft = $state({
 		to: [] as EmailAddress[],
@@ -30,67 +39,83 @@
 		folder: 'drafts' as Folder
 	});
 
-	let draftId = $state<string | null>(null);
-	let lastSaved = $state<Date | null>(null);
-	let isSending = $state(false);
-	let autoSaveInterval = $state<ReturnType<typeof setInterval> | null>(null);
-	let showAccountDropdown = $state(false);
-
 	onMount(async () => {
 		await loadAccounts();
 	});
 
-	async function loadAccounts() {
+	$effect(() => {
+		if (!showAccountDropdown) return;
+
+		function handlePointerDown(event: PointerEvent): void {
+			const target = event.target as Node | null;
+			if (accountMenuRef && target && !accountMenuRef.contains(target)) {
+				closeAccountDropdown();
+			}
+		}
+
+		window.addEventListener('pointerdown', handlePointerDown);
+		return () => window.removeEventListener('pointerdown', handlePointerDown);
+	});
+
+	$effect(() => {
+		if (!isOpen) {
+			draftId = null;
+			lastSaved = null;
+			closeAccountDropdown();
+			draftAttachments = [];
+			return;
+		}
+
+		if (availableAccounts.length === 0) {
+			void loadAccounts();
+		}
+
+		draftAttachments = [];
+
+		if (replyTo) {
+			draft.to = replyTo.to?.[0] ? [replyTo.to[0]] : [];
+			draft.cc = [];
+			draft.bcc = [];
+			draft.subject = replyTo.subject.startsWith('Re:') ? replyTo.subject : `Re: ${replyTo.subject}`;
+			draft.body = `\n\n--- Original Message ---\nFrom: ${replyTo.from_name} <${replyTo.from_email}>\nDate: ${new Date(replyTo.timestamp).toLocaleString()}\nSubject: ${replyTo.subject}\n\n${replyTo.body}`;
+		} else if (forward) {
+			draft.to = [];
+			draft.cc = [];
+			draft.bcc = [];
+			draft.subject = forward.subject.startsWith('Fwd:') ? forward.subject : `Fwd: ${forward.subject}`;
+			draft.body = `\n\n--- Forwarded Message ---\nFrom: ${forward.from_name} <${forward.from_email}>\nDate: ${new Date(forward.timestamp).toLocaleString()}\nSubject: ${forward.subject}\n\n${forward.body}`;
+		} else {
+			draft.to = [];
+			draft.cc = [];
+			draft.bcc = [];
+			draft.subject = '';
+			draft.body = '';
+		}
+
+		const timer = setInterval(() => {
+			void saveDraft();
+		}, 30000);
+
+		return () => {
+			clearInterval(timer);
+		};
+	});
+
+	async function loadAccounts(): Promise<void> {
 		try {
 			availableAccounts = await accounts.getAccounts();
 			if (availableAccounts.length > 0 && !selectedAccountId) {
-				selectedAccountId = availableAccounts.find(a => a.is_active)?.id || availableAccounts[0].id;
+				selectedAccountId = availableAccounts.find((account) => account.is_active)?.id || availableAccounts[0].id;
 			}
 		} catch (error) {
 			console.error('Failed to load accounts:', error);
 		}
 	}
 
-	$effect(() => {
-		if (isOpen) {
-			if (availableAccounts.length === 0) {
-				loadAccounts();
-			}
-
-			if (replyTo) {
-				draft.to = replyTo.to?.[0] ? [replyTo.to[0]] : [];
-				draft.subject = replyTo.subject.startsWith('Re:')
-					? replyTo.subject
-					: `Re: ${replyTo.subject}`;
-				draft.body = `\n\n--- Original Message ---\nFrom: ${replyTo.from_name} <${replyTo.from_email}>\nDate: ${new Date(replyTo.timestamp).toLocaleString()}\nSubject: ${replyTo.subject}\n\n${replyTo.body}`;
-			} else if (forward) {
-				draft.subject = forward.subject.startsWith('Fwd:')
-					? forward.subject
-					: `Fwd: ${forward.subject}`;
-				draft.body = `\n\n--- Forwarded Message ---\nFrom: ${forward.from_name} <${forward.from_email}>\nDate: ${new Date(forward.timestamp).toLocaleString()}\nSubject: ${forward.subject}\n\n${forward.body}`;
-			} else {
-				draft.to = [];
-				draft.cc = [];
-				draft.bcc = [];
-				draft.subject = '';
-				draft.body = '';
-			}
-
-			autoSaveInterval = setInterval(saveDraft, 30000);
-		} else {
-			if (autoSaveInterval) {
-				clearInterval(autoSaveInterval);
-				autoSaveInterval = null;
-			}
-			draftId = null;
-			lastSaved = null;
-		}
-	});
-
-	async function saveDraft() {
+	async function saveDraft(): Promise<void> {
 		if (!isOpen) return;
 
-		const selectedAccount = availableAccounts.find(a => a.id === selectedAccountId);
+		const selectedAccount = availableAccounts.find((account) => account.id === selectedAccountId);
 		if (!selectedAccount) return;
 
 		const mail: Omit<Mail, 'id'> & { id?: string; account_id?: string } = {
@@ -105,9 +130,10 @@
 			folder: draft.folder,
 			unread: false,
 			is_read: true,
+			has_attachments: draftAttachments.length > 0,
 			to: draft.to.length > 0 ? draft.to : undefined,
 			cc: draft.cc.length > 0 ? draft.cc : undefined,
-			bcc: draft.bcc.length > 0 ? draft.bcc : undefined,
+			bcc: draft.bcc.length > 0 ? draft.bcc : undefined
 		};
 
 		try {
@@ -118,7 +144,126 @@
 		}
 	}
 
-	async function sendMail() {
+	function getSelectedAccount(): Account | undefined {
+		return availableAccounts.find((account) => account.id === selectedAccountId);
+	}
+
+	function openAccountDropdown(): void {
+		if (availableAccounts.length === 0) return;
+		showAccountDropdown = true;
+		const selectedIndex = availableAccounts.findIndex((account) => account.id === selectedAccountId);
+		highlightedAccountIndex = selectedIndex >= 0 ? selectedIndex : 0;
+	}
+
+	function closeAccountDropdown(): void {
+		showAccountDropdown = false;
+		highlightedAccountIndex = -1;
+	}
+
+	function moveAccountHighlight(delta: number): void {
+		if (availableAccounts.length === 0) return;
+		if (!showAccountDropdown) {
+			openAccountDropdown();
+			return;
+		}
+
+		if (highlightedAccountIndex < 0) {
+			highlightedAccountIndex = 0;
+			return;
+		}
+
+		highlightedAccountIndex =
+			(highlightedAccountIndex + delta + availableAccounts.length) % availableAccounts.length;
+	}
+
+	function selectAccountByIndex(index: number): void {
+		const account = availableAccounts[index];
+		if (!account) return;
+		selectedAccountId = account.id;
+		closeAccountDropdown();
+	}
+
+	function handleAccountSwitcherKeydown(event: KeyboardEvent): void {
+		switch (event.key) {
+			case 'ArrowDown':
+				event.preventDefault();
+				moveAccountHighlight(1);
+				break;
+			case 'ArrowUp':
+				event.preventDefault();
+				moveAccountHighlight(-1);
+				break;
+			case 'Enter':
+				event.preventDefault();
+				if (!showAccountDropdown) {
+					openAccountDropdown();
+				} else if (highlightedAccountIndex >= 0) {
+					selectAccountByIndex(highlightedAccountIndex);
+				}
+				break;
+			case 'Escape':
+				event.preventDefault();
+				closeAccountDropdown();
+				break;
+		}
+	}
+
+	function openAttachmentPicker(): void {
+		fileInputRef?.click();
+	}
+
+	async function handleAttachmentChange(event: Event): Promise<void> {
+		const input = event.currentTarget as HTMLInputElement;
+		const files = Array.from(input.files ?? []);
+		if (files.length === 0) return;
+
+		if (!draftId) {
+			await saveDraft();
+		}
+
+		if (!draftId) {
+			input.value = '';
+			return;
+		}
+
+		const persisted: Attachment[] = [];
+		for (const file of files) {
+			try {
+				const bytes = Array.from(new Uint8Array(await file.arrayBuffer()));
+				const attachment = await db.addMailAttachment(
+					draftId,
+					file.name,
+					file.type || 'application/octet-stream',
+					bytes
+				);
+				persisted.push(attachment);
+			} catch (error) {
+				console.error(`Failed to attach file '${file.name}':`, error);
+			}
+		}
+
+		if (persisted.length > 0) {
+			const existingIds = new Set(draftAttachments.map((attachment) => attachment.id));
+			draftAttachments = [
+				...draftAttachments,
+				...persisted.filter((attachment) => !existingIds.has(attachment.id))
+			];
+			await saveDraft();
+		}
+		input.value = '';
+	}
+
+	async function removeAttachment(id: string): Promise<void> {
+		try {
+			await db.removeMailAttachment(id);
+			draftAttachments = draftAttachments.filter((attachment) => attachment.id !== id);
+			await saveDraft();
+		} catch (error) {
+			console.error('Failed to remove attachment:', error);
+		}
+	}
+
+	async function sendMail(): Promise<void> {
 		if (!selectedAccountId) {
 			alert('Please select an account to send from');
 			return;
@@ -148,7 +293,7 @@
 		onClose();
 	}
 
-	async function discardDraft() {
+	async function discardDraft(): Promise<void> {
 		if (draftId) {
 			try {
 				await db.moveToTrash(draftId, 'drafts');
@@ -159,63 +304,67 @@
 		onClose();
 	}
 
-	function closeModal() {
+	function closeModal(): void {
 		onClose();
-	}
-
-	function getSelectedAccount(): Account | undefined {
-		return availableAccounts.find(a => a.id === selectedAccountId);
 	}
 </script>
 
 {#if isOpen}
 	<div>
-		<!-- Backdrop -->
 		<div
-			class="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm"
-			onclick={(e) => { if (e.target === e.currentTarget) closeModal(); }}
-			onkeydown={(e) => { if (e.key === 'Escape') closeModal(); }}
+			class="fixed inset-0 z-50 flex items-center justify-center bg-black/22 backdrop-blur-sm"
+			onclick={(event) => {
+				if (event.target === event.currentTarget) closeModal();
+			}}
+			onkeydown={(event) => {
+				if (event.key === 'Escape') closeModal();
+			}}
 			role="dialog"
 			aria-modal="true"
 			aria-labelledby="compose-title"
 			tabindex="-1"
+			in:fade={{ duration: 120 }}
+			out:fade={{ duration: 140 }}
 		>
-			<!-- Modal -->
 			<div
-				class="flex flex-col rounded-xl bg-white shadow-2xl w-full h-full sm:h-auto sm:max-h-[80vh] sm:max-w-[640px] sm:w-[640px] overflow-hidden sm:m-0 m-0 ring-1 ring-zinc-200/50"
-				onclick={(e) => e.stopPropagation()}
+				class="compose-modal-shell flex flex-col w-full h-full sm:h-auto sm:min-h-[60vh] sm:max-h-[88vh] sm:max-w-[820px] overflow-hidden rounded-none sm:rounded-2xl border border-[var(--border-primary)] bg-[var(--bg-primary)] shadow-2xl"
 				role="document"
+				in:scale={{ duration: 160, start: 0.97, opacity: 0.2 }}
+				out:scale={{ duration: 120, start: 1, opacity: 0.15 }}
 			>
-				<!-- Header -->
-				<div class="flex items-center justify-between border-b border-zinc-100 px-5 py-3">
-					<div class="flex items-center gap-3">
-						<h2 id="compose-title" class="text-[14px] font-semibold text-zinc-900">
-							New Message
-						</h2>
+				<header class="flex items-center justify-between gap-3 px-6 py-3 border-b border-[var(--border-primary)] bg-[var(--bg-secondary)]">
+					<div class="flex items-center gap-3 min-w-0">
+						<h2 id="compose-title" class="text-[15px] font-semibold text-[var(--text-primary)] shrink-0">New Message</h2>
 
 						{#if availableAccounts.length > 0}
-							<div class="relative">
+							<div class="relative" bind:this={accountMenuRef}>
 								<button
-									onclick={() => showAccountDropdown = !showAccountDropdown}
-									class="flex items-center gap-1.5 px-2.5 py-1 bg-zinc-50 hover:bg-zinc-100 rounded-md text-[12px] text-zinc-500 transition-colors"
+									type="button"
+									onclick={() => (showAccountDropdown ? closeAccountDropdown() : openAccountDropdown())}
+									onkeydown={handleAccountSwitcherKeydown}
+									class="from-switcher"
+									aria-haspopup="listbox"
+									aria-expanded={showAccountDropdown}
 								>
-									<span>{getSelectedAccount()?.email}</span>
-									<ChevronDown class="size-3" strokeWidth={1.5} />
+									<span class="truncate">From: {getSelectedAccount()?.email}</span>
+									<ChevronDown class="size-3.5" strokeWidth={1.8} />
 								</button>
 
 								{#if showAccountDropdown}
-									<div class="absolute top-full left-0 mt-1 w-60 bg-white border border-zinc-100 rounded-lg shadow-lg z-10 py-1">
-										{#each availableAccounts as account}
+									<div class="account-dropdown" role="listbox" transition:fade={{ duration: 100 }}>
+										{#each availableAccounts as account, index}
 											<button
-												onclick={() => { selectedAccountId = account.id; showAccountDropdown = false; }}
-												class="w-full px-3 py-2 text-left hover:bg-zinc-50 flex items-center gap-2.5 transition-colors {selectedAccountId === account.id ? 'bg-zinc-50' : ''}"
+												type="button"
+												onclick={() => selectAccountByIndex(index)}
+												class:selected={selectedAccountId === account.id}
+												class:highlighted={highlightedAccountIndex === index}
+												role="option"
+												aria-selected={selectedAccountId === account.id}
 											>
-												<div class="size-6 rounded-full bg-zinc-100 flex items-center justify-center text-zinc-500 text-[11px] font-medium">
-													{account.name.charAt(0).toUpperCase()}
-												</div>
-												<div class="flex-1 min-w-0">
-													<div class="text-[13px] text-zinc-700 truncate">{account.name}</div>
-													<div class="text-[11px] text-zinc-400 truncate">{account.email}</div>
+												<div class="mail-avatar">{account.name.charAt(0).toUpperCase()}</div>
+												<div class="account-info">
+													<p>{account.name}</p>
+													<p>{account.email}</p>
 												</div>
 											</button>
 										{/each}
@@ -223,30 +372,139 @@
 								{/if}
 							</div>
 						{:else}
-							<span class="text-[12px] text-zinc-400">No accounts configured</span>
+							<span class="text-[12px] text-[var(--text-tertiary)]">No accounts configured</span>
 						{/if}
 					</div>
 
 					<button
+						type="button"
 						onclick={closeModal}
-						class="flex size-7 items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-100/60 hover:text-zinc-600"
-						aria-label="Close"
+						class="flex size-8 items-center justify-center rounded-md text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
+						aria-label="Close compose"
 					>
-						<X class="size-4" strokeWidth={1.5} />
+						<X class="size-4" strokeWidth={1.8} />
 					</button>
-				</div>
+				</header>
 
-				<!-- Compose form -->
+				<input
+					type="file"
+					multiple
+					bind:this={fileInputRef}
+					onchange={handleAttachmentChange}
+					class="hidden"
+				/>
+
 				<ComposeHeader bind:values={draft} />
-				<ComposeEditor bind:value={draft.body} />
+				<ComposeEditor
+					bind:value={draft.body}
+					attachments={draftAttachments}
+					onAttach={openAttachmentPicker}
+					onRemoveAttachment={removeAttachment}
+				/>
 				<ComposeActions
 					lastSaved={lastSaved}
 					{isSending}
 					onSend={sendMail}
 					onDiscard={discardDraft}
-					onClose={closeModal}
 				/>
 			</div>
 		</div>
 	</div>
 {/if}
+
+<style>
+	.from-switcher {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.45rem;
+		max-width: min(430px, 52vw);
+		height: 32px;
+		padding: 0 0.75rem;
+		border-radius: 9px;
+		border: 1px solid var(--border-primary);
+		background: var(--bg-primary);
+		color: var(--text-secondary);
+		font-size: 12px;
+		font-weight: 500;
+		cursor: pointer;
+	}
+
+	.from-switcher:hover {
+		background: var(--bg-hover);
+		color: var(--text-primary);
+	}
+
+	.account-dropdown {
+		position: absolute;
+		top: calc(100% + 6px);
+		left: 0;
+		z-index: 20;
+		width: min(360px, 70vw);
+		padding: 0.3rem;
+		border-radius: 12px;
+		border: 1px solid var(--border-primary);
+		background: var(--bg-primary);
+		box-shadow: var(--shadow-lg);
+	}
+
+	.account-dropdown button {
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+		width: 100%;
+		padding: 0.45rem 0.5rem;
+		border: none;
+		border-radius: 8px;
+		background: transparent;
+		cursor: pointer;
+		text-align: left;
+	}
+
+	.account-dropdown button:hover,
+	.account-dropdown button.selected,
+	.account-dropdown button.highlighted {
+		background: var(--bg-hover);
+	}
+
+	.mail-avatar {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 28px;
+		height: 28px;
+		border-radius: 50%;
+		background: var(--accent-light);
+		color: var(--accent-primary);
+		font-size: 12px;
+		font-weight: 600;
+		flex-shrink: 0;
+	}
+
+	.account-info {
+		min-width: 0;
+	}
+
+	.account-info p {
+		margin: 0;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.account-info p:first-child {
+		font-size: 13px;
+		font-weight: 500;
+		color: var(--text-primary);
+	}
+
+	.account-info p:last-child {
+		font-size: 11px;
+		color: var(--text-tertiary);
+	}
+
+	@media (max-width: 640px) {
+		.compose-modal-shell {
+			border-radius: 0;
+		}
+	}
+</style>

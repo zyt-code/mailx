@@ -9,7 +9,12 @@ fn main() {
     panic::set_hook(Box::new(|panic_info| {
         eprintln!("=== PANIC ===");
         if let Some(location) = panic_info.location() {
-            eprintln!("Location: {}:{}:{}", location.file(), location.line(), location.column());
+            eprintln!(
+                "Location: {}:{}:{}",
+                location.file(),
+                location.line(),
+                location.column()
+            );
         }
         // Get the panic payload as a string
         let payload = panic_info.payload();

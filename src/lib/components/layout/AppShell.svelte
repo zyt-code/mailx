@@ -10,20 +10,35 @@
 	import * as db from '$lib/db/index.js';
 	import { hasAccounts, activeAccount } from '$lib/stores/accountStore.js';
 	import { initSyncStore, isSyncing } from '$lib/stores/syncStore.js';
-import { initMailStore, switchFolder, setSelectedAccount, markMailReadLocally, markMailUnreadLocally } from '$lib/stores/mailStore.js';
+	import { initMailStore, switchFolder, setSelectedAccount, markMailReadLocally, markMailUnreadLocally } from '$lib/stores/mailStore.js';
 	import { initSyncHandlers } from '$lib/events/index.js';
 	import { initUnreadStore } from '$lib/stores/unreadStore.js';
 	import { syncAccount, syncAllAccounts } from '$lib/sync/index.js';
 	import { listen } from '@tauri-apps/api/event';
 	import { goto } from '$app/navigation';
+	import { browser } from '$app/environment';
 	import { get } from 'svelte/store';
 
 	const STORAGE_KEY = 'mailx-layout';
-	const DEFAULTS = { sidebarCollapsed: false, mailListWidth: 360 };
 	const MIN_MAIL_WIDTH = 280;
 	const MIN_READING_WIDTH = 400;
-	const SIDEBAR_EXPANDED = 240;
 	const SIDEBAR_COLLAPSED = 56;
+	let SIDEBAR_EXPANDED = 240;
+	let DEFAULT_MAIL_LIST_WIDTH = 320;
+
+	function getSpacingValue(variable: string, fallback: number): number {
+		if (!browser) return fallback;
+		const raw = getComputedStyle(document.documentElement).getPropertyValue(variable);
+		const numeric = Number.parseFloat(raw);
+		return Number.isFinite(numeric) ? numeric : fallback;
+	}
+
+	if (browser) {
+		SIDEBAR_EXPANDED = getSpacingValue('--spacing-sidebar', SIDEBAR_EXPANDED);
+		DEFAULT_MAIL_LIST_WIDTH = getSpacingValue('--spacing-mail-list', DEFAULT_MAIL_LIST_WIDTH);
+	}
+
+const DEFAULTS = { sidebarCollapsed: false, mailListWidth: DEFAULT_MAIL_LIST_WIDTH };
 
 	// Layout state
 	let sidebarCollapsed = $state(DEFAULTS.sidebarCollapsed);
@@ -128,6 +143,7 @@ import { initMailStore, switchFolder, setSelectedAccount, markMailReadLocally, m
 		error = null;
 		try {
 			mails = await db.getMails(activeFolder);
+			console.log('[AppShell] Loaded mails:', mails.length, 'for folder:', activeFolder);
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to load mails';
 			console.error('Failed to load mails:', e);
@@ -136,7 +152,23 @@ import { initMailStore, switchFolder, setSelectedAccount, markMailReadLocally, m
 		}
 	}
 
+	// Load mails when component mounts
 	$effect(() => {
+		console.log('[AppShell] Effect triggered: mounting/loading mails');
+		loadMails();
+	});
+
+	// Reload when account configuration changes
+	$effect(() => {
+		console.log('[AppShell] isAccountConfigured changed:', isAccountConfigured);
+		if (isAccountConfigured) {
+			loadMails();
+		}
+	});
+
+	// Reload when folder changes
+	$effect(() => {
+		console.log('[AppShell] activeFolder changed:', activeFolder);
 		loadMails();
 	});
 
@@ -211,15 +243,13 @@ import { initMailStore, switchFolder, setSelectedAccount, markMailReadLocally, m
 
 	async function handleMarkRead(mail: Mail, read: boolean) {
 		try {
-			await db.markMailRead(mail.id, read);
+			// First update local state for immediate UI feedback
 			if (read) {
 				markMailReadLocally(mail.id);
 			} else {
 				markMailUnreadLocally(mail.id);
 			}
-			mails = mails.map((existing) =>
-				existing.id === mail.id ? { ...existing, is_read: read, unread: !read } : existing
-			);
+			// markMailReadLocally/UnreadLocally now handles DB persistence in background
 		} catch (e) {
 			console.error('Failed to mark mail:', e);
 		}
@@ -271,7 +301,7 @@ import { initMailStore, switchFolder, setSelectedAccount, markMailReadLocally, m
 	}
 </script>
 
-<div class="flex flex-col h-screen w-screen overflow-hidden bg-white">
+<div class="flex flex-col h-screen w-screen overflow-hidden bg-[var(--bg-primary)]">
 	<!-- Custom Titlebar -->
 	<Titlebar />
 

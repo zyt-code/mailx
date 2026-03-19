@@ -1,4 +1,4 @@
-use rusqlite::{Connection, Result as SqliteResult, params};
+use rusqlite::{params, Connection, Result as SqliteResult};
 use std::sync::Mutex;
 use thiserror::Error;
 
@@ -37,6 +37,7 @@ pub struct SmtpConfig {
 
 /// Account management errors
 #[derive(Debug, Error)]
+#[allow(dead_code)]
 pub enum AccountError {
     #[error("Database error: {0}")]
     Database(#[from] rusqlite::Error),
@@ -71,7 +72,9 @@ unsafe impl Sync for AccountManager {}
 impl AccountManager {
     /// Create a new account manager with database connection
     pub fn new(conn: Connection) -> Self {
-        Self { conn: Mutex::new(conn) }
+        Self {
+            conn: Mutex::new(conn),
+        }
     }
 
     /// Get all accounts from the database
@@ -80,26 +83,27 @@ impl AccountManager {
         let mut stmt = conn.prepare(
             "SELECT id, email, name, imap_server, imap_port, imap_use_ssl,
                      smtp_server, smtp_port, smtp_use_ssl, is_active, created_at, updated_at
-             FROM accounts ORDER BY created_at DESC"
+             FROM accounts ORDER BY created_at DESC",
         )?;
 
-        let accounts = stmt.query_map([], |row| {
-            Ok(Account {
-                id: row.get(0)?,
-                email: row.get(1)?,
-                name: row.get(2)?,
-                imap_server: row.get(3)?,
-                imap_port: row.get(4)?,
-                imap_use_ssl: row.get::<_, i32>(5)? == 1,
-                smtp_server: row.get(6)?,
-                smtp_port: row.get(7)?,
-                smtp_use_ssl: row.get::<_, i32>(8)? == 1,
-                is_active: row.get::<_, i32>(9)? == 1,
-                created_at: row.get(10)?,
-                updated_at: row.get(11)?,
-            })
-        })?
-        .collect::<SqliteResult<Vec<_>>>()?;
+        let accounts = stmt
+            .query_map([], |row| {
+                Ok(Account {
+                    id: row.get(0)?,
+                    email: row.get(1)?,
+                    name: row.get(2)?,
+                    imap_server: row.get(3)?,
+                    imap_port: row.get(4)?,
+                    imap_use_ssl: row.get::<_, i32>(5)? == 1,
+                    smtp_server: row.get(6)?,
+                    smtp_port: row.get(7)?,
+                    smtp_use_ssl: row.get::<_, i32>(8)? == 1,
+                    is_active: row.get::<_, i32>(9)? == 1,
+                    created_at: row.get(10)?,
+                    updated_at: row.get(11)?,
+                })
+            })?
+            .collect::<SqliteResult<Vec<_>>>()?;
 
         Ok(accounts)
     }
@@ -132,12 +136,15 @@ impl AccountManager {
 
         match account {
             Ok(acc) => Ok(acc),
-            Err(rusqlite::Error::QueryReturnedNoRows) => Err(AccountError::NotFound(id.to_string())),
+            Err(rusqlite::Error::QueryReturnedNoRows) => {
+                Err(AccountError::NotFound(id.to_string()))
+            }
             Err(e) => Err(AccountError::Database(e)),
         }
     }
 
     /// Get an account by email address
+    #[allow(dead_code)]
     pub fn get_by_email(&self, email: &str) -> Result<Account> {
         let conn = self.conn.lock().unwrap();
         let account = conn.query_row(
@@ -165,7 +172,9 @@ impl AccountManager {
 
         match account {
             Ok(acc) => Ok(acc),
-            Err(rusqlite::Error::QueryReturnedNoRows) => Err(AccountError::NotFound(email.to_string())),
+            Err(rusqlite::Error::QueryReturnedNoRows) => {
+                Err(AccountError::NotFound(email.to_string()))
+            }
             Err(e) => Err(AccountError::Database(e)),
         }
     }
@@ -176,26 +185,27 @@ impl AccountManager {
         let mut stmt = conn.prepare(
             "SELECT id, email, name, imap_server, imap_port, imap_use_ssl,
                      smtp_server, smtp_port, smtp_use_ssl, is_active, created_at, updated_at
-             FROM accounts WHERE is_active = 1 ORDER BY created_at DESC"
+             FROM accounts WHERE is_active = 1 ORDER BY created_at DESC",
         )?;
 
-        let accounts = stmt.query_map([], |row| {
-            Ok(Account {
-                id: row.get(0)?,
-                email: row.get(1)?,
-                name: row.get(2)?,
-                imap_server: row.get(3)?,
-                imap_port: row.get(4)?,
-                imap_use_ssl: row.get::<_, i32>(5)? == 1,
-                smtp_server: row.get(6)?,
-                smtp_port: row.get(7)?,
-                smtp_use_ssl: row.get::<_, i32>(8)? == 1,
-                is_active: row.get::<_, i32>(9)? == 1,
-                created_at: row.get(10)?,
-                updated_at: row.get(11)?,
-            })
-        })?
-        .collect::<SqliteResult<Vec<_>>>()?;
+        let accounts = stmt
+            .query_map([], |row| {
+                Ok(Account {
+                    id: row.get(0)?,
+                    email: row.get(1)?,
+                    name: row.get(2)?,
+                    imap_server: row.get(3)?,
+                    imap_port: row.get(4)?,
+                    imap_use_ssl: row.get::<_, i32>(5)? == 1,
+                    smtp_server: row.get(6)?,
+                    smtp_port: row.get(7)?,
+                    smtp_use_ssl: row.get::<_, i32>(8)? == 1,
+                    is_active: row.get::<_, i32>(9)? == 1,
+                    created_at: row.get(10)?,
+                    updated_at: row.get(11)?,
+                })
+            })?
+            .collect::<SqliteResult<Vec<_>>>()?;
 
         Ok(accounts)
     }
@@ -308,20 +318,29 @@ impl AccountManager {
 
         // Basic email validation
         if !email.contains('@') || !email.contains('.') {
-            return Err(AccountError::InvalidEmail(format!("Invalid email format: {}", email)));
+            return Err(AccountError::InvalidEmail(format!(
+                "Invalid email format: {}",
+                email
+            )));
         }
 
         // Check for basic structure: local@domain.tld
         let parts: Vec<&str> = email.split('@').collect();
         if parts.len() != 2 {
-            return Err(AccountError::InvalidEmail(format!("Invalid email format: {}", email)));
+            return Err(AccountError::InvalidEmail(format!(
+                "Invalid email format: {}",
+                email
+            )));
         }
 
         let local = parts[0];
         let domain = parts[1];
 
         if local.is_empty() || domain.is_empty() || !domain.contains('.') {
-            return Err(AccountError::InvalidEmail(format!("Invalid email format: {}", email)));
+            return Err(AccountError::InvalidEmail(format!(
+                "Invalid email format: {}",
+                email
+            )));
         }
 
         Ok(())

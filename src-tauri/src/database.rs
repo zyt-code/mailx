@@ -1,10 +1,11 @@
-use rusqlite::{Connection, Result as SqliteResult, params};
-use std::fs;
-use std::sync::Mutex;
+use regex::Regex;
+use rusqlite::{params, Connection, Result as SqliteResult};
 use std::collections::HashSet;
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 use tauri::AppHandle;
 use tauri::Manager;
-use regex::Regex;
 
 /// Email address structure for recipients
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -64,6 +65,7 @@ pub struct Mail {
 /// Database wrapper for SQLite operations
 pub struct Database {
     conn: Mutex<Connection>,
+    attachments_root: PathBuf,
 }
 
 // SAFETY: rusqlite::Connection is Send + Sync when using bundled features
@@ -80,14 +82,18 @@ impl Database {
             .expect("Failed to get app data dir");
 
         // Ensure app data directory exists
-        fs::create_dir_all(&app_data_dir)
-            .expect("Failed to create app data directory");
+        fs::create_dir_all(&app_data_dir).expect("Failed to create app data directory");
 
         let db_path = app_data_dir.join("mailx.db");
+        let attachments_root = app_data_dir.join("attachments");
+        fs::create_dir_all(&attachments_root).expect("Failed to create attachments directory");
         let conn = Connection::open(db_path)?;
         conn.execute_batch("PRAGMA journal_mode=WAL")?;
 
-        let db = Database { conn: Mutex::new(conn) };
+        let db = Database {
+            conn: Mutex::new(conn),
+            attachments_root,
+        };
         db.init_schema()?;
         Ok(db)
     }
@@ -145,31 +151,47 @@ impl Database {
         let conn = self.conn.lock().unwrap();
 
         // Add to_json column if not exists
-        conn.execute("ALTER TABLE mails ADD COLUMN to_json TEXT", []).ok();
+        conn.execute("ALTER TABLE mails ADD COLUMN to_json TEXT", [])
+            .ok();
 
         // Add cc_json column if not exists
-        conn.execute("ALTER TABLE mails ADD COLUMN cc_json TEXT", []).ok();
+        conn.execute("ALTER TABLE mails ADD COLUMN cc_json TEXT", [])
+            .ok();
 
         // Add bcc_json column if not exists
-        conn.execute("ALTER TABLE mails ADD COLUMN bcc_json TEXT", []).ok();
+        conn.execute("ALTER TABLE mails ADD COLUMN bcc_json TEXT", [])
+            .ok();
 
         // Add account_id column if not exists
-        conn.execute("ALTER TABLE mails ADD COLUMN account_id TEXT", []).ok();
+        conn.execute("ALTER TABLE mails ADD COLUMN account_id TEXT", [])
+            .ok();
 
         // Add uid column if not exists
-        conn.execute("ALTER TABLE mails ADD COLUMN uid INTEGER", []).ok();
+        conn.execute("ALTER TABLE mails ADD COLUMN uid INTEGER", [])
+            .ok();
 
         // Add html_body column if not exists (Phase 1)
-        conn.execute("ALTER TABLE mails ADD COLUMN html_body TEXT", []).ok();
+        conn.execute("ALTER TABLE mails ADD COLUMN html_body TEXT", [])
+            .ok();
 
         // Add reply_to_json column if not exists (Phase 1)
-        conn.execute("ALTER TABLE mails ADD COLUMN reply_to_json TEXT", []).ok();
+        conn.execute("ALTER TABLE mails ADD COLUMN reply_to_json TEXT", [])
+            .ok();
 
         // Add starred column if not exists (Phase 1)
-        conn.execute("ALTER TABLE mails ADD COLUMN starred INTEGER DEFAULT 0", []).ok();
+        conn.execute("ALTER TABLE mails ADD COLUMN starred INTEGER DEFAULT 0", [])
+            .ok();
 
         // Add has_attachments column if not exists (Phase 1)
-        conn.execute("ALTER TABLE mails ADD COLUMN has_attachments INTEGER DEFAULT 0", []).ok();
+        conn.execute(
+            "ALTER TABLE mails ADD COLUMN has_attachments INTEGER DEFAULT 0",
+            [],
+        )
+        .ok();
+
+        // Add is_read column if not exists (Phase 2 - read/unread state tracking)
+        conn.execute("ALTER TABLE mails ADD COLUMN is_read INTEGER DEFAULT 0", [])
+            .ok();
 
         // Create accounts table
         conn.execute(
@@ -236,18 +258,41 @@ impl Database {
             [],
         )?;
 
+        // Create attachments table for compose/uploaded files.
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS mail_attachments (
+                id TEXT PRIMARY KEY,
+                mail_id TEXT NOT NULL,
+                file_name TEXT NOT NULL,
+                content_type TEXT NOT NULL,
+                size INTEGER NOT NULL,
+                stored_path TEXT NOT NULL,
+                created_at INTEGER NOT NULL,
+                FOREIGN KEY (mail_id) REFERENCES mails(id) ON DELETE CASCADE
+            )",
+            [],
+        )?;
+
         // Create index for account-based mail queries
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_mails_account ON mails(account_id, folder)",
             [],
         )?;
 
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_mail_attachments_mail_id ON mail_attachments(mail_id)",
+            [],
+        )?;
+
         Ok(())
     }
 
-
     /// Get all mails, optionally filtered by folder and account
-    pub fn get_mails(&self, folder: Option<String>, account_id: Option<String>) -> SqliteResult<Vec<Mail>> {
+    pub fn get_mails(
+        &self,
+        folder: Option<String>,
+        account_id: Option<String>,
+    ) -> SqliteResult<Vec<Mail>> {
         let conn = self.conn.lock().unwrap();
 
         let mut query = "SELECT id, uid, from_name, from_email, subject, preview, body, timestamp, folder, unread, account_id, to_json, cc_json, bcc_json, html_body, reply_to_json, starred, has_attachments FROM mails".to_string();
@@ -346,8 +391,112 @@ impl Database {
         }
     }
 
+    /// Insert or update a mail, preserving the local read/unread status if it already exists
+    pub fn upsert_mail_preserving_read_status(&self, mail: &Mail) -> SqliteResult<()> {
+        let conn = self.conn.lock().unwrap();
+
+        // Check if mail already exists and get the local-only fields we need to preserve
+        let existing_row = conn.query_row(
+            "SELECT unread, created_at, folder, starred FROM mails WHERE id = ?1",
+            params![&mail.id],
+            |row| {
+                let unread: i32 = row.get(0)?;
+                let created_at: i64 = row.get(1)?;
+                let folder: String = row.get(2)?;
+                // Starred is stored as 0/1 but may be NULL, so handle Option explicitly
+                let starred: bool = match row.get::<_, Option<i32>>(3)? {
+                    Some(value) => value == 1,
+                    None => false,
+                };
+                Ok((unread == 1, created_at, folder, starred))
+            },
+        );
+
+        // Use existing read status/created_at/folder/starred if mail exists,
+        // or use server status + current time if new
+        let (unread, is_read, created_at, folder_value, starred_value) = match existing_row {
+            Ok((local_unread, local_created_at, local_folder, local_starred)) => {
+                // Mail exists: preserve local read status, created timestamp,
+                // folder (moves/archives) and starred state
+                println!(
+                    "[DB] Upsert mail {}: preserving local unread={}, folder='{}', starred={}, created_at={}",
+                    mail.id, local_unread, local_folder, local_starred, local_created_at
+                );
+                (
+                    local_unread,
+                    !local_unread,
+                    local_created_at,
+                    local_folder,
+                    local_starred,
+                )
+            }
+            Err(_) => {
+                // New mail: use the status from the server and current time
+                let now = chrono::Utc::now().timestamp_millis();
+                println!(
+                    "[DB] Upsert mail {}: new mail, using server unread={}, folder='{}', starred={}, created_at={}",
+                    mail.id,
+                    mail.unread,
+                    mail.folder,
+                    mail.starred.unwrap_or(false),
+                    now
+                );
+                (
+                    mail.unread,
+                    mail.is_read,
+                    now,
+                    mail.folder.clone(),
+                    mail.starred.unwrap_or(false),
+                )
+            }
+        };
+
+        // Serialize addresses using the existing helper function
+        let to_json = serialize_addresses(&mail.to);
+        let cc_json = serialize_addresses(&mail.cc);
+        let bcc_json = serialize_addresses(&mail.bcc);
+        let reply_to_json = serialize_addresses(&mail.reply_to);
+        let clean_preview = strip_html(&mail.preview);
+
+        conn.execute(
+            "INSERT OR REPLACE INTO mails (
+                id, uid, from_name, from_email, subject, preview, body, timestamp,
+                folder, unread, is_read, account_id, to_json, cc_json, bcc_json,
+                html_body, reply_to_json, starred, has_attachments, created_at
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)",
+            params![
+                &mail.id,
+                mail.uid,
+                &mail.from_name,
+                &mail.from_email,
+                &mail.subject,
+                clean_preview,
+                &mail.body,
+                mail.timestamp,
+                &folder_value,
+                unread as i32,
+                is_read as i32,
+                &mail.account_id,
+                to_json,
+                cc_json,
+                bcc_json,
+                &mail.html_body,
+                reply_to_json,
+                starred_value as i32,
+                mail.has_attachments.unwrap_or(false) as i32,
+                created_at,
+            ],
+        )?;
+
+        Ok(())
+    }
+
     /// Get a single mail by account and UID
-    pub fn get_mail_by_account_and_uid(&self, account_id: &str, uid: u32) -> SqliteResult<Option<Mail>> {
+    pub fn get_mail_by_account_and_uid(
+        &self,
+        account_id: &str,
+        uid: u32,
+    ) -> SqliteResult<Option<Mail>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
             "SELECT id, uid, from_name, from_email, subject, preview, body, timestamp, folder, unread, account_id, to_json, cc_json, bcc_json, html_body, reply_to_json, starred, has_attachments
@@ -466,10 +615,169 @@ impl Database {
                 &mail.html_body,
                 reply_to_json,
                 if mail.starred.unwrap_or(false) { 1 } else { 0 },
-                if mail.has_attachments.unwrap_or(false) { 1 } else { 0 },
+                if mail.has_attachments.unwrap_or(false) {
+                    1
+                } else {
+                    0
+                },
                 &mail.id,
             ],
         )?;
+        Ok(())
+    }
+
+    /// Persist an attachment file and register metadata for a mail draft.
+    pub fn add_mail_attachment(
+        &self,
+        mail_id: &str,
+        file_name: &str,
+        content_type: &str,
+        data: &[u8],
+    ) -> Result<Attachment, String> {
+        {
+            let conn = self.conn.lock().unwrap();
+            let exists: i64 = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM mails WHERE id = ?1",
+                    params![mail_id],
+                    |row| row.get(0),
+                )
+                .map_err(|e| format!("Failed to verify mail: {}", e))?;
+            if exists == 0 {
+                return Err(format!("Mail '{}' not found", mail_id));
+            }
+        }
+
+        let now = chrono::Utc::now();
+        let created_at = now.timestamp_millis();
+        let unique_ns = now.timestamp_nanos_opt().unwrap_or(created_at * 1_000_000);
+        let attachment_id = format!(
+            "att-{}-{}",
+            unique_ns,
+            sanitize_filename(file_name).chars().take(12).collect::<String>()
+        );
+        let safe_file_name = sanitize_filename(file_name);
+        let mail_dir = self.attachments_root.join(mail_id);
+        fs::create_dir_all(&mail_dir)
+            .map_err(|e| format!("Failed to create attachment directory: {}", e))?;
+        let stored_path = mail_dir.join(format!("{}-{}", attachment_id, safe_file_name));
+        fs::write(&stored_path, data)
+            .map_err(|e| format!("Failed to write attachment file: {}", e))?;
+
+        let attachment = Attachment {
+            id: attachment_id,
+            mail_id: mail_id.to_string(),
+            file_name: file_name.to_string(),
+            content_type: content_type.to_string(),
+            size: data.len() as i64,
+            stored_path: stored_path.to_string_lossy().to_string(),
+            created_at,
+        };
+
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO mail_attachments (id, mail_id, file_name, content_type, size, stored_path, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            params![
+                &attachment.id,
+                &attachment.mail_id,
+                &attachment.file_name,
+                &attachment.content_type,
+                attachment.size,
+                &attachment.stored_path,
+                attachment.created_at,
+            ],
+        )
+        .map_err(|e| format!("Failed to save attachment metadata: {}", e))?;
+
+        conn.execute(
+            "UPDATE mails SET has_attachments = 1 WHERE id = ?1",
+            params![mail_id],
+        )
+        .map_err(|e| format!("Failed to update mail attachment flag: {}", e))?;
+
+        Ok(attachment)
+    }
+
+    /// Get all persisted attachments for a mail.
+    pub fn get_mail_attachments(&self, mail_id: &str) -> Result<Vec<Attachment>, String> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, mail_id, file_name, content_type, size, stored_path, created_at
+                 FROM mail_attachments WHERE mail_id = ?1 ORDER BY created_at ASC",
+            )
+            .map_err(|e| format!("Failed to prepare attachment query: {}", e))?;
+
+        let rows = stmt
+            .query_map(params![mail_id], |row| {
+                Ok(Attachment {
+                    id: row.get(0)?,
+                    mail_id: row.get(1)?,
+                    file_name: row.get(2)?,
+                    content_type: row.get(3)?,
+                    size: row.get(4)?,
+                    stored_path: row.get(5)?,
+                    created_at: row.get(6)?,
+                })
+            })
+            .map_err(|e| format!("Failed to query attachments: {}", e))?;
+
+        let mut attachments = Vec::new();
+        for row in rows {
+            attachments.push(row.map_err(|e| format!("Failed to parse attachment row: {}", e))?);
+        }
+        Ok(attachments)
+    }
+
+    /// Remove an attachment and update the parent mail attachment flag.
+    pub fn delete_mail_attachment(&self, attachment_id: &str) -> Result<(), String> {
+        let (mail_id, stored_path) = {
+            let conn = self.conn.lock().unwrap();
+            let result = conn.query_row(
+                "SELECT mail_id, stored_path FROM mail_attachments WHERE id = ?1",
+                params![attachment_id],
+                |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+            );
+
+            match result {
+                Ok(data) => data,
+                Err(rusqlite::Error::QueryReturnedNoRows) => return Ok(()),
+                Err(e) => return Err(format!("Failed to find attachment: {}", e)),
+            }
+        };
+
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "DELETE FROM mail_attachments WHERE id = ?1",
+            params![attachment_id],
+        )
+        .map_err(|e| format!("Failed to delete attachment metadata: {}", e))?;
+
+        let remaining: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM mail_attachments WHERE mail_id = ?1",
+                params![&mail_id],
+                |row| row.get(0),
+            )
+            .map_err(|e| format!("Failed to count remaining attachments: {}", e))?;
+
+        conn.execute(
+            "UPDATE mails SET has_attachments = ?1 WHERE id = ?2",
+            params![if remaining > 0 { 1 } else { 0 }, &mail_id],
+        )
+        .map_err(|e| format!("Failed to update attachment flag: {}", e))?;
+
+        drop(conn);
+
+        // File delete runs after DB updates to avoid leaving stale metadata.
+        if let Err(e) = fs::remove_file(Path::new(&stored_path)) {
+            // Ignore not found to keep delete idempotent.
+            if e.kind() != std::io::ErrorKind::NotFound {
+                return Err(format!("Failed to remove attachment file: {}", e));
+            }
+        }
+
         Ok(())
     }
 
@@ -491,8 +799,8 @@ impl Database {
     pub fn mark_mail_read(&self, id: &str, read: bool) -> SqliteResult<()> {
         let conn = self.conn.lock().unwrap();
         conn.execute(
-            "UPDATE mails SET unread = ?1 WHERE id = ?2",
-            params![if read { 0 } else { 1 }, id],
+            "UPDATE mails SET unread = ?1, is_read = ?2 WHERE id = ?3",
+            params![if read { 0 } else { 1 }, if read { 1 } else { 0 }, id],
         )?;
         Ok(())
     }
@@ -561,7 +869,27 @@ fn parse_json_addresses(json: Option<String>) -> Option<Vec<EmailAddress>> {
 
 /// Serialize a vector of EmailAddress to a JSON string
 fn serialize_addresses(addresses: &Option<Vec<EmailAddress>>) -> Option<String> {
-    addresses.as_ref().and_then(|addrs| serde_json::to_string(addrs).ok())
+    addresses
+        .as_ref()
+        .and_then(|addrs| serde_json::to_string(addrs).ok())
+}
+
+/// Sanitize a user-provided filename for local storage.
+fn sanitize_filename(input: &str) -> String {
+    let mut output = String::with_capacity(input.len());
+    for ch in input.chars() {
+        if ch.is_ascii_alphanumeric() || matches!(ch, '.' | '_' | '-') {
+            output.push(ch);
+        } else {
+            output.push('_');
+        }
+    }
+    let trimmed = output.trim_matches('_');
+    if trimmed.is_empty() {
+        "attachment.bin".to_string()
+    } else {
+        trimmed.to_string()
+    }
 }
 
 /// Strip HTML tags from text, returning plain text only

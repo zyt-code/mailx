@@ -56,7 +56,7 @@
 	tabindex="0"
 	class={cn(
 		'w-px shrink-0 cursor-col-resize relative group',
-		dragging ? 'bg-zinc-200' : 'bg-zinc-100 hover:bg-zinc-200'
+		dragging ? 'bg-[var(--border-secondary)]' : 'bg-[var(--border-primary)] hover:bg-[var(--border-secondary)]'
 	)}
 	style="transition: background-color 75ms ease;"
 	onpointerdown={onPointerDown}

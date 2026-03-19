@@ -1,14 +1,14 @@
 use crate::accounts::{Account, AccountManager};
 use crate::credentials::CredentialManager;
-use crate::database::{Database, Mail};
+use crate::database::{Attachment, Database, Mail};
 use crate::html_sanitize;
 use crate::imap_client::ImapClient;
+use crate::provider_defaults;
 use crate::smtp_client::SmtpClient;
 use crate::sync_manager::{SyncManager, SyncStatus};
-use crate::provider_defaults;
 use serde_json::json;
-use tauri::{AppHandle, Emitter, Manager, State};
 use std::sync::Arc;
+use tauri::{AppHandle, Emitter, Manager, State};
 
 #[derive(Debug, serde::Serialize)]
 pub struct ProviderDefaultsResponse {
@@ -32,18 +32,17 @@ pub fn get_mails(
     account_id: Option<String>,
     db: State<'_, Database>,
 ) -> Result<Vec<Mail>, String> {
-    db.inner().get_mails(folder, account_id)
+    db.inner()
+        .get_mails(folder, account_id)
         .map(|mails| mails.into_iter().map(sanitize_mail_html).collect())
         .map_err(|e| format!("Failed to get mails: {}", e))
 }
 
 /// Get a single mail by ID
 #[tauri::command]
-pub fn get_mail(
-    id: String,
-    db: State<'_, Database>,
-) -> Result<Mail, String> {
-    db.inner().get_mail(&id)
+pub fn get_mail(id: String, db: State<'_, Database>) -> Result<Mail, String> {
+    db.inner()
+        .get_mail(&id)
         .map_err(|e| format!("Failed to get mail: {}", e))?
         .map(sanitize_mail_html)
         .ok_or_else(|| format!("Mail with id '{}' not found", id))
@@ -51,43 +50,59 @@ pub fn get_mail(
 
 /// Create a new mail
 #[tauri::command]
-pub fn create_mail(
-    mail: Mail,
-    db: State<'_, Database>,
-) -> Result<String, String> {
-    db.inner().insert_mail(&mail)
+pub fn create_mail(mail: Mail, db: State<'_, Database>) -> Result<String, String> {
+    db.inner()
+        .insert_mail(&mail)
         .map_err(|e| format!("Failed to create mail: {}", e))?;
     Ok(mail.id)
 }
 
+/// Add an attachment to an existing draft mail.
+#[tauri::command]
+pub fn add_mail_attachment(
+    mail_id: String,
+    file_name: String,
+    content_type: String,
+    data: Vec<u8>,
+    db: State<'_, Database>,
+) -> Result<Attachment, String> {
+    db.inner()
+        .add_mail_attachment(&mail_id, &file_name, &content_type, &data)
+}
+
+/// List persisted attachments for a mail.
+#[tauri::command]
+pub fn get_mail_attachments(mail_id: String, db: State<'_, Database>) -> Result<Vec<Attachment>, String> {
+    db.inner().get_mail_attachments(&mail_id)
+}
+
+/// Remove one attachment by id.
+#[tauri::command]
+pub fn remove_mail_attachment(attachment_id: String, db: State<'_, Database>) -> Result<(), String> {
+    db.inner().delete_mail_attachment(&attachment_id)
+}
+
 /// Update an existing mail
 #[tauri::command]
-pub fn update_mail(
-    mail: Mail,
-    db: State<'_, Database>,
-) -> Result<(), String> {
-    db.inner().update_mail(&mail)
+pub fn update_mail(mail: Mail, db: State<'_, Database>) -> Result<(), String> {
+    db.inner()
+        .update_mail(&mail)
         .map_err(|e| format!("Failed to update mail: {}", e))
 }
 
 /// Delete a mail by ID
 #[tauri::command]
-pub fn delete_mail(
-    id: String,
-    db: State<'_, Database>,
-) -> Result<(), String> {
-    db.inner().delete_mail(&id)
+pub fn delete_mail(id: String, db: State<'_, Database>) -> Result<(), String> {
+    db.inner()
+        .delete_mail(&id)
         .map_err(|e| format!("Failed to delete mail: {}", e))
 }
 
 /// Mark a mail as read or unread
 #[tauri::command]
-pub fn mark_mail_read(
-    id: String,
-    read: bool,
-    db: State<'_, Database>,
-) -> Result<(), String> {
-    db.inner().mark_mail_read(&id, read)
+pub fn mark_mail_read(id: String, read: bool, db: State<'_, Database>) -> Result<(), String> {
+    db.inner()
+        .mark_mail_read(&id, read)
         .map_err(|e| format!("Failed to mark mail: {}", e))
 }
 
@@ -103,33 +118,54 @@ pub async fn mark_as_read(
     println!("[CMD] mark_as_read: uid={}, account_id={}", uid, account_id);
 
     // 1. Locate the mail to obtain folder + primary key
-    let mail = db.inner().get_mail_by_account_and_uid(&account_id, uid)
+    let mail = db
+        .inner()
+        .get_mail_by_account_and_uid(&account_id, uid)
         .map_err(|e| format!("Failed to get mail by UID: {}", e))?
-        .ok_or_else(|| format!("Mail with uid '{}' not found for account {}", uid, account_id))?;
+        .ok_or_else(|| {
+            format!(
+                "Mail with uid '{}' not found for account {}",
+                uid, account_id
+            )
+        })?;
 
-    println!("[CMD] mark_as_read: mail found, id={}, folder={}", mail.id, mail.folder);
+    println!(
+        "[CMD] mark_as_read: mail found, id={}, folder={}",
+        mail.id, mail.folder
+    );
 
     // 2. Fetch credentials + IMAP config
-    let account = account_manager.get(&account_id)
+    let account = account_manager
+        .get(&account_id)
         .map_err(|e| format!("Failed to get account: {}", e))?;
-    let password = credential_manager.get_password(&account_id)
+    let password = credential_manager
+        .get_password(&account_id)
         .map_err(|e| format!("Failed to get password: {}", e))?;
-    let imap_config = account_manager.get_imap_config(&account_id)
+    let imap_config = account_manager
+        .get_imap_config(&account_id)
         .map_err(|e| format!("Failed to get IMAP config: {}", e))?;
 
-    println!("[CMD] mark_as_read: connecting to {}:{}", imap_config.server, imap_config.port);
+    println!(
+        "[CMD] mark_as_read: connecting to {}:{}",
+        imap_config.server, imap_config.port
+    );
 
     // 3. Store the Seen flag via UID STORE
     let imap_client = ImapClient::new(imap_config, account.email, password);
-    println!("[CMD] mark_as_read: UID STORE {}, folder={}, flags=+FLAGS (\\Seen)", uid, mail.folder);
-    imap_client.store_flags(&mail.folder, uid, "+FLAGS (\\Seen)")
+    println!(
+        "[CMD] mark_as_read: UID STORE {}, folder={}, flags=+FLAGS (\\Seen)",
+        uid, mail.folder
+    );
+    imap_client
+        .store_flags(&mail.folder, uid, "+FLAGS (\\Seen)")
         .await
         .map_err(|e| format!("Failed to store flags on server: {}", e))?;
 
     println!("[CMD] mark_as_read: remote flag synced");
 
     // 4. Update local DB copy
-    db.inner().mark_mail_read(&mail.id, true)
+    db.inner()
+        .mark_mail_read(&mail.id, true)
         .map_err(|e| format!("Failed to mark mail as read in database: {}", e))?;
 
     println!("[CMD] mark_as_read: SUCCESS");
@@ -143,48 +179,40 @@ pub fn move_to_trash(
     current_folder: String,
     db: State<'_, Database>,
 ) -> Result<(), String> {
-    db.inner().move_to_trash(&id, &current_folder)
+    db.inner()
+        .move_to_trash(&id, &current_folder)
         .map_err(|e| format!("Failed to move mail to trash: {}", e))
 }
 
 /// Archive a mail
 #[tauri::command]
-pub fn archive_mail(
-    id: String,
-    db: State<'_, Database>,
-) -> Result<(), String> {
-    db.inner().archive_mail(&id)
+pub fn archive_mail(id: String, db: State<'_, Database>) -> Result<(), String> {
+    db.inner()
+        .archive_mail(&id)
         .map_err(|e| format!("Failed to archive mail: {}", e))
 }
 
 /// Unarchive a mail (move back to inbox)
 #[tauri::command]
-pub fn unarchive_mail(
-    id: String,
-    db: State<'_, Database>,
-) -> Result<(), String> {
-    db.inner().unarchive_mail(&id)
+pub fn unarchive_mail(id: String, db: State<'_, Database>) -> Result<(), String> {
+    db.inner()
+        .unarchive_mail(&id)
         .map_err(|e| format!("Failed to unarchive mail: {}", e))
 }
 
 /// Toggle star status for a mail
 #[tauri::command]
-pub fn toggle_star(
-    id: String,
-    starred: bool,
-    db: State<'_, Database>,
-) -> Result<(), String> {
-    db.inner().toggle_star(&id, starred)
+pub fn toggle_star(id: String, starred: bool, db: State<'_, Database>) -> Result<(), String> {
+    db.inner()
+        .toggle_star(&id, starred)
         .map_err(|e| format!("Failed to toggle star: {}", e))
 }
 
 /// Get unread mail count for a folder
 #[tauri::command]
-pub fn get_unread_count(
-    folder: String,
-    db: State<'_, Database>,
-) -> Result<i64, String> {
-    db.inner().get_unread_count(&folder)
+pub fn get_unread_count(folder: String, db: State<'_, Database>) -> Result<i64, String> {
+    db.inner()
+        .get_unread_count(&folder)
         .map_err(|e| format!("Failed to get unread count: {}", e))
 }
 
@@ -418,7 +446,10 @@ pub async fn test_imap_connection(
         .await
         .map_err(|e| format!("IMAP ping failed ({}): {}", server_info, e))?;
 
-    Ok(format!("IMAP OK — connected to {} as {}", server_info, account.email))
+    Ok(format!(
+        "IMAP OK — connected to {} as {}",
+        server_info, account.email
+    ))
 }
 
 // ============================================================================
@@ -459,8 +490,12 @@ pub async fn send_mail(
 
     // Send the email
     let smtp_client = SmtpClient::new(smtp_config, account.email, password);
+    let attachments = db
+        .inner()
+        .get_mail_attachments(&mail_id)
+        .map_err(|e| format!("Failed to get attachments: {}", e))?;
     smtp_client
-        .send_mail(&mail)
+        .send_mail(&mail, &attachments)
         .await
         .map_err(|e| format!("Failed to send email: {}", e))?;
 
@@ -473,7 +508,10 @@ pub async fn send_mail(
         .map_err(|e| format!("Failed to update mail: {}", e))?;
 
     // Emit mail sent event
-    let _ = app_handle.emit("mail:sent", json!({ "id": mail_id, "account_id": account_id }));
+    let _ = app_handle.emit(
+        "mail:sent",
+        json!({ "id": mail_id, "account_id": account_id }),
+    );
 
     Ok(())
 }
@@ -492,13 +530,16 @@ pub fn open_devtools(app_handle: AppHandle) -> Result<(), String> {
 /// Clear all mails from the database (for re-syncing clean data)
 #[tauri::command]
 pub fn clear_database(db: State<'_, Database>) -> Result<(), String> {
-    db.inner().clear_all_mails()
+    db.inner()
+        .clear_all_mails()
         .map_err(|e| format!("Failed to clear database: {}", e))
 }
 
 /// Lookup provider defaults shared with the frontend configuration.
 #[tauri::command]
-pub fn provider_defaults_for_email(email: String) -> Result<Option<ProviderDefaultsResponse>, String> {
+pub fn provider_defaults_for_email(
+    email: String,
+) -> Result<Option<ProviderDefaultsResponse>, String> {
     let domain = email
         .split('@')
         .nth(1)

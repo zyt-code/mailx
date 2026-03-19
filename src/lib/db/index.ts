@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { Mail, Folder } from '$lib/types.js';
+import type { Attachment, Mail, Folder } from '$lib/types.js';
 
 /**
  * Get all mails, optionally filtered by folder and account
@@ -22,6 +22,7 @@ export async function createMail(mail: Omit<Mail, 'id'> & { id?: string }): Prom
 	const id = mail.id || crypto.randomUUID();
 	const isRead = mail.is_read ?? !(mail.unread ?? true);
 	const fullMail: Mail = {
+		...mail,
 		id,
 		from_name: mail.from_name,
 		from_email: mail.from_email || mail.from_name,
@@ -30,11 +31,42 @@ export async function createMail(mail: Omit<Mail, 'id'> & { id?: string }): Prom
 		body: mail.body || '',
 		timestamp: mail.timestamp || Date.now(),
 		folder: mail.folder || 'inbox',
-		unread: isRead ? false : true,
+		unread: mail.unread ?? !isRead,
 		is_read: isRead
 	};
 	await invoke('create_mail', { mail: fullMail });
 	return id;
+}
+
+/**
+ * Persist one attachment for an existing mail draft.
+ */
+export async function addMailAttachment(
+	mailId: string,
+	fileName: string,
+	contentType: string,
+	data: number[]
+): Promise<Attachment> {
+	return invoke<Attachment>('add_mail_attachment', {
+		mailId,
+		fileName,
+		contentType,
+		data
+	});
+}
+
+/**
+ * Get all attachments for a mail draft.
+ */
+export async function getMailAttachments(mailId: string): Promise<Attachment[]> {
+	return invoke<Attachment[]>('get_mail_attachments', { mailId });
+}
+
+/**
+ * Remove one attachment by id.
+ */
+export async function removeMailAttachment(attachmentId: string): Promise<void> {
+	return invoke<void>('remove_mail_attachment', { attachmentId });
 }
 
 /**

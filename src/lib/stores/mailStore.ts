@@ -120,6 +120,9 @@ export function initMailStore(): void {
     _activeFolder.set(folder);
     await loadMails(folder);
   });
+
+  // Prime the list on first app load so Inbox has data before any folder click.
+  void loadMails(get(_activeFolder));
 }
 
 export async function loadMails(folder?: Folder): Promise<void> {
@@ -148,9 +151,23 @@ export function switchFolder(folder: Folder): void {
 }
 
 export function markMailReadLocally(mailId: string): Mail | null {
-	return updateMailInStore(mailId, (mail) => ensureReadState(mail, true));
+	const updated = updateMailInStore(mailId, (mail) => ensureReadState(mail, true));
+	// Persist to database in the background (fire and forget)
+	if (updated) {
+		db.markMailRead(mailId, true).catch((error) => {
+			console.error('[MailStore] Failed to persist read status to DB:', error);
+		});
+	}
+	return updated;
 }
 
 export function markMailUnreadLocally(mailId: string): Mail | null {
-	return updateMailInStore(mailId, (mail) => ensureReadState(mail, false));
+	const updated = updateMailInStore(mailId, (mail) => ensureReadState(mail, false));
+	// Persist to database in the background (fire and forget)
+	if (updated) {
+		db.markMailRead(mailId, false).catch((error) => {
+			console.error('[MailStore] Failed to persist unread status to DB:', error);
+		});
+	}
+	return updated;
 }

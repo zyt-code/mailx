@@ -28,14 +28,17 @@ pub fn smtp_for_domain(domain: &str) -> Option<ProviderServerConfig> {
     PROVIDER_DEFAULTS.smtp.get(&domain.to_lowercase()).cloned()
 }
 
+#[allow(dead_code)]
 pub fn imap_for_email(email: &str) -> Option<ProviderServerConfig> {
     domain_from_email(email).and_then(|domain| imap_for_domain(&domain))
 }
 
+#[allow(dead_code)]
 pub fn smtp_for_email(email: &str) -> Option<ProviderServerConfig> {
     domain_from_email(email).and_then(|domain| smtp_for_domain(&domain))
 }
 
+#[allow(dead_code)]
 fn domain_from_email(email: &str) -> Option<String> {
     email.split('@').nth(1).map(|d| d.to_lowercase())
 }

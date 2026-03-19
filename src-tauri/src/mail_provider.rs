@@ -69,6 +69,7 @@ impl MailProvider {
     }
 
     /// Get appropriate SMTP port for this provider
+    #[allow(dead_code)]
     pub fn get_smtp_port(&self) -> u16 {
         match self {
             // Chinese providers use port 465 with SSL
@@ -81,6 +82,7 @@ impl MailProvider {
     }
 
     /// Check if this provider uses SSL for SMTP (true) or STARTTLS (false)
+    #[allow(dead_code)]
     pub fn use_smtp_ssl(&self) -> bool {
         match self {
             // Chinese providers use SSL on port 465

@@ -49,8 +49,8 @@
 		<img
 			{src}
 			{alt}
-			on:error={() => hasError = true}
-			on:load={() => imageLoaded = true}
+			onerror={() => hasError = true}
+			onload={() => imageLoaded = true}
 			class:opacity-0={!imageLoaded}
 			class="aspect-square h-full w-full object-cover transition-opacity"
 		/>

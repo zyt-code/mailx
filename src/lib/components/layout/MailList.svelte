@@ -156,25 +156,25 @@
 </script>
 
 <div
-	class="flex h-full flex-col bg-white select-none overflow-hidden shrink-0 border-r border-zinc-100 [-webkit-user-select:none] [user-select:none]"
+	class="flex h-full flex-col bg-[var(--bg-primary)] select-none overflow-hidden shrink-0 border-r border-[var(--border-primary)] [-webkit-user-select:none] [user-select:none]"
 	style:width={width !== undefined ? `${width}px` : undefined}
 	class:w-full={width === undefined}
 >
-	<!-- Search - Notion Quick Find style -->
-	<div class="flex items-center gap-2 px-4 py-2.5 border-b border-zinc-100 shrink-0 sticky top-0 bg-white z-10">
+	<!-- Search -->
+	<div class="flex items-center gap-2 px-3 py-2 border-b border-[var(--border-primary)] shrink-0 sticky top-0 bg-[var(--bg-primary)] z-10">
 		<Search class={cn(
 			"size-4 shrink-0",
-			isAccountConfigured ? "text-zinc-300" : "text-zinc-200"
-		)} strokeWidth={1.5} />
+			isAccountConfigured ? "text-[var(--text-tertiary)]" : "text-[var(--text-quaternary)]"
+		)} strokeWidth={1.8} />
 		<input
 			type="text"
 			placeholder="Search {folderLabels[activeFolder].toLowerCase()}..."
 			disabled={!isAccountConfigured}
 			class={cn(
-				"flex-1 bg-transparent text-[13px] outline-none placeholder:text-zinc-400 transition-colors duration-75 rounded-md px-2 -mx-2",
+				"flex-1 bg-transparent text-[13px] outline-none placeholder:text-[var(--text-tertiary)] transition-colors duration-150 rounded-md px-2 -mx-2",
 				isAccountConfigured
-					? "text-zinc-900 focus:bg-zinc-100/50"
-					: "text-zinc-300 cursor-not-allowed placeholder:text-zinc-300"
+					? "text-[var(--text-primary)] focus:bg-[var(--bg-secondary)]"
+					: "text-[var(--text-quaternary)] cursor-not-allowed placeholder:text-[var(--text-quaternary)]"
 			)}
 			bind:value={searchQuery}
 		/>
@@ -182,8 +182,8 @@
 
 	<!-- Sync loading bar -->
 	{#if isSyncing}
-		<div class="shrink-0 h-[2px] w-full bg-zinc-100 overflow-hidden">
-			<div class="h-full w-1/3 bg-blue-500 rounded-full animate-[shimmer_1.5s_ease-in-out_infinite]"></div>
+		<div class="shrink-0 h-[1px] w-full bg-[var(--border-primary)] overflow-hidden">
+			<div class="h-full w-1/4 bg-[var(--accent-primary)] animate-shimmer"></div>
 		</div>
 	{/if}
 
@@ -191,7 +191,7 @@
 	<div class="flex-1 overflow-y-auto min-h-0">
 		{#if filteredMails.length === 0}
 			<div class="flex flex-col items-center justify-center px-6 py-16">
-				<p class="text-[13px] text-zinc-400">No emails found</p>
+				<p class="text-[13px] text-[var(--text-tertiary)]">No emails found</p>
 			</div>
 		{:else}
 			<div class="px-2 py-1">
@@ -202,17 +202,16 @@
 						<ContextMenu.Trigger>
 							<button
 								class={cn(
-									'relative flex w-full items-center text-left select-none [-webkit-user-select:none] [user-select:none] cursor-default mx-2 my-1 rounded-lg',
+									'relative flex w-full items-center text-left select-none [-webkit-user-select:none] [user-select:none] cursor-default mx-1 my-0.5 rounded-md transition-all duration-120 mail-item-button',
 									isSelected
-										? 'bg-[#007AFF] text-white'
-										: 'bg-white hover:bg-zinc-50'
+										? 'bg-[var(--bg-selected)]'
+										: 'hover:bg-[var(--bg-hover)]'
 								)}
-								style="height: 92px; padding-left: 2.5rem; padding-right: 1rem; padding-top: 0.5rem; padding-bottom: 0.5rem;"
 								onclick={() => handleSelectMail(mail.id)}
 							>
-								<!-- Unread blue dot - only show when not selected -->
+								<!-- Unread dot - only show when not selected -->
 								{#if isUnread && !isSelected}
-									<div class="absolute left-3 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-[#007AFF]"></div>
+									<div class="absolute left-2.5 top-1/2 -translate-y-1/2 unread-dot"></div>
 								{/if}
 
 									<!-- Account indicator dot (when multiple accounts) -->
@@ -222,7 +221,7 @@
 												class={cn(
 													'size-2 rounded-full',
 													getAccountColor(mail),
-													isSelected && 'opacity-70'
+													isSelected && 'opacity-60'
 												)}
 												title={getAccountForMail(mail)?.email || 'Unknown account'}
 											></div>
@@ -237,17 +236,17 @@
 												class={cn(
 													'truncate text-[13px]',
 													isSelected
-														? 'text-white font-bold'
+														? 'text-[var(--accent-primary)] font-semibold'
 														: isUnread
-															? 'font-bold text-zinc-900'
-															: 'font-normal text-zinc-500'
+															? 'font-semibold text-[var(--text-primary)]'
+															: 'font-medium text-[var(--text-secondary)]'
 												)}
 											>
 												{mail.from_name}
 											</span>
 											<span class={cn(
 												'text-[11px] tabular-nums shrink-0',
-												isSelected ? 'text-white' : 'text-zinc-400'
+												isSelected ? 'text-[var(--accent-primary)]' : 'text-[var(--text-tertiary)]'
 											)}>
 												{formatMailTime(mail.timestamp)}
 											</span>
@@ -258,10 +257,10 @@
 											<span class={cn(
 												'block truncate text-[13px]',
 												isSelected
-													? 'text-white font-bold'
+													? 'text-[var(--text-primary)] font-semibold'
 													: isUnread
-														? 'font-bold text-zinc-900'
-														: 'font-normal text-zinc-500'
+														? 'font-semibold text-[var(--text-primary)]'
+														: 'font-medium text-[var(--text-secondary)]'
 											)}>
 												{mail.subject}
 											</span>
@@ -270,8 +269,8 @@
 										<!-- Bottom: Preview snippet - always 2 lines height -->
 										<div class="overflow-hidden">
 											<p class={cn(
-												'line-clamp-2 text-[12px] leading-tight',
-												isSelected ? 'text-white' : 'text-zinc-400'
+												'line-clamp-2 text-[12px] leading-snug',
+												isSelected ? 'text-[var(--text-secondary)]' : 'text-[var(--text-tertiary)]'
 											)}>
 												{mail.preview || ' '}
 											</p>
@@ -280,11 +279,11 @@
 
 									<!-- Attachment indicator -->
 									{#if mail.has_attachments}
-										<div class="flex-shrink-0 mx-3">
+										<div class="flex-shrink-0 mx-2">
 											<Paperclip class={cn(
 												'size-3.5',
-												isSelected ? 'text-white' : 'text-zinc-300'
-											)} strokeWidth={1.5} />
+												isSelected ? 'text-[var(--accent-primary)]' : 'text-[var(--text-quaternary)]'
+											)} strokeWidth={1.8} />
 										</div>
 									{/if}
 								</button>

@@ -47,6 +47,8 @@
 		{ icon: Trash2, label: 'Trash', folder: 'trash' }
 	];
 
+	const SIDEBAR_COLLAPSED_WIDTH = 56;
+
 	let showCompose = $state(false);
 	let isRefreshing = $state(false);
 	let showDisabledTooltip = $state(false);
@@ -221,67 +223,68 @@
 </script>
 
 {#if isMobile && !collapsed}
-	<div
+	<button
+		type="button"
 		class="fixed inset-0 z-30 bg-black/5 backdrop-blur-[2px] transition-opacity duration-100"
 		onclick={onToggle}
 		aria-label="Close sidebar"
-	></div>
+	></button>
 {/if}
 
 <aside
 	class={cn(
-		'flex h-full flex-col bg-white shrink-0 select-none [-webkit-user-select:none] [user-select:none]',
+		'flex h-full flex-col bg-[var(--bg-secondary)] shrink-0 select-none [-webkit-user-select:none] [user-select:none]',
 		isMobile && 'fixed inset-y-0 left-0 z-40 shadow-lg',
 		isMobile && collapsed && '-translate-x-full',
-		!isMobile && 'border-r border-zinc-100'
+		!isMobile && 'border-r border-[var(--border-primary)]'
 	)}
-	style:width={collapsed && !isMobile ? '56px' : '240px'}
+	style:width={collapsed && !isMobile ? `${SIDEBAR_COLLAPSED_WIDTH}px` : 'var(--spacing-sidebar)'}
 >
 	<!-- Top controls -->
-	<div class="flex h-10 items-center justify-between px-3 shrink-0">
+	<div class="flex h-9 items-center justify-between px-2.5 shrink-0">
 		<button
 			onclick={onToggle}
-			class="flex size-7 items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-100/60 hover:text-zinc-600"
+			class="flex size-7 items-center justify-center rounded-md text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-all"
 			aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
 		>
 			{#if collapsed && !isMobile}
-				<PanelLeftOpen class="size-[18px]" strokeWidth={1.5} />
+				<PanelLeftOpen class="size-[16px]" strokeWidth={1.8} />
 			{:else}
-				<PanelLeftClose class="size-[18px]" strokeWidth={1.5} />
+				<PanelLeftClose class="size-[16px]" strokeWidth={1.8} />
 			{/if}
 		</button>
 		{#if !collapsed && onRefresh}
 			<button
 				onclick={handleRefresh}
 				disabled={!isAccountConfigured}
-				class="flex size-7 items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-100/60 hover:text-zinc-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors duration-75"
+				class="flex size-7 items-center justify-center rounded-md text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
 				aria-label="Refresh"
 			>
-				<RefreshCw class={cn('size-[15px]', isRefreshing && 'animate-spin')} strokeWidth={1.5} />
+				<RefreshCw class={cn('size-[15px]', isRefreshing && 'animate-spin')} strokeWidth={1.8} />
 			</button>
 		{/if}
 	</div>
 
 	{#if !collapsed || isMobile}
-		<!-- Global Compose Button (Notion Style) -->
-		<div class="px-2 mt-1">
+		<!-- Compose Button -->
+		<div class="px-2.5 mt-2">
 			<button
 				onclick={openCompose}
 				disabled={!isAccountConfigured}
 				class={cn(
-					"flex items-center justify-center gap-2 w-full px-3 py-2.5 rounded-lg transition-all duration-75",
+					"flex items-center justify-center gap-2 w-full px-3 py-2 rounded-md transition-all duration-120 font-medium text-sm",
 					isAccountConfigured
-						? "bg-zinc-900 text-white hover:bg-zinc-800 shadow-sm"
-						: "bg-zinc-200 text-zinc-400 cursor-not-allowed"
+						? "bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-secondary)] shadow-sm hover:shadow-md active:scale-[0.98]"
+						: "bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] cursor-not-allowed"
 				)}
 				aria-label="New Message"
 			>
 				{#if isAccountConfigured}
-					<SquarePen class="size-[16px]" strokeWidth={1.5} />
-					<span class="text-sm font-medium">New Message</span>
+					<SquarePen class="size-[15px]" strokeWidth={1.8} />
+					<span>New Message</span>
 				{:else}
-					<Lock class="size-[16px]" strokeWidth={1.5} />
-					<span class="text-sm font-medium">Add Account</span>
+					<Lock class="size-[15px]" strokeWidth={1.8} />
+					<span>Add Account</span>
 				{/if}
 			</button>
 		</div>
@@ -297,31 +300,31 @@
 					toggleAccountsCollapse();
 				}}
 				class={cn(
-					"flex items-center gap-2 px-3 py-2 rounded-md mx-2 mt-1 relative z-10 transition-[background-color] duration-75",
+					"flex items-center gap-2 px-2.5 py-1.5 rounded-md mx-2.5 mt-2 relative z-10 transition-all duration-120",
 					selectedAccountId === null
-						? "bg-zinc-100 text-zinc-900"
-						: "hover:bg-zinc-50 text-zinc-600"
+						? "bg-[var(--bg-active)] text-[var(--text-primary)]"
+						: "hover:bg-[var(--bg-hover)] text-[var(--text-secondary)]"
 				)}
 				title="All Inboxes"
 				aria-expanded={!accountsCollapsed}
 				aria-controls="account-list"
 			>
 				<div class="relative">
-					<div class="flex size-7 items-center justify-center rounded-md bg-zinc-200 text-zinc-600">
-						<Layers class="size-[15px]" strokeWidth={1.5} />
+					<div class="flex size-7 items-center justify-center rounded-md bg-[var(--bg-tertiary)] text-[var(--text-secondary)]">
+						<Layers class="size-[15px]" strokeWidth={1.8} />
 					</div>
-					<div class="absolute -top-1 -right-1 size-3 bg-zinc-300 rounded-full flex items-center justify-center">
+					<div class="absolute -top-0.5 -right-0.5 size-3.5 bg-[var(--accent-primary)] rounded-full flex items-center justify-center shadow-sm">
 						{#if accountsCollapsed}
-							<ChevronRight class="size-[10px] text-zinc-600" strokeWidth={2.5} />
+							<ChevronRight class="size-[8px] text-white" strokeWidth={2.5} />
 						{:else}
-							<ChevronDown class="size-[10px] text-zinc-600" strokeWidth={2.5} />
+							<ChevronDown class="size-[8px] text-white" strokeWidth={2.5} />
 						{/if}
 					</div>
 				</div>
 				<div class="flex-1 min-w-0 text-left">
 					<p class="text-sm font-medium truncate">All Inboxes</p>
 					{#if formattedLastSync && selectedAccountId === null}
-						<p class="text-[10px] text-zinc-400">
+						<p class="text-[11px] text-[var(--text-tertiary)] tabular-nums">
 							{formattedLastSync}
 						</p>
 					{/if}
@@ -333,7 +336,7 @@
 				id="account-list"
 				role="region"
 				class={cn(
-					"overflow-hidden transition-[max-height] duration-100 ease-in-out",
+					"overflow-hidden transition-[max-height] duration-150 ease-out",
 					accountsCollapsed ? "max-h-0" : "max-h-[800px]"
 				)}
 				aria-hidden={accountsCollapsed}
@@ -342,25 +345,25 @@
 					<button
 						onclick={() => handleAccountClick(account.id)}
 						class={cn(
-							"flex items-center gap-2 px-3 py-2 rounded-md mx-1 relative z-10 transition-[background-color] duration-75",
+							"flex items-center gap-2 px-2.5 py-1.5 rounded-md mx-1.5 relative z-10 transition-all duration-120",
 							selectedAccountId === account.id
-								? "bg-zinc-100 text-zinc-900"
-								: "hover:bg-zinc-50 text-zinc-600"
+								? "bg-[var(--bg-active)] text-[var(--text-primary)]"
+								: "hover:bg-[var(--bg-hover)] text-[var(--text-secondary)]"
 						)}
 						title={account.email}
 					>
 						<div class={cn(
-							"flex size-7 items-center justify-center rounded-full text-xs font-medium shrink-0",
+							"flex size-7 items-center justify-center rounded-full text-xs font-semibold shrink-0",
 							getAccountColor(account.email)
 						)}>
 							{getInitials(account.name)}
 						</div>
 						<div class="flex-1 min-w-0 text-left">
 							<p class="text-sm font-medium truncate">{account.name}</p>
-							<p class="text-xs text-zinc-500 truncate">{account.email}</p>
+							<p class="text-xs text-[var(--text-tertiary)] truncate">{account.email}</p>
 						</div>
 						{#if isRefreshing && selectedAccountId === account.id}
-							<RefreshCw class="size-3 text-zinc-400 animate-spin" strokeWidth={1.5} />
+							<RefreshCw class="size-3 text-[var(--accent-primary)] animate-spin" strokeWidth={1.8} />
 						{/if}
 					</button>
 				{/each}
@@ -404,34 +407,34 @@
 
 		<!-- Disabled feedback tooltip -->
 		{#if showDisabledTooltip}
-			<div class="absolute top-20 left-1/2 -translate-x-1/2 z-50 px-3 py-2 bg-zinc-900 text-white text-xs rounded-lg shadow-lg pointer-events-none animate-in fade-in slide-in-from-top-2 duration-200">
+			<div class="absolute top-16 left-1/2 -translate-x-1/2 z-50 px-3 py-1.5 bg-[var(--text-primary)] text-[var(--bg-primary)] text-xs rounded-md shadow-lg pointer-events-none animate-scale-in">
 				Please add an account in Settings
 			</div>
 		{/if}
 
 		<!-- Navigation -->
-		<nav class="flex-1 overflow-y-auto px-2 mt-1">
+		<nav class="flex-1 overflow-y-auto px-2.5 mt-2">
 			<div class="space-y-0.5 pb-2">
 				{#each navItems as item}
 					<button
 						class={cn(
-							'group flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] relative z-10',
+							'group flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-sm relative z-10 transition-all duration-120',
 							isAccountConfigured && item.folder === activeFolder
-								? 'bg-[#007AFF] text-white font-semibold'
+								? 'bg-[var(--bg-active)] text-[var(--text-primary)] font-medium'
 								: '',
 							isAccountConfigured
-								? 'text-zinc-500 hover:bg-zinc-50 hover:text-zinc-700 cursor-pointer'
-								: 'text-zinc-300 cursor-not-allowed'
+								? 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] cursor-pointer'
+								: 'text-[var(--text-quaternary)] cursor-not-allowed'
 						)}
 						onclick={() => handleFolderClick(item.folder)}
 						disabled={!isAccountConfigured}
 					>
-						<item.icon class="size-[18px] shrink-0" strokeWidth={1.5} />
+						<item.icon class="size-[17px] shrink-0" strokeWidth={1.8} />
 						<span class="flex-1 text-left truncate">
 							{item.label}
 						</span>
 						{#if item.folder === 'inbox' && unreadCount > 0}
-							<span class="text-[11px] font-medium text-blue-600 bg-blue-50 rounded-full px-1.5">
+							<span class="text-[11px] font-semibold text-[var(--accent-primary)] bg-[var(--accent-light)] rounded-full px-1.5 py-0.5 min-w-[20px] text-center">
 								{unreadCount}
 							</span>
 						{/if}
@@ -441,13 +444,14 @@
 		</nav>
 
 		<!-- Footer -->
-		<div class="shrink-0 px-2 pb-2">
+		<div class="shrink-0 px-2.5 pb-2.5 pt-1">
 			<button
 				onclick={navigateToSettings}
-				class="settings-icon group flex items-center justify-center w-9 h-9 rounded-md text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 transition-all duration-75 relative z-10 cursor-pointer"
+				class="settings-icon group flex items-center gap-2 w-full px-2.5 py-1.5 rounded-md text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-all duration-120 relative z-10 cursor-pointer"
 				aria-label="Settings"
 			>
-				<Settings class="size-[18px] transition-transform duration-100 group-hover:rotate-45" strokeWidth={1.5} />
+				<Settings class="size-[17px] transition-transform duration-300 group-hover:rotate-45" strokeWidth={1.8} />
+				<span class="text-sm">Settings</span>
 			</button>
 		</div>
 	{:else}
@@ -457,43 +461,43 @@
 				onclick={openCompose}
 				disabled={!isAccountConfigured}
 				class={cn(
-					"flex size-8 items-center justify-center rounded-lg relative z-10",
+					"flex size-8 items-center justify-center rounded-md relative z-10 transition-all duration-120",
 					isAccountConfigured
-						? "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700 cursor-pointer"
-						: "text-zinc-300 cursor-not-allowed"
+						? "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] cursor-pointer"
+						: "text-[var(--text-quaternary)] cursor-not-allowed"
 				)}
 				aria-label="Compose"
 			>
 				{#if isAccountConfigured}
-					<SquarePen class="size-[16px]" strokeWidth={1.5} />
+					<SquarePen class="size-[16px]" strokeWidth={1.8} />
 				{:else}
-					<Lock class="size-[16px]" strokeWidth={1.5} />
+					<Lock class="size-[16px]" strokeWidth={1.8} />
 				{/if}
 			</button>
 		</div>
 
 		<!-- Collapsed navigation -->
-		<nav class="flex-1 overflow-y-auto px-2 mt-2">
-			<div class="flex flex-col items-center gap-1 pb-2">
+		<nav class="flex-1 overflow-y-auto px-2 mt-1">
+			<div class="flex flex-col items-center gap-0.5 pb-2">
 				{#each navItems as item}
 					<button
 						class={cn(
-							'group flex size-8 items-center justify-center rounded-md relative z-10',
+							'group flex size-8 items-center justify-center rounded-md relative z-10 transition-all duration-120',
 							isAccountConfigured && item.folder === activeFolder
-								? 'bg-zinc-100 text-zinc-900'
+								? 'bg-[var(--bg-active)] text-[var(--text-primary)]'
 								: '',
 							isAccountConfigured
-								? 'text-zinc-500 hover:bg-zinc-50 hover:text-zinc-700 cursor-pointer'
-								: 'text-zinc-300 cursor-not-allowed'
+								? 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] cursor-pointer'
+								: 'text-[var(--text-quaternary)] cursor-not-allowed'
 						)}
 						onclick={() => handleFolderClick(item.folder)}
 						disabled={!isAccountConfigured}
 						aria-label={item.label}
 					>
 						<div class="relative">
-							<item.icon class="size-[18px]" strokeWidth={1.5} />
+							<item.icon class="size-[17px]" strokeWidth={1.8} />
 							{#if item.folder === 'inbox' && unreadCount > 0}
-								<span class="absolute -top-0.5 -right-0.5 size-2.5 bg-blue-500 rounded-full border-2 border-white"></span>
+								<span class="absolute -top-0.5 -right-0.5 size-2 bg-[var(--accent-primary)] rounded-full border-2 border-[var(--bg-secondary)]"></span>
 							{/if}
 						</div>
 					</button>
@@ -506,10 +510,10 @@
 			<div class="flex flex-col items-center gap-1">
 			<button
 				onclick={navigateToSettings}
-				class="settings-icon group flex size-8 items-center justify-center rounded-md text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 transition-all duration-75 relative z-10 cursor-pointer"
+				class="settings-icon group flex size-8 items-center justify-center rounded-md text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-all duration-120 relative z-10 cursor-pointer"
 				aria-label="Settings"
 			>
-				<Settings class="size-[18px] transition-transform duration-100 group-hover:rotate-45" strokeWidth={1.5} />
+				<Settings class="size-[17px] transition-transform duration-300 group-hover:rotate-45" strokeWidth={1.8} />
 			</button>
 			</div>
 		</div>

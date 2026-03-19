@@ -82,13 +82,13 @@
 	}
 </script>
 
-<div class="flex flex-1 min-w-0 h-full bg-white overflow-hidden">
+<div class="reading-pane flex flex-1 min-w-0 h-full bg-[var(--bg-primary)] overflow-hidden">
 	{#if mail}
 		<div class="flex flex-1 flex-col min-h-0 overflow-hidden">
 			{#if isMobile}
-				<div class="flex items-center border-b border-zinc-100 px-3 py-2">
-					<button onclick={onBack} class="flex size-7 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-100/60" aria-label="Back to list">
-						<ArrowLeft class="size-[18px]" strokeWidth={1.5} />
+				<div class="flex items-center border-b border-[var(--border-primary)] px-3 py-2">
+					<button onclick={onBack} class="flex size-7 items-center justify-center rounded-md text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]" aria-label="Back to list">
+						<ArrowLeft class="size-[17px]" strokeWidth={1.8} />
 					</button>
 				</div>
 			{/if}
@@ -99,7 +99,7 @@
 			</div>
 
 			<!-- Mail actions toolbar - stays fixed at top -->
-			<div class="shrink-0 border-b border-zinc-100">
+			<div class="shrink-0 border-b border-[var(--border-primary)]">
 				<MailActions
 					{mail}
 					onReply={handleReply}
@@ -114,18 +114,18 @@
 
 			<!-- Email body - independent scroll, rendered in isolated iframe -->
 			<div class="flex-1 overflow-y-auto min-h-0">
-				<div class="px-8 pt-6 pb-6 max-w-3xl select-text cursor-text" data-allow-context-menu>
+				<div class="reading-content select-text cursor-text" data-allow-context-menu>
 					<EmailRenderer htmlBody={mail.html_body} plainBody={mail.body} />
 				</div>
 			</div>
 		</div>
 	{:else}
-		<!-- Empty State - Linear minimal -->
+		<!-- Empty State -->
 		<div class="flex h-full w-full items-center justify-center">
 			<div class="flex flex-col items-center gap-3 text-center">
-				<MailIcon class="size-6 text-zinc-300 opacity-20" strokeWidth={1.5} />
+				<MailIcon class="size-7 text-[var(--text-tertiary)] opacity-40" strokeWidth={1.8} />
 				<div>
-					<p class="text-[13px] text-zinc-400 leading-relaxed">Select an email to read</p>
+					<p class="text-[13px] text-[var(--text-tertiary)]">Select an email to read</p>
 				</div>
 			</div>
 		</div>

@@ -1,6 +1,5 @@
 <script lang="ts">
-	import { cn } from '$lib/utils.js';
-	import { X, Plus } from 'lucide-svelte';
+	import { X } from 'lucide-svelte';
 	import type { EmailAddress } from '$lib/types.js';
 
 	interface Props {
@@ -20,142 +19,266 @@
 	let ccInput = $state('');
 	let bccInput = $state('');
 
-	function addRecipient(list: EmailAddress[], inputValue: string): void {
-		const trimmed = inputValue.trim();
-		if (!trimmed) return;
+	function parseAddress(input: string): EmailAddress | null {
+		const trimmed = input.trim();
+		if (!trimmed) return null;
 
-		const emailMatch = trimmed.match(/([^<]+)<([^>]+)>/) || trimmed.match(/(.+)@(.+)/);
-
-		if (emailMatch) {
-			const name = emailMatch[1]?.trim() || '';
-			const email = emailMatch[2]?.trim() || trimmed;
-			list.push({ name, email });
-			if (trimmed === toInput) toInput = '';
-			else if (trimmed === ccInput) ccInput = '';
-			else if (trimmed === bccInput) bccInput = '';
+		const namedMatch = trimmed.match(/([^<]+)<([^>]+)>/);
+		if (namedMatch) {
+			return {
+				name: namedMatch[1]?.trim() || '',
+				email: namedMatch[2]?.trim() || ''
+			};
 		}
+
+		if (trimmed.includes('@')) {
+			return { name: '', email: trimmed };
+		}
+
+		return null;
+	}
+
+	function addRecipient(list: EmailAddress[], inputValue: string): void {
+		const address = parseAddress(inputValue);
+		if (!address || !address.email) return;
+		list.push(address);
+
+		if (inputValue === toInput) toInput = '';
+		if (inputValue === ccInput) ccInput = '';
+		if (inputValue === bccInput) bccInput = '';
 	}
 
 	function removeRecipient(list: EmailAddress[], index: number): void {
 		list.splice(index, 1);
 	}
 
-	function handleKeyDown(event: KeyboardEvent, list: EmailAddress[], inputValue: string): void {
-		// Allow paste shortcuts (Cmd+V / Ctrl+V) to pass through
-		if ((event.metaKey || event.ctrlKey) && event.key === 'v') {
-			return; // Let the default paste behavior happen
-		}
+	function handleRecipientKeydown(event: KeyboardEvent, list: EmailAddress[], inputValue: string): void {
+		if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'v') return;
 
 		if (event.key === 'Enter' || event.key === ',') {
 			event.preventDefault();
 			addRecipient(list, inputValue);
-		} else if (event.key === 'Backspace' && !inputValue) {
-			if (list.length > 0) {
-				list.pop();
-			}
+		}
+
+		if (event.key === 'Backspace' && !inputValue && list.length > 0) {
+			list.pop();
 		}
 	}
 </script>
 
-<div class="flex flex-col border-b border-zinc-100">
-	<!-- To -->
-	<div class="flex items-center gap-2 px-5 py-2 border-b border-zinc-50">
-		<label for="to-input" class="text-[13px] text-zinc-400 w-8 shrink-0">To</label>
-		<div class="flex flex-1 flex-wrap items-center gap-1.5">
+<div class="compose-lines border-b border-[var(--border-primary)] bg-[var(--bg-primary)]">
+	<div class="compose-line">
+		<label for="compose-to" class="line-label">To</label>
+		<div class="line-input-wrap">
 			{#each values.to as addr, index}
-				<span class="flex items-center gap-1 rounded-md bg-zinc-100 px-2 py-0.5 text-[12px] text-zinc-600">
+				<span class="recipient-chip">
 					{addr.name ? addr.name : addr.email}
 					<button
 						type="button"
-						class="text-zinc-400 hover:text-zinc-600"
 						onclick={() => removeRecipient(values.to, index)}
-						aria-label="Remove"
+						aria-label="Remove recipient"
 					>
-						<X class="size-3" strokeWidth={1.5} />
+						<X class="size-3" strokeWidth={1.8} />
 					</button>
 				</span>
 			{/each}
 			<input
-				id="to-input"
-				bind:value={toInput}
-				onkeydown={(e) => handleKeyDown(e, values.to, toInput)}
+				id="compose-to"
 				type="text"
-				placeholder={values.to.length === 0 ? "Recipients" : ""}
-				class="flex-1 min-w-[100px] bg-transparent text-[13px] text-zinc-900 outline-none placeholder:text-zinc-300"
-				onpaste={(e) => { /* Allow paste */ }}
+				bind:value={toInput}
+				onkeydown={(event) => handleRecipientKeydown(event, values.to, toInput)}
+				onblur={() => addRecipient(values.to, toInput)}
+				placeholder={values.to.length === 0 ? 'test@example.com' : ''}
+				class="line-input"
 			/>
 		</div>
-		<div class="flex gap-1">
+		<div class="line-actions">
 			{#if !showCc}
-				<button onclick={() => showCc = true} class="text-[11px] text-zinc-400 hover:text-zinc-600 px-1">Cc</button>
+				<button type="button" onclick={() => (showCc = true)}>Cc</button>
 			{/if}
 			{#if !showBcc}
-				<button onclick={() => showBcc = true} class="text-[11px] text-zinc-400 hover:text-zinc-600 px-1">Bcc</button>
+				<button type="button" onclick={() => (showBcc = true)}>Bcc</button>
 			{/if}
 		</div>
 	</div>
 
-	<!-- Cc -->
 	{#if showCc}
-		<div class="flex items-center gap-2 px-5 py-2 border-b border-zinc-50">
-			<label for="cc-input" class="text-[13px] text-zinc-400 w-8 shrink-0">Cc</label>
-			<div class="flex flex-1 flex-wrap items-center gap-1.5">
+		<div class="compose-line">
+			<label for="compose-cc" class="line-label">Cc</label>
+			<div class="line-input-wrap">
 				{#each values.cc as addr, index}
-					<span class="flex items-center gap-1 rounded-md bg-zinc-100 px-2 py-0.5 text-[12px] text-zinc-600">
+					<span class="recipient-chip">
 						{addr.name ? addr.name : addr.email}
-						<button type="button" class="text-zinc-400 hover:text-zinc-600" onclick={() => removeRecipient(values.cc, index)} aria-label="Remove">
-							<X class="size-3" strokeWidth={1.5} />
+						<button
+							type="button"
+							onclick={() => removeRecipient(values.cc, index)}
+							aria-label="Remove cc recipient"
+						>
+							<X class="size-3" strokeWidth={1.8} />
 						</button>
 					</span>
 				{/each}
 				<input
-					id="cc-input"
+					id="compose-cc"
+					type="text"
 					bind:value={ccInput}
-					onkeydown={(e) => handleKeyDown(e, values.cc, ccInput)}
-					type="text"
-					placeholder=""
-					class="flex-1 min-w-[100px] bg-transparent text-[13px] text-zinc-900 outline-none placeholder:text-zinc-300"
-					onpaste={(e) => { /* Allow paste */ }}
+					onkeydown={(event) => handleRecipientKeydown(event, values.cc, ccInput)}
+					onblur={() => addRecipient(values.cc, ccInput)}
+					class="line-input"
 				/>
 			</div>
+			<div class="line-actions"></div>
 		</div>
 	{/if}
 
-	<!-- Bcc -->
 	{#if showBcc}
-		<div class="flex items-center gap-2 px-5 py-2 border-b border-zinc-50">
-			<label for="bcc-input" class="text-[13px] text-zinc-400 w-8 shrink-0">Bcc</label>
-			<div class="flex flex-1 flex-wrap items-center gap-1.5">
+		<div class="compose-line">
+			<label for="compose-bcc" class="line-label">Bcc</label>
+			<div class="line-input-wrap">
 				{#each values.bcc as addr, index}
-					<span class="flex items-center gap-1 rounded-md bg-zinc-100 px-2 py-0.5 text-[12px] text-zinc-600">
+					<span class="recipient-chip">
 						{addr.name ? addr.name : addr.email}
-						<button type="button" class="text-zinc-400 hover:text-zinc-600" onclick={() => removeRecipient(values.bcc, index)} aria-label="Remove">
-							<X class="size-3" strokeWidth={1.5} />
+						<button
+							type="button"
+							onclick={() => removeRecipient(values.bcc, index)}
+							aria-label="Remove bcc recipient"
+						>
+							<X class="size-3" strokeWidth={1.8} />
 						</button>
 					</span>
 				{/each}
 				<input
-					id="bcc-input"
-					bind:value={bccInput}
-					onkeydown={(e) => handleKeyDown(e, values.bcc, bccInput)}
+					id="compose-bcc"
 					type="text"
-					placeholder=""
-					class="flex-1 min-w-[100px] bg-transparent text-[13px] text-zinc-900 outline-none placeholder:text-zinc-300"
-					onpaste={(e) => { /* Allow paste */ }}
+					bind:value={bccInput}
+					onkeydown={(event) => handleRecipientKeydown(event, values.bcc, bccInput)}
+					onblur={() => addRecipient(values.bcc, bccInput)}
+					class="line-input"
 				/>
 			</div>
+			<div class="line-actions"></div>
 		</div>
 	{/if}
 
-	<!-- Subject -->
-	<div class="flex items-center gap-2 px-5 py-2">
-		<label for="subject-input" class="text-[13px] text-zinc-400 w-8 shrink-0">Sub</label>
-		<input
-			id="subject-input"
-			bind:value={values.subject}
-			placeholder="Subject"
-			class="flex-1 bg-transparent text-[13px] text-zinc-900 outline-none placeholder:text-zinc-300 font-medium"
-			onpaste={(e) => { /* Allow paste */ }}
-		/>
+	<div class="compose-line no-bottom-border">
+		<label for="compose-subject" class="sr-only">Subject</label>
+		<div class="line-input-wrap subject-wrap">
+			<input
+				id="compose-subject"
+				type="text"
+				bind:value={values.subject}
+				placeholder="Write a useful subject..."
+				class="line-input subject-input"
+			/>
+		</div>
 	</div>
 </div>
+
+<style>
+	.compose-lines {
+		font-size: 13px;
+	}
+
+	.compose-line {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		min-height: 46px;
+		padding: 0 1.5rem;
+		border-bottom: 1px solid var(--border-tertiary);
+	}
+
+	.compose-line.no-bottom-border {
+		border-bottom: none;
+	}
+
+	.line-label {
+		width: 44px;
+		flex-shrink: 0;
+		color: var(--text-tertiary);
+		font-size: 12px;
+	}
+
+	.line-input-wrap {
+		display: flex;
+		align-items: center;
+		flex-wrap: wrap;
+		flex: 1;
+		gap: 0.35rem;
+		min-height: 42px;
+	}
+
+	.line-input {
+		flex: 1;
+		min-width: 150px;
+		border: none;
+		background: transparent;
+		outline: none;
+		padding: 0;
+		font-size: 13px;
+		color: var(--text-primary);
+	}
+
+	.line-input::placeholder {
+		color: color-mix(in srgb, var(--text-tertiary) 70%, white);
+	}
+
+	.subject-wrap {
+		min-height: 48px;
+	}
+
+	.subject-input {
+		font-size: 14px;
+		font-weight: 500;
+	}
+
+	.line-actions {
+		display: flex;
+		align-items: center;
+		gap: 0.25rem;
+		margin-left: 0.5rem;
+	}
+
+	.line-actions button {
+		border: none;
+		background: transparent;
+		font-size: 11px;
+		font-weight: 600;
+		color: var(--text-tertiary);
+		padding: 0.2rem 0.45rem;
+		border-radius: 999px;
+		cursor: pointer;
+	}
+
+	.line-actions button:hover {
+		background: var(--bg-hover);
+		color: var(--text-secondary);
+	}
+
+	.recipient-chip {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.35rem;
+		background: color-mix(in srgb, var(--accent-light) 45%, white);
+		color: var(--text-secondary);
+		border: 1px solid color-mix(in srgb, var(--accent-muted) 60%, white);
+		border-radius: 999px;
+		font-size: 12px;
+		padding: 0.2rem 0.45rem;
+	}
+
+	.recipient-chip button {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		border: none;
+		background: transparent;
+		color: var(--text-tertiary);
+		padding: 0;
+		cursor: pointer;
+	}
+
+	.recipient-chip button:hover {
+		color: var(--text-primary);
+	}
+</style>

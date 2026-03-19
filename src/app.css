@@ -1,162 +1,522 @@
+/* ========================================
+   MAILX THEME: APPLE MAIL + NOTION
+   Refined minimalist native UI
+   ======================================== */
+
 @import "tailwindcss";
 
-@layer base {
-  :root {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: 240 5.9% 10%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 240 5.9% 10%;
-    --radius: 0.5rem;
-  }
+/* ========================================
+   TYPOGRAPHY SYSTEM
+   ======================================== */
 
-  .dark {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 240 5.9% 10%;
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 240 4.9% 83.9%;
-  }
+/* Use native system fonts for authentic feel */
+:root {
+	/* SF Pro Display for macOS, Segoe UI for Windows */
+	--font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', system-ui, sans-serif;
+	/* SF Pro Text for body text */
+	--font-body: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
+	/* SF Mono for monospace */
+	--font-mono: 'SF Mono', 'SF Mono Regular', 'Cascadia Code', 'Consolas', monospace;
 }
 
-@theme {
-  --color-bg-primary: #ffffff;
-  --color-bg-secondary: #fafafa;
-  --color-bg-hover: #f4f4f5;
-  --color-border: #f4f4f5;
-  --color-border-subtle: #e4e4e7;
-  --color-text: #18181b;
-  --color-text-muted: #71717a;
-  --color-text-faint: #a1a1aa;
-  --color-accent: #2563eb;
-
-  --spacing-sidebar: 240px;
-  --spacing-mail-list: 360px;
-
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-}
-
-/* System font stack - Notion-style */
+/* Apply fonts */
 * {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', 'Helvetica Neue', sans-serif;
+	font-family: var(--font-body);
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
 }
 
-body {
-  background-color: #ffffff;
-  color: var(--color-text);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-rendering: optimizeLegibility;
-  font-size: 14px;
-  line-height: 1.5;
+h1, h2, h3, .font-display {
+	font-family: var(--font-display);
 }
 
-/* macOS-style scrollbar - ultra subtle */
+code, pre, .font-mono, .tabular-nums {
+	font-family: var(--font-mono);
+}
+
+/* ========================================
+   COLOR PALETTE - LIGHT & CRISP
+   ======================================== */
+
+@layer base {
+	:root {
+		/* Clean whites and grays */
+		--bg-primary: #ffffff;
+		--bg-secondary: #f7f6f5;
+		--bg-tertiary: #f0f0f0;
+		--bg-hover: #f5f5f5;
+		--bg-active: #e8e8e8;
+		--bg-selected: #eaf3ff;
+
+		/* Crisp text colors */
+		--text-primary: #1d1d1f;
+		--text-secondary: #6e6e73;
+		--text-tertiary: #86868b;
+		--text-quaternary: #aeaeb2;
+
+		/* Apple blue accent */
+		--accent-primary: #007aff;
+		--accent-secondary: #0051d5;
+		--accent-light: #e5f1ff;
+		--accent-muted: #d1e3ff;
+
+		/* Semantic colors */
+		--success: #34c759;
+		--success-light: #e8f5ed;
+		--warning: #ff9500;
+		--warning-light: #fff5e6;
+		--error: #ff3b30;
+		--error-light: #ffebee;
+
+		/* Subtle borders */
+		--border-primary: #e5e5e7;
+		--border-secondary: #ebebed;
+		--border-tertiary: #f2f2f2;
+
+		/* Native-style shadows */
+		--shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.02);
+		--shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
+		--shadow-md: 0 4px 6px rgba(0, 0, 0, 0.04), 0 2px 4px rgba(0, 0, 0, 0.02);
+		--shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.04), 0 4px 6px rgba(0, 0, 0, 0.02);
+		--shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.05), 0 8px 10px rgba(0, 0, 0, 0.02);
+
+		/* Spacing */
+		--spacing-sidebar: 240px;
+		--spacing-mail-list: 320px;
+
+		/* Border radius */
+		--radius-xs: 4px;
+		--radius-sm: 6px;
+		--radius-md: 8px;
+		--radius-lg: 12px;
+		--radius-xl: 16px;
+		--radius-full: 9999px;
+
+		/* Transition durations */
+		--duration-fast: 100ms;
+		--duration-normal: 120ms;
+		--duration-slow: 150ms;
+	}
+
+	.dark {
+		/* Dark mode */
+		--bg-primary: #1c1c1e;
+		--bg-secondary: #2c2c2e;
+		--bg-tertiary: #3a3a3c;
+		--bg-hover: #323234;
+		--bg-active: #48484a;
+		--bg-selected: #1a3a5a;
+
+		--text-primary: #f5f5f7;
+		--text-secondary: #98989d;
+		--text-tertiary: #636366;
+		--text-quaternary: #48484a;
+
+		--accent-primary: #0a84ff;
+		--accent-secondary: #409cff;
+		--accent-light: #1c3a5c;
+		--accent-muted: #163257;
+
+		--border-primary: #38383a;
+		--border-secondary: #323234;
+		--border-tertiary: #2c2c2e;
+
+		--shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
+		--shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+		--shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4);
+		--shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.5);
+		--shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.6);
+	}
+}
+
+/* ========================================
+   BASE STYLES
+   ======================================== */
+
+@layer base {
+	body {
+		background-color: var(--bg-primary);
+		color: var(--text-primary);
+		font-size: 13px;
+		line-height: 1.5;
+		letter-spacing: -0.01em;
+	}
+
+	/* Crisp selection */
+	::selection {
+		background: var(--accent-light);
+		color: var(--text-primary);
+	}
+
+	/* Native focus ring */
+	:focus-visible {
+		outline: 2px solid var(--accent-primary);
+		outline-offset: 2px;
+		border-radius: var(--radius-xs);
+	}
+}
+
+/* ========================================
+   SCROLLBAR - NATIVE STYLE
+   ======================================== */
+
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+	width: 8px;
+	height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: transparent;
+	background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.08);
-  border-radius: 3px;
+	background: rgba(0, 0, 0, 0.15);
+	border-radius: 4px;
+	border: 0;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.14);
+	background: rgba(0, 0, 0, 0.25);
 }
 
 * {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(0, 0, 0, 0.08) transparent;
+	scrollbar-width: thin;
+	scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
 }
 
-/* Focus styles */
-:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 1px;
-  border-radius: 4px;
+.dark ::-webkit-scrollbar-thumb {
+	background: rgba(255, 255, 255, 0.15);
 }
 
-/* Smooth transitions for all interactive elements */
+.dark ::-webkit-scrollbar-thumb:hover {
+	background: rgba(255, 255, 255, 0.25);
+}
+
+/* ========================================
+   TRANSITIONS - SMOOTH & NATIVE
+   ======================================== */
+
 button, a, input, textarea, select {
-  transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease, opacity 150ms ease;
+	transition:
+		background-color 150ms cubic-bezier(0.4, 0, 0.2, 1),
+		border-color 150ms cubic-bezier(0.4, 0, 0.2, 1),
+		color 150ms cubic-bezier(0.4, 0, 0.2, 1),
+		opacity 150ms cubic-bezier(0.4, 0, 0.2, 1),
+		transform 150ms cubic-bezier(0.4, 0, 0.2, 1),
+		box-shadow 150ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Ensure all input fields allow text selection and copy/paste */
+/* ========================================
+   TEXT INPUT STYLES
+   ======================================== */
+
 input, textarea {
-  user-select: text !important;
-  -webkit-user-select: text !important;
-  -moz-user-select: text !important;
-  -ms-user-select: text !important;
+	user-select: text !important;
+	-webkit-user-select: text !important;
+	background: var(--bg-primary);
+	border: 1px solid var(--border-primary);
+	color: var(--text-primary);
+	border-radius: var(--radius-md);
+	padding: 6px 10px;
+	font-size: 13px;
 }
+
+input::placeholder, textarea::placeholder {
+	color: var(--text-tertiary);
+}
+
+input:focus, textarea:focus {
+	outline: none;
+	border-color: var(--accent-primary);
+	box-shadow: 0 0 0 3px var(--accent-light);
+}
+
+/* ========================================
+   UTILITY CLASSES
+   ======================================== */
 
 /* Line clamping */
 .line-clamp-1 {
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 1;
+	overflow: hidden;
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 1;
 }
 
 .line-clamp-2 {
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+	overflow: hidden;
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+}
+
+.line-clamp-3 {
+	overflow: hidden;
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 3;
 }
 
 /* Tabular numbers */
 .tabular-nums {
-  font-variant-numeric: tabular-nums;
+	font-variant-numeric: tabular-nums;
+	font-feature-settings: 'tnum' 1;
 }
 
-/* Selection */
-::selection {
-  background: rgba(37, 99, 235, 0.12);
-}
-
-/* Prevent text selection flash on right-click in list areas */
+/* Prevent text selection */
 .select-none {
-  -webkit-touch-callout: none;
+	-webkit-touch-callout: none;
+	user-select: none;
+	-webkit-user-select: none;
 }
 
-/* Sync loading bar animation */
+/* ========================================
+   ANIMATIONS
+   ======================================== */
+
+/* Shimmer for sync loading */
 @keyframes shimmer {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(400%); }
+	0% { transform: translateX(-100%); }
+	100% { transform: translateX(400%); }
+}
+
+.animate-shimmer {
+	animation: shimmer 1.5s ease-in-out infinite;
+}
+
+/* Fade in */
+@keyframes fade-in {
+	from { opacity: 0; }
+	to { opacity: 1; }
+}
+
+.animate-fade-in {
+	animation: fade-in 0.2s ease-out;
+}
+
+/* Scale in */
+@keyframes scale-in {
+	from {
+		opacity: 0;
+		transform: scale(0.95);
+	}
+	to {
+		opacity: 1;
+		transform: scale(1);
+	}
+}
+
+.animate-scale-in {
+	animation: scale-in 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Slide in from right */
+@keyframes slide-in-right {
+	from {
+		opacity: 0;
+		transform: translateX(10px);
+	}
+	to {
+		opacity: 1;
+		transform: translateX(0);
+	}
+}
+
+.animate-slide-in-right {
+	animation: slide-in-right 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Rotate */
+@keyframes rotate {
+	from { transform: rotate(0deg); }
+	to { transform: rotate(360deg); }
+}
+
+.animate-spin {
+	animation: rotate 1s linear infinite;
+}
+
+/* Bounce */
+@keyframes bounce-subtle {
+	0%, 100% { transform: translateY(0); }
+	50% { transform: translateY(-2px); }
+}
+
+.animate-bounce-subtle {
+	animation: bounce-subtle 0.5s ease-in-out;
+}
+
+/* ========================================
+   COMPONENT STYLES
+   ======================================== */
+
+/* Sidebar active state */
+.sidebar-active {
+	background: var(--bg-active) !important;
+	color: var(--text-primary) !important;
+}
+
+/* Mail list item */
+.mail-item {
+	position: relative;
+	border-radius: var(--radius-md);
+	padding: 10px 12px;
+	margin: 2px 8px;
+	transition: all 120ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mail-item:hover {
+	background: var(--bg-hover);
+}
+
+.mail-item-selected {
+	background: var(--bg-selected) !important;
+	box-shadow: var(--shadow-xs);
+}
+
+/* Mail item button - compact 78px height with custom padding */
+.mail-item-button {
+	height: 78px;
+	padding-left: 2.2rem;
+	padding-right: 0.75rem;
+	padding-top: 0.5rem;
+	padding-bottom: 0.5rem;
+}
+
+/* Unread indicator */
+.unread-dot {
+	width: 8px;
+	height: 8px;
+	background: var(--accent-primary);
+	border-radius: 50%;
+}
+
+/* Badge styles */
+.badge {
+	display: inline-flex;
+	align-items: center;
+	padding: 2px 7px;
+	border-radius: var(--radius-full);
+	font-size: 11px;
+	font-weight: 500;
+	background: var(--bg-tertiary);
+	color: var(--text-secondary);
+}
+
+.badge-accent {
+	background: var(--accent-primary);
+	color: white;
+}
+
+/* Button styles */
+.btn-primary {
+	background: var(--accent-primary);
+	color: white;
+	padding: 8px 16px;
+	border-radius: var(--radius-md);
+	font-weight: 500;
+	font-size: 13px;
+	transition: all 120ms ease;
+}
+
+.btn-primary:hover {
+	background: var(--accent-secondary);
+	box-shadow: var(--shadow-md);
+}
+
+.btn-primary:active {
+	transform: scale(0.98);
+}
+
+.btn-ghost {
+	background: transparent;
+	color: var(--text-secondary);
+	padding: 6px 10px;
+	border-radius: var(--radius-md);
+	font-size: 13px;
+	transition: all 120ms ease;
+}
+
+.btn-ghost:hover {
+	background: var(--bg-hover);
+	color: var(--text-primary);
+}
+
+/* Card styles */
+.card {
+	background: var(--bg-primary);
+	border: 1px solid var(--border-primary);
+	border-radius: var(--radius-lg);
+	padding: 16px;
+	box-shadow: var(--shadow-sm);
+}
+
+/* ========================================
+   READING PANE SPECIFIC
+   ======================================== */
+
+.reading-pane {
+	background: var(--bg-primary);
+}
+
+.reading-header {
+	border-bottom: 1px solid var(--border-primary);
+	padding: 20px 24px;
+	background: var(--bg-primary);
+}
+
+.reading-subject {
+	font-family: var(--font-display);
+	font-size: 20px;
+	font-weight: 600;
+	line-height: 1.3;
+	color: var(--text-primary);
+	letter-spacing: -0.02em;
+}
+
+.reading-meta {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 12px 24px;
+	background: var(--bg-secondary);
+	border-bottom: 1px solid var(--border-primary);
+}
+
+.reading-content {
+	padding: 24px;
+	max-width: 680px;
+	margin: 0 auto;
+}
+
+.reading-content p {
+	margin-bottom: 1em;
+	line-height: 1.6;
+}
+
+/* ========================================
+   RESPONSIVE ADJUSTMENTS
+   ======================================== */
+
+@media (max-width: 768px) {
+	:root {
+		--spacing-sidebar: 100%;
+		--spacing-mail-list: 100%;
+	}
+
+	.reading-header {
+		padding: 16px 20px;
+	}
+
+	.reading-subject {
+		font-size: 18px;
+	}
+
+	.reading-meta {
+		padding: 10px 20px;
+	}
+
+	.reading-content {
+		padding: 20px;
+	}
 }

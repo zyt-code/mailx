@@ -7,6 +7,7 @@ use thiserror::Error;
 
 /// IMAP client errors
 #[derive(Debug, Error)]
+#[allow(dead_code)]
 pub enum ImapError {
     #[error("Connection failed: {0}")]
     ConnectionFailed(String),
@@ -72,19 +73,24 @@ impl ImapClient {
         let password = self.password.clone();
 
         tokio::task::spawn_blocking(move || {
-            println!("[IMAP] test_connection: {}:{} (SSL={})", config.server, config.port, config.use_ssl);
+            println!(
+                "[IMAP] test_connection: {}:{} (SSL={})",
+                config.server, config.port, config.use_ssl
+            );
 
             if !config.use_ssl {
                 let mut session = Self::connect_plain(&config, &email, &password)?;
                 println!("[IMAP] test_connection: login OK, selecting INBOX...");
-                session.select("INBOX")
+                session
+                    .select("INBOX")
                     .map_err(|e| ImapError::Protocol(format!("Failed to select INBOX: {}", e)))?;
                 println!("[IMAP] test_connection: INBOX selected OK");
                 let _ = session.logout();
             } else {
                 let mut session = Self::connect_and_login(&config, &email, &password)?;
                 println!("[IMAP] test_connection: login OK, selecting INBOX...");
-                session.select("INBOX")
+                session
+                    .select("INBOX")
                     .map_err(|e| ImapError::Protocol(format!("Failed to select INBOX: {}", e)))?;
                 println!("[IMAP] test_connection: INBOX selected OK");
                 let _ = session.logout();
@@ -108,7 +114,10 @@ impl ImapClient {
     ) -> Result<imap::Session<native_tls::TlsStream<std::net::TcpStream>>> {
         let use_tls = config.use_ssl;
 
-        println!("[IMAP] Connection setup: use_tls={}, server={}, port={}", use_tls, config.server, config.port);
+        println!(
+            "[IMAP] Connection setup: use_tls={}, server={}, port={}",
+            use_tls, config.server, config.port
+        );
 
         let (server, _) = Self::split_server_port(&config.server, config.port);
         let addr = (server, config.port);
@@ -137,57 +146,45 @@ impl ImapClient {
                 .min_protocol_version(Some(native_tls::Protocol::Tlsv12))
                 .build()
                 .map_err(|e| ImapError::Tls(format!("Failed to create TLS connector: {}", e)))?;
-            let client = imap::connect(addr, addr.0, &tls)
-                .map_err(|e| {
-                    println!("[IMAP] Connection FAILED: {}", e);
-                    ImapError::ConnectionFailed(format!(
-                        "Failed to connect to {}:{} — {}",
-                        addr.0, addr.1, e
-                    ))
-                })?;
+            let client = imap::connect(addr, addr.0, &tls).map_err(|e| {
+                println!("[IMAP] Connection FAILED: {}", e);
+                ImapError::ConnectionFailed(format!(
+                    "Failed to connect to {}:{} — {}",
+                    addr.0, addr.1, e
+                ))
+            })?;
             println!("[IMAP] Connected OK (TLS)");
 
             println!("[IMAP] Logging in as '{}'...", email);
-            let session = client
-                .login(email, password)
-                .map_err(|(e, _)| {
-                    println!("[IMAP] Login FAILED: {}", e);
-                    ImapError::AuthenticationFailed(format!(
-                        "Login failed for '{}': {}",
-                        email, e
-                    ))
-                })?;
+            let session = client.login(email, password).map_err(|(e, _)| {
+                println!("[IMAP] Login FAILED: {}", e);
+                ImapError::AuthenticationFailed(format!("Login failed for '{}': {}", email, e))
+            })?;
             println!("[IMAP] Login OK");
             Ok(session)
         } else {
             // Plain TCP connection (no TLS) - use different session type
             println!("[IMAP] Connecting to {}:{}... (TLS=false)", addr.0, addr.1);
-            let tcp = std::net::TcpStream::connect(addr)
-                .map_err(|e| {
-                    println!("[IMAP] TCP connection FAILED: {}", e);
-                    ImapError::ConnectionFailed(format!(
-                        "Failed to connect to {}:{} — {}",
-                        addr.0, addr.1, e
-                    ))
-                })?;
+            let tcp = std::net::TcpStream::connect(addr).map_err(|e| {
+                println!("[IMAP] TCP connection FAILED: {}", e);
+                ImapError::ConnectionFailed(format!(
+                    "Failed to connect to {}:{} — {}",
+                    addr.0, addr.1, e
+                ))
+            })?;
             let client = imap::Client::new(tcp);
             println!("[IMAP] Connected OK (plain)");
 
             println!("[IMAP] Logging in as '{}'...", email);
-            let session = client
-                .login(email, password)
-                .map_err(|(e, _)| {
-                    println!("[IMAP] Login FAILED: {}", e);
-                    ImapError::AuthenticationFailed(format!(
-                        "Login failed for '{}': {}",
-                        email, e
-                    ))
-                })?;
+            let _session = client.login(email, password).map_err(|(e, _)| {
+                println!("[IMAP] Login FAILED: {}", e);
+                ImapError::AuthenticationFailed(format!("Login failed for '{}': {}", email, e))
+            })?;
             println!("[IMAP] Login OK");
             // Note: Plain connections return a different session type
             // We need to handle this at the caller level
             Err(ImapError::ConnectionFailed(
-                "Plain connections not fully supported in standard flow".into()
+                "Plain connections not fully supported in standard flow".into(),
             ))
         }
     }
@@ -205,34 +202,35 @@ impl ImapClient {
     ) -> Result<imap::Session<native_tls::TlsStream<std::net::TcpStream>>> {
         use std::io::{BufRead, Write};
 
-        println!("[IMAP] Connecting to {}:{} (with ID)... (TLS={})", addr.0, addr.1, use_tls);
-        
+        println!(
+            "[IMAP] Connecting to {}:{} (with ID)... (TLS={})",
+            addr.0, addr.1, use_tls
+        );
+
         // Note: ID command flow always requires TLS for Chinese providers
         if !use_tls {
             return Err(ImapError::ConnectionFailed(
-                "ID command flow requires TLS but TLS was disabled".into()
+                "ID command flow requires TLS but TLS was disabled".into(),
             ));
         }
-        
+
         let tls = native_tls::TlsConnector::builder()
             .min_protocol_version(Some(native_tls::Protocol::Tlsv12))
             .build()
             .map_err(|e| ImapError::Tls(format!("Failed to create TLS connector: {}", e)))?;
-        
-        let tcp = std::net::TcpStream::connect(addr)
-            .map_err(|e| {
-                println!("[IMAP] TCP connect FAILED: {}", e);
-                ImapError::ConnectionFailed(format!(
-                    "Failed to connect to {}:{} — {}",
-                    addr.0, addr.1, e
-                ))
-            })?;
-        
-        let tls_stream = tls.connect(addr.0, tcp)
-            .map_err(|e| {
-                println!("[IMAP] TLS handshake FAILED: {}", e);
-                ImapError::Tls(format!("TLS handshake failed for {}: {}", addr.0, e))
-            })?;
+
+        let tcp = std::net::TcpStream::connect(addr).map_err(|e| {
+            println!("[IMAP] TCP connect FAILED: {}", e);
+            ImapError::ConnectionFailed(format!(
+                "Failed to connect to {}:{} — {}",
+                addr.0, addr.1, e
+            ))
+        })?;
+
+        let tls_stream = tls.connect(addr.0, tcp).map_err(|e| {
+            println!("[IMAP] TLS handshake FAILED: {}", e);
+            ImapError::Tls(format!("TLS handshake failed for {}: {}", addr.0, e))
+        })?;
         println!("[IMAP] Connected OK");
 
         // Wrap in BufReader for reliable line-by-line reading.
@@ -240,22 +238,28 @@ impl ImapClient {
 
         // 1. Read server greeting (e.g. "* OK Coremail ... ready")
         let mut greeting = String::new();
-        reader.read_line(&mut greeting)
+        reader
+            .read_line(&mut greeting)
             .map_err(|e| ImapError::Protocol(format!("Failed to read greeting: {}", e)))?;
         println!("[IMAP] Greeting: {}", greeting.trim());
 
         // 2. Send ID command with a tag that won't collide with the imap crate
         println!("[IMAP] Sending ID command...");
         let id_cmd = b"a0 ID (\"name\" \"mailx\" \"version\" \"1.0.0\" \"vendor\" \"Mailx\")\r\n";
-        reader.get_mut().write_all(id_cmd)
+        reader
+            .get_mut()
+            .write_all(id_cmd)
             .map_err(|e| ImapError::Protocol(format!("Failed to send ID: {}", e)))?;
-        reader.get_mut().flush()
+        reader
+            .get_mut()
+            .flush()
             .map_err(|e| ImapError::Protocol(format!("Failed to flush ID: {}", e)))?;
 
         // 3. Read until the tagged response "a0 OK/NO/BAD ..."
         loop {
             let mut line = String::new();
-            reader.read_line(&mut line)
+            reader
+                .read_line(&mut line)
                 .map_err(|e| ImapError::Protocol(format!("Failed to read ID response: {}", e)))?;
             let trimmed = line.trim();
             println!("[IMAP] ID response: {}", trimmed);
@@ -274,15 +278,10 @@ impl ImapClient {
 
         // 6. Login normally via the imap crate
         println!("[IMAP] Logging in as '{}'...", email);
-        let session = client
-            .login(email, password)
-            .map_err(|(e, _)| {
-                println!("[IMAP] Login FAILED: {}", e);
-                ImapError::AuthenticationFailed(format!(
-                    "Login failed for '{}': {}",
-                    email, e
-                ))
-            })?;
+        let session = client.login(email, password).map_err(|(e, _)| {
+            println!("[IMAP] Login FAILED: {}", e);
+            ImapError::AuthenticationFailed(format!("Login failed for '{}': {}", email, e))
+        })?;
         println!("[IMAP] Login OK");
         Ok(session)
     }
@@ -298,17 +297,17 @@ impl ImapClient {
     /// If the server string contains a colon followed by a valid port number,
     /// extracts that port and uses the preceding part as the hostname.
     /// Repeatedly extracts ports from the end to handle cases where the server
-    /// string might have embedded port information (e.g., "host:port1:port2" 
+    /// string might have embedded port information (e.g., "host:port1:port2"
     /// where port1 is the actual port and :port2 is erroneous).
     /// Otherwise returns the server as hostname and the provided default port.
     fn split_server_port(server: &str, default_port: u16) -> (&str, u16) {
         let server = server.trim();
-        
+
         // Handle IPv6 addresses in brackets like [::1]:993
         if server.starts_with('[') {
             if let Some(end_bracket) = server.find(']') {
                 let host = &server[1..end_bracket];
-                let port_part = &server[end_bracket+1..];
+                let port_part = &server[end_bracket + 1..];
                 if port_part.starts_with(':') {
                     if let Ok(port) = port_part[1..].parse::<u16>() {
                         return (host, port);
@@ -318,26 +317,25 @@ impl ImapClient {
                 return (host, default_port);
             }
         }
-        
+
         // For hostnames, repeatedly try to split off a port from the end
         // as long as what remains looks like a valid hostname (no embedded ports)
         let mut current = server;
         let mut port = default_port;
-        
+
         loop {
             // Try to split off a port from the end
             if let Some(last_colon) = current.rfind(':') {
                 let host_candidate = &current[..last_colon];
-                let port_str = &current[last_colon+1..];
-                
+                let port_str = &current[last_colon + 1..];
+
                 // Check if port_str is a valid port number
                 if let Ok(port_candidate) = port_str.parse::<u16>() {
                     // Check if host_candidate looks like it might still contain a port
                     // (i.e., contains a colon and is not an IPv6 address in brackets)
-                    let host_candidate_might_have_port = 
-                        host_candidate.contains(':') && 
-                        !(host_candidate.starts_with('[') && host_candidate.ends_with(']'));
-                    
+                    let host_candidate_might_have_port = host_candidate.contains(':')
+                        && !(host_candidate.starts_with('[') && host_candidate.ends_with(']'));
+
                     if host_candidate_might_have_port {
                         // The host_candidate still looks like it has an embedded port,
                         // so continue trying to extract from it
@@ -353,7 +351,7 @@ impl ImapClient {
             // If we can't split off a port anymore, we're done
             break;
         }
-        
+
         // Return what we have left and the last port we found (or default)
         (current, port)
     }
@@ -368,27 +366,21 @@ impl ImapClient {
         let (server, port) = Self::split_server_port(&config.server, config.port);
         let addr = (server, port);
         println!("[IMAP] Connecting (plain) to {}:{}...", addr.0, addr.1);
-        let tcp = std::net::TcpStream::connect(addr)
-            .map_err(|e| {
-                println!("[IMAP] TCP connect FAILED: {}", e);
-                ImapError::ConnectionFailed(format!(
-                    "Failed to connect to {}:{} — {}",
-                    addr.0, addr.1, e
-                ))
-            })?;
+        let tcp = std::net::TcpStream::connect(addr).map_err(|e| {
+            println!("[IMAP] TCP connect FAILED: {}", e);
+            ImapError::ConnectionFailed(format!(
+                "Failed to connect to {}:{} — {}",
+                addr.0, addr.1, e
+            ))
+        })?;
         let client = imap::Client::new(tcp);
         println!("[IMAP] Connected OK (plain)");
 
         println!("[IMAP] Logging in as '{}'...", email);
-        let session = client
-            .login(email, password)
-            .map_err(|(e, _)| {
-                println!("[IMAP] Login FAILED: {}", e);
-                ImapError::AuthenticationFailed(format!(
-                    "Login failed for '{}': {}",
-                    email, e
-                ))
-            })?;
+        let session = client.login(email, password).map_err(|(e, _)| {
+            println!("[IMAP] Login FAILED: {}", e);
+            ImapError::AuthenticationFailed(format!("Login failed for '{}': {}", email, e))
+        })?;
         println!("[IMAP] Login OK");
         Ok(session)
     }
@@ -433,12 +425,10 @@ impl ImapClient {
         let mut session = Self::connect_plain(&config, &email, &password)?;
 
         println!("[IMAP] Selecting folder '{}'...", folder);
-        let mailbox = session
-            .select(folder)
-            .map_err(|e| {
-                println!("[IMAP] Select folder '{}' FAILED: {}", folder, e);
-                ImapError::Protocol(format!("Failed to select folder '{}': {}", folder, e))
-            })?;
+        let mailbox = session.select(folder).map_err(|e| {
+            println!("[IMAP] Select folder '{}' FAILED: {}", folder, e);
+            ImapError::Protocol(format!("Failed to select folder '{}': {}", folder, e))
+        })?;
 
         let exists = mailbox.exists;
         println!(
@@ -460,21 +450,29 @@ impl ImapClient {
             1
         };
         let range = format!("{}:{}", start, exists);
-        println!("[IMAP] Fetching sequence range {} ({} messages)...", range, exists - start + 1);
+        println!(
+            "[IMAP] Fetching sequence range {} ({} messages)...",
+            range,
+            exists - start + 1
+        );
 
         // Detect mail provider for provider-specific fetch behavior
         let provider = MailProvider::detect_from_host(&config.server);
         let fetch_command = provider.get_fetch_command();
-        println!("[IMAP] Provider: {}, fetch command: {}", provider, fetch_command);
+        println!(
+            "[IMAP] Provider: {}, fetch command: {}",
+            provider, fetch_command
+        );
 
-        let fetch_results = session
-            .fetch(&range, fetch_command)
-            .map_err(|e| {
-                println!("[IMAP] Fetch FAILED: {}", e);
-                ImapError::FetchFailed(format!("Fetch range {} failed: {}", range, e))
-            })?;
+        let fetch_results = session.fetch(&range, fetch_command).map_err(|e| {
+            println!("[IMAP] Fetch FAILED: {}", e);
+            ImapError::FetchFailed(format!("Fetch range {} failed: {}", range, e))
+        })?;
 
-        println!("[IMAP] Fetched {} responses, parsing...", fetch_results.len());
+        println!(
+            "[IMAP] Fetched {} responses, parsing...",
+            fetch_results.len()
+        );
 
         let mut mails = Vec::new();
         let mut parse_errors = 0u32;
@@ -495,7 +493,10 @@ impl ImapClient {
                                     if let Some(rfc822_fetch) = rfc822_results.first() {
                                         match Self::parse_fetch_response(rfc822_fetch, folder) {
                                             Ok(rfc822_mail) => {
-                                                println!("[IMAP] RFC822 fallback succeeded for UID={}", uid);
+                                                println!(
+                                                    "[IMAP] RFC822 fallback succeeded for UID={}",
+                                                    uid
+                                                );
                                                 mails.push(rfc822_mail);
                                                 continue;
                                             }
@@ -506,7 +507,10 @@ impl ImapClient {
                                     }
                                 }
                                 Err(e2) => {
-                                    println!("[IMAP] RFC822 fallback fetch failed for UID={}: {}", uid, e2);
+                                    println!(
+                                        "[IMAP] RFC822 fallback fetch failed for UID={}: {}",
+                                        uid, e2
+                                    );
                                 }
                             }
                         }
@@ -547,12 +551,10 @@ impl ImapClient {
         let mut session = Self::connect_and_login(&config, &email, &password)?;
 
         println!("[IMAP] Selecting folder '{}'...", folder);
-        let mailbox = session
-            .select(folder)
-            .map_err(|e| {
-                println!("[IMAP] Select folder '{}' FAILED: {}", folder, e);
-                ImapError::Protocol(format!("Failed to select folder '{}': {}", folder, e))
-            })?;
+        let mailbox = session.select(folder).map_err(|e| {
+            println!("[IMAP] Select folder '{}' FAILED: {}", folder, e);
+            ImapError::Protocol(format!("Failed to select folder '{}': {}", folder, e))
+        })?;
 
         let exists = mailbox.exists;
         println!(
@@ -574,21 +576,29 @@ impl ImapClient {
             1
         };
         let range = format!("{}:{}", start, exists);
-        println!("[IMAP] Fetching sequence range {} ({} messages)...", range, exists - start + 1);
+        println!(
+            "[IMAP] Fetching sequence range {} ({} messages)...",
+            range,
+            exists - start + 1
+        );
 
         // Detect mail provider for provider-specific fetch behavior
         let provider = MailProvider::detect_from_host(&config.server);
         let fetch_command = provider.get_fetch_command();
-        println!("[IMAP] Provider: {}, fetch command: {}", provider, fetch_command);
+        println!(
+            "[IMAP] Provider: {}, fetch command: {}",
+            provider, fetch_command
+        );
 
-        let fetch_results = session
-            .fetch(&range, fetch_command)
-            .map_err(|e| {
-                println!("[IMAP] Fetch FAILED: {}", e);
-                ImapError::FetchFailed(format!("Fetch range {} failed: {}", range, e))
-            })?;
+        let fetch_results = session.fetch(&range, fetch_command).map_err(|e| {
+            println!("[IMAP] Fetch FAILED: {}", e);
+            ImapError::FetchFailed(format!("Fetch range {} failed: {}", range, e))
+        })?;
 
-        println!("[IMAP] Fetched {} responses, parsing...", fetch_results.len());
+        println!(
+            "[IMAP] Fetched {} responses, parsing...",
+            fetch_results.len()
+        );
 
         let mut mails = Vec::new();
         let mut parse_errors = 0u32;
@@ -609,7 +619,10 @@ impl ImapClient {
                                     if let Some(rfc822_fetch) = rfc822_results.first() {
                                         match Self::parse_fetch_response(rfc822_fetch, folder) {
                                             Ok(rfc822_mail) => {
-                                                println!("[IMAP] RFC822 fallback succeeded for UID={}", uid);
+                                                println!(
+                                                    "[IMAP] RFC822 fallback succeeded for UID={}",
+                                                    uid
+                                                );
                                                 mails.push(rfc822_mail);
                                                 continue;
                                             }
@@ -620,7 +633,10 @@ impl ImapClient {
                                     }
                                 }
                                 Err(e2) => {
-                                    println!("[IMAP] RFC822 fallback fetch failed for UID={}: {}", uid, e2);
+                                    println!(
+                                        "[IMAP] RFC822 fallback fetch failed for UID={}: {}",
+                                        uid, e2
+                                    );
                                 }
                             }
                         }
@@ -742,21 +758,17 @@ impl ImapClient {
     ) -> Result<()> {
         if !config.use_ssl {
             let mut session = Self::connect_plain(&config, &email, &password)?;
-            session
-                .select(folder)
-                .map_err(|e| {
-                    println!("[IMAP] Select folder '{}' FAILED: {}", folder, e);
-                    ImapError::Protocol(format!("Failed to select folder '{}': {}", folder, e))
-                })?;
+            session.select(folder).map_err(|e| {
+                println!("[IMAP] Select folder '{}' FAILED: {}", folder, e);
+                ImapError::Protocol(format!("Failed to select folder '{}': {}", folder, e))
+            })?;
 
             println!("[IMAP] Storing flags '{}' on UID {}...", flags, uid);
             let uid_str = uid.to_string();
-            session
-                .uid_store(&uid_str, flags)
-                .map_err(|e| {
-                    println!("[IMAP] Store flags FAILED for UID {}: {}", uid, e);
-                    ImapError::Protocol(format!("Failed to store flags '{}': {}", flags, e))
-                })?;
+            session.uid_store(&uid_str, flags).map_err(|e| {
+                println!("[IMAP] Store flags FAILED for UID {}: {}", uid, e);
+                ImapError::Protocol(format!("Failed to store flags '{}': {}", flags, e))
+            })?;
 
             println!("[IMAP] Flags stored successfully for UID {}", uid);
             let _ = session.logout();
@@ -765,21 +777,17 @@ impl ImapClient {
         }
 
         let mut session = Self::connect_and_login(&config, &email, &password)?;
-        session
-            .select(folder)
-            .map_err(|e| {
-                println!("[IMAP] Select folder '{}' FAILED: {}", folder, e);
-                ImapError::Protocol(format!("Failed to select folder '{}': {}", folder, e))
-            })?;
+        session.select(folder).map_err(|e| {
+            println!("[IMAP] Select folder '{}' FAILED: {}", folder, e);
+            ImapError::Protocol(format!("Failed to select folder '{}': {}", folder, e))
+        })?;
 
         println!("[IMAP] Storing flags '{}' on UID {}...", flags, uid);
         let uid_str = uid.to_string();
-        session
-            .uid_store(&uid_str, flags)
-            .map_err(|e| {
-                println!("[IMAP] Store flags FAILED for UID {}: {}", uid, e);
-                ImapError::Protocol(format!("Failed to store flags '{}': {}", flags, e))
-            })?;
+        session.uid_store(&uid_str, flags).map_err(|e| {
+            println!("[IMAP] Store flags FAILED for UID {}: {}", uid, e);
+            ImapError::Protocol(format!("Failed to store flags '{}': {}", flags, e))
+        })?;
 
         println!("[IMAP] Flags stored successfully for UID {}", uid);
         let _ = session.logout();
@@ -791,13 +799,16 @@ impl ImapClient {
     /// Applies fallbacks so that malformed headers don't crash the whole sync.
     fn parse_fetch_response(fetch: &imap::types::Fetch, folder: &str) -> Result<Mail> {
         // Get the UID — required for dedup
-        let uid = fetch.uid.ok_or_else(|| {
-            ImapError::ParseError("No UID in fetch response".to_string())
-        })?;
+        let uid = fetch
+            .uid
+            .ok_or_else(|| ImapError::ParseError("No UID in fetch response".to_string()))?;
 
         // Get the raw email body - now using BODY.PEEK[] from the fetch query
         let body = fetch.body().ok_or_else(|| {
-            ImapError::ParseError(format!("No body in fetch response (UID={}). Ensure fetch query includes BODY.PEEK[].", uid))
+            ImapError::ParseError(format!(
+                "No body in fetch response (UID={}). Ensure fetch query includes BODY.PEEK[].",
+                uid
+            ))
         })?;
 
         // Log the body size for diagnostics
@@ -819,22 +830,34 @@ impl ImapClient {
             println!("[IMAP] UID={} mail-parser OK - parsed successfully", uid);
         }
 
-        let (from_name, from_email, subject, body_text, html_body, preview, timestamp, to, cc, bcc, reply_to, attachment_count) =
-            if let Some(ref msg) = message {
-                let from_addr = msg.from();
-                let (fn_, fe_) = Self::extract_first_address(from_addr);
-                let subj = msg.subject().unwrap_or("(No Subject)").to_string();
-                let bt = Self::extract_body_text(msg);
-                let hb = msg.body_html(0).map(|h| h.to_string());
-                let pv = Self::create_preview(&bt);
+        let (
+            from_name,
+            from_email,
+            subject,
+            body_text,
+            html_body,
+            preview,
+            timestamp,
+            to,
+            cc,
+            bcc,
+            reply_to,
+            attachment_count,
+        ) = if let Some(ref msg) = message {
+            let from_addr = msg.from();
+            let (fn_, fe_) = Self::extract_first_address(from_addr);
+            let subj = msg.subject().unwrap_or("(No Subject)").to_string();
+            let bt = Self::extract_body_text(msg);
+            let hb = msg.body_html(0).map(|h| h.to_string());
+            let pv = Self::create_preview(&bt);
 
-                // Parse timestamp from email Date header
-                // to_timestamp() returns seconds since epoch — multiply by 1000 for milliseconds
-                // If Date header is invalid or < 1000000 (around 1970), use current time as fallback
-                // Note: imap 0.9 doesn't have internal_date() method on Fetch, using current time
-                let current_time_ms = chrono::Utc::now().timestamp_millis();
-                let min_timestamp = 1000000i64; // 1970-01-12 approx in milliseconds
-                let ts = msg.date()
+            // Parse timestamp from email Date header
+            // to_timestamp() returns seconds since epoch — multiply by 1000 for milliseconds
+            // If Date header is invalid or < 1000000 (around 1970), use current time as fallback
+            // Note: imap 0.9 doesn't have internal_date() method on Fetch, using current time
+            let current_time_ms = chrono::Utc::now().timestamp_millis();
+            let min_timestamp = 1000000i64; // 1970-01-12 approx in milliseconds
+            let ts = msg.date()
                     .map(|d| {
                         let secs = d.to_timestamp();
                         let ms = secs * 1000;
@@ -852,33 +875,33 @@ impl ImapClient {
                         current_time_ms
                     });
 
-                let to_ = Self::extract_from_address(msg.to());
-                let cc_ = Self::extract_from_address(msg.cc());
-                let bcc_ = Self::extract_from_address(msg.bcc());
-                let rt_ = Self::extract_from_address(msg.reply_to());
-                let ac = msg.attachment_count();
-                (fn_, fe_, subj, bt, hb, pv, ts, to_, cc_, bcc_, rt_, ac)
-            } else {
-                // mail-parser failed entirely — produce a stub
-                println!(
-                    "[IMAP] mail-parser returned None for UID={}, creating fallback stub",
-                    uid
-                );
-                (
-                    "Unknown Sender".to_string(),
-                    "unknown@unknown".to_string(),
-                    "(Unparseable Email)".to_string(),
-                    String::new(),
-                    None,
-                    String::new(),
-                    chrono::Utc::now().timestamp_millis(),
-                    None,
-                    None,
-                    None,
-                    None,
-                    0,
-                )
-            };
+            let to_ = Self::extract_from_address(msg.to());
+            let cc_ = Self::extract_from_address(msg.cc());
+            let bcc_ = Self::extract_from_address(msg.bcc());
+            let rt_ = Self::extract_from_address(msg.reply_to());
+            let ac = msg.attachment_count();
+            (fn_, fe_, subj, bt, hb, pv, ts, to_, cc_, bcc_, rt_, ac)
+        } else {
+            // mail-parser failed entirely — produce a stub
+            println!(
+                "[IMAP] mail-parser returned None for UID={}, creating fallback stub",
+                uid
+            );
+            (
+                "Unknown Sender".to_string(),
+                "unknown@unknown".to_string(),
+                "(Unparseable Email)".to_string(),
+                String::new(),
+                None,
+                String::new(),
+                chrono::Utc::now().timestamp_millis(),
+                None,
+                None,
+                None,
+                None,
+                0,
+            )
+        };
 
         // Get flags for read/unread status
         let flags = fetch.flags();
@@ -976,7 +999,11 @@ impl ImapClient {
             if low_bytes[i] == b'<' && i + 7 < low_bytes.len() {
                 let rest = &lowered[i..];
                 if rest.starts_with("<style") || rest.starts_with("<script") {
-                    let end_tag = if rest.starts_with("<style") { "</style>" } else { "</script>" };
+                    let end_tag = if rest.starts_with("<style") {
+                        "</style>"
+                    } else {
+                        "</script>"
+                    };
                     if let Some(end_pos) = lowered[i..].find(end_tag) {
                         i += end_pos + end_tag.len();
                         continue;
@@ -1068,7 +1095,11 @@ impl ImapClient {
                         })
                     })
                     .collect();
-                if list.is_empty() { None } else { Some(list) }
+                if list.is_empty() {
+                    None
+                } else {
+                    Some(list)
+                }
             }
             Some(mail_parser::Address::Group(groups)) => {
                 let list: Vec<EmailAddress> = groups
@@ -1082,7 +1113,11 @@ impl ImapClient {
                         })
                     })
                     .collect();
-                if list.is_empty() { None } else { Some(list) }
+                if list.is_empty() {
+                    None
+                } else {
+                    Some(list)
+                }
             }
             None => None,
         }
@@ -1098,7 +1133,6 @@ impl ImapClient {
         uid.hash(&mut hasher);
         format!("{:x}", hasher.finish())
     }
-
 }
 #[cfg(test)]
 #[path = "../test/imap_client_tests.rs"]
