@@ -8,6 +8,7 @@
 	import ComposeActions from './ComposeActions.svelte';
 	import type { Account, Attachment, EmailAddress, Folder, Mail } from '$lib/types.js';
 	import { onMount } from 'svelte';
+	import { preferences } from '$lib/stores/preferencesStore.js';
 
 	interface Props {
 		isOpen: boolean;
@@ -29,6 +30,7 @@
 	let isSending = $state(false);
 	let fileInputRef = $state<HTMLInputElement | null>(null);
 	let draftAttachments = $state<Attachment[]>([]);
+	let sendWithModEnter = $state(true);
 
 	let draft = $state({
 		to: [] as EmailAddress[],
@@ -41,6 +43,13 @@
 
 	onMount(async () => {
 		await loadAccounts();
+	});
+
+	$effect(() => {
+		const unsub = preferences.subscribe((value) => {
+			sendWithModEnter = value.keyboard.sendWithModEnter;
+		});
+		return unsub;
 	});
 
 	$effect(() => {
@@ -318,6 +327,10 @@
 			}}
 			onkeydown={(event) => {
 				if (event.key === 'Escape') closeModal();
+				if (sendWithModEnter && (event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+					event.preventDefault();
+					void sendMail();
+				}
 			}}
 			role="dialog"
 			aria-modal="true"
@@ -404,6 +417,7 @@
 				<ComposeActions
 					lastSaved={lastSaved}
 					{isSending}
+					{sendWithModEnter}
 					onSend={sendMail}
 					onDiscard={discardDraft}
 				/>

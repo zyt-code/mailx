@@ -7,6 +7,8 @@
 	import { inboxUnread } from '$lib/stores/unreadStore.js';
 	import { selectedAccountId as storeSelectedAccountId } from '$lib/stores/mailStore.js';
 	import { syncAllAccounts, syncAccount } from '$lib/sync/index.js';
+	import { eventBus } from '$lib/events/index.js';
+	import { preferences } from '$lib/stores/preferencesStore.js';
 	import {
 		Inbox,
 		Send,
@@ -62,6 +64,7 @@
 	let allAccounts = $state<Account[]>([]);
 	let selectedAccountId = $state<string | null>(null); // null = All Inboxes
 	let accountsCollapsed = $state(false);
+	let showShortcutHints = $state(true);
 
 	function toggleAccountsCollapse() {
 		accountsCollapsed = !accountsCollapsed;
@@ -90,6 +93,9 @@
 		const unsubSelectedAccount = storeSelectedAccountId.subscribe((value) => {
 			selectedAccountId = value;
 		});
+		const unsubPreferences = preferences.subscribe((value) => {
+			showShortcutHints = value.keyboard.showShortcutHints;
+		});
 
 		return () => {
 			unsubActive();
@@ -99,6 +105,7 @@
 			unsubUnread();
 			unsubAccounts();
 			unsubSelectedAccount();
+			unsubPreferences();
 		};
 	});
 
@@ -220,6 +227,17 @@
 			showDisabledTooltip = false;
 		}, 2000);
 	}
+
+	$effect(() => {
+		const handleComposeOpen = () => {
+			openCompose();
+		};
+
+		eventBus.on('compose:open', handleComposeOpen);
+		return () => {
+			eventBus.off('compose:open', handleComposeOpen);
+		};
+	});
 </script>
 
 {#if isMobile && !collapsed}
@@ -257,10 +275,13 @@
 			<button
 				onclick={handleRefresh}
 				disabled={!isAccountConfigured}
-				class="flex size-7 items-center justify-center rounded-md text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+				class="flex size-auto min-w-7 items-center justify-center gap-1 rounded-md px-2 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
 				aria-label="Refresh"
 			>
 				<RefreshCw class={cn('size-[15px]', isRefreshing && 'animate-spin')} strokeWidth={1.8} />
+				{#if showShortcutHints && isAccountConfigured}
+					<span class="ml-0.5 rounded-[6px] border border-[var(--border-primary)] bg-[var(--bg-primary)] px-1.5 py-0.5 text-[10px] font-semibold leading-none text-[var(--text-tertiary)] shadow-sm">R</span>
+				{/if}
 			</button>
 		{/if}
 	</div>
@@ -282,6 +303,9 @@
 				{#if isAccountConfigured}
 					<SquarePen class="size-[15px]" strokeWidth={1.8} />
 					<span>New Message</span>
+					{#if showShortcutHints}
+						<span class="ml-auto rounded-[6px] border border-white/18 bg-white/12 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white/92">C</span>
+					{/if}
 				{:else}
 					<Lock class="size-[15px]" strokeWidth={1.8} />
 					<span>Add Account</span>
@@ -452,6 +476,9 @@
 			>
 				<Settings class="size-[17px] transition-transform duration-300 group-hover:rotate-45" strokeWidth={1.8} />
 				<span class="text-sm">Settings</span>
+				{#if showShortcutHints}
+					<span class="ml-auto rounded-[6px] border border-[var(--border-primary)] bg-[var(--bg-primary)] px-1.5 py-0.5 text-[10px] font-semibold leading-none text-[var(--text-tertiary)] shadow-sm">Cmd/Ctrl+,</span>
+				{/if}
 			</button>
 		</div>
 	{:else}

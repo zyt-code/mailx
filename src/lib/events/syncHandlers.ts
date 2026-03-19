@@ -4,6 +4,7 @@ import { activeAccount } from '$lib/stores/accountStore.js';
 import { get } from 'svelte/store';
 import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { preferences, isQuietHoursActive } from '$lib/stores/preferencesStore.js';
 
 let _initialized = false;
 
@@ -38,7 +39,12 @@ export function initSyncHandlers(): void {
 
   // Show toast on sync failure
   eventBus.onTauri<{ account_id: string; error: string }>('sync:failed', ({ error }) => {
-    if (typeof window !== 'undefined' && (window as any).notification) {
+    const notificationPreferences = get(preferences).notifications;
+    if (
+      notificationPreferences.syncFailureToasts &&
+      typeof window !== 'undefined' &&
+      (window as any).notification
+    ) {
       // Categorize common errors for user-friendly messages
       let title = 'Sync Failed';
       let message = error;
@@ -68,7 +74,13 @@ export function initSyncHandlers(): void {
 
   // Show toast on sync success
   eventBus.onTauri<{ account_email: string; new_count?: number }>('sync:completed', async ({ account_email, new_count }) => {
-    if (typeof window !== 'undefined' && (window as any).notification) {
+    const notificationPreferences = get(preferences).notifications;
+
+    if (
+      notificationPreferences.syncSuccessToasts &&
+      typeof window !== 'undefined' &&
+      (window as any).notification
+    ) {
       (window as any).notification.show({
         type: 'success',
         title: 'Sync Complete',
@@ -78,7 +90,12 @@ export function initSyncHandlers(): void {
     }
 
     // Send system notification for new mail if window is not focused
-    if (new_count && new_count > 0) {
+    if (
+      notificationPreferences.desktopNotifications &&
+      !isQuietHoursActive(notificationPreferences) &&
+      new_count &&
+      new_count > 0
+    ) {
       try {
         const window = getCurrentWindow();
         const focused = await window.isFocused();

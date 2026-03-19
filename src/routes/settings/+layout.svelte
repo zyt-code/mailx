@@ -11,11 +11,11 @@
 	let { children }: Props = $props();
 
 	const menuItems = [
-		{ id: 'accounts', label: 'Accounts', icon: User, href: '/settings', color: 'from-violet-500 to-purple-600' },
-		{ id: 'appearance', label: 'Appearance', icon: Palette, href: '/settings/appearance', color: 'from-amber-500 to-orange-600' },
-		{ id: 'notifications', label: 'Notifications', icon: Bell, href: '/settings/notifications', color: 'from-rose-500 to-pink-600' },
-		{ id: 'privacy', label: 'Privacy', icon: Shield, href: '/settings/privacy', color: 'from-emerald-500 to-teal-600' },
-		{ id: 'keyboard', label: 'Keyboard', icon: Keyboard, href: '/settings/keyboard', color: 'from-blue-500 to-indigo-600' }
+		{ id: 'accounts', label: 'Accounts', icon: User, href: '/settings', note: 'Identity, servers, sync' },
+		{ id: 'appearance', label: 'Appearance', icon: Palette, href: '/settings/appearance', note: 'Theme, density, accents' },
+		{ id: 'notifications', label: 'Notifications', icon: Bell, href: '/settings/notifications', note: 'Alerts, toasts, quiet hours' },
+		{ id: 'privacy', label: 'Privacy', icon: Shield, href: '/settings/privacy', note: 'Security controls' },
+		{ id: 'keyboard', label: 'Keyboard', icon: Keyboard, href: '/settings/keyboard', note: 'Shortcuts, hints, send keys' }
 	];
 
 	let activeSection = $derived($page.url.pathname.split('/').pop() || 'accounts');
@@ -25,248 +25,285 @@
 	}
 </script>
 
-<div class="settings-container">
-	<!-- Settings Sidebar -->
+<div class="settings-shell">
 	<aside class="settings-sidebar">
-		<!-- Back button -->
-		<button
-			onclick={goBack}
-			class="back-button"
-		>
-			<ArrowLeft class="size-[15px]" strokeWidth={1.5} />
-			<span>Back</span>
+		<button onclick={goBack} class="back-button">
+			<ArrowLeft class="size-[15px]" strokeWidth={1.6} />
+			<span>Back to inbox</span>
 		</button>
 
-		<!-- Title -->
-		<h1 class="settings-title">Settings</h1>
+		<div class="sidebar-header">
+			<p class="eyebrow">Workspace Preferences</p>
+			<h1 class="settings-title">Settings</h1>
+			<p class="settings-subtitle">
+				Tune Mailx for focus, noise level, and input speed.
+			</p>
+		</div>
 
-		<!-- Navigation -->
-		<nav class="settings-nav">
-			{#each menuItems as item, index}
+		<nav class="settings-nav" aria-label="Settings sections">
+			{#each menuItems as item}
 				<button
 					onclick={() => goto(item.href)}
 					class="nav-item"
 					class:active={activeSection === item.id}
-					style="--item-index: {index}"
 				>
-					<div class="icon-container bg-gradient-to-br {item.color}">
-						<item.icon class="size-4" strokeWidth={1.5} />
+					<div class="nav-icon">
+						<item.icon class="size-4" strokeWidth={1.55} />
 					</div>
-					<span class="nav-label">{item.label}</span>
-					{#if activeSection === item.id}
-						<div class="active-indicator"></div>
-					{/if}
+					<div class="nav-copy">
+						<span class="nav-label">{item.label}</span>
+						<span class="nav-note">{item.note}</span>
+					</div>
 				</button>
 			{/each}
 		</nav>
-
-		<!-- Bottom decoration -->
-		<div class="sidebar-decoration">
-			<div class="decoration-line"></div>
-		</div>
 	</aside>
 
-	<!-- Main Content -->
 	<main class="settings-main">
-		<div class="content-wrapper" style="animation: contentFadeIn 0.25s ease-out">
-			{@render children()}
+		<div class="main-grid">
+			<div class="settings-hero">
+				<div>
+					<p class="hero-kicker">Mailx Control Center</p>
+					<h2>Less friction, fewer interruptions.</h2>
+				</div>
+				<div class="hero-chip">
+					<span class="hero-dot"></span>
+					Persisted locally
+				</div>
+			</div>
+
+			<div class="content-wrapper">
+				{@render children()}
+			</div>
 		</div>
 	</main>
 </div>
 
 <style>
-	.settings-container {
-		display: flex;
-		height: 100vh;
+	.settings-shell {
+		display: grid;
+		grid-template-columns: 300px minmax(0, 1fr);
+		min-height: 100vh;
 		width: 100vw;
-		background: linear-gradient(135deg, #faf9f7 0%, #f5f3f0 100%);
-		font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
+		background:
+			radial-gradient(circle at top left, color-mix(in srgb, var(--accent-light) 72%, transparent) 0, transparent 38%),
+			linear-gradient(160deg, color-mix(in srgb, var(--bg-secondary) 82%, white) 0%, var(--bg-primary) 56%);
+		color: var(--text-primary);
 	}
 
-	/* Sidebar */
 	.settings-sidebar {
-		width: 280px;
-		background: rgba(255, 255, 255, 0.8);
-		backdrop-filter: blur(20px);
-		border-right: 1px solid rgba(0, 0, 0, 0.06);
-		padding: 2rem 1.5rem;
+		position: sticky;
+		top: 0;
 		display: flex;
 		flex-direction: column;
-		position: relative;
+		gap: 1.5rem;
+		height: 100vh;
+		padding: 2rem 1.25rem 1.4rem;
+		background: color-mix(in srgb, var(--bg-primary) 78%, transparent);
+		backdrop-filter: blur(20px);
+		border-right: 1px solid color-mix(in srgb, var(--border-primary) 78%, transparent);
 	}
 
 	.back-button {
-		display: flex;
+		display: inline-flex;
 		align-items: center;
 		gap: 0.5rem;
-		padding: 0.625rem 0.875rem;
-		font-size: 0.8125rem;
-		font-weight: 500;
-		color: #6b6b6b;
-		background: transparent;
-		border: none;
-		border-radius: 10px;
-		cursor: pointer;
-		transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-		margin-bottom: 1.5rem;
 		width: fit-content;
+		padding: 0.625rem 0.9rem;
+		border: 1px solid transparent;
+		border-radius: 999px;
+		background: transparent;
+		color: var(--text-secondary);
+		font-size: 0.82rem;
+		font-weight: 600;
+		cursor: pointer;
 	}
 
 	.back-button:hover {
-		color: #1d1d1f;
-		background: rgba(0, 0, 0, 0.04);
+		background: color-mix(in srgb, var(--bg-hover) 80%, transparent);
+		color: var(--text-primary);
+		border-color: color-mix(in srgb, var(--border-primary) 80%, transparent);
+	}
+
+	.sidebar-header {
+		display: grid;
+		gap: 0.55rem;
+	}
+
+	.eyebrow,
+	.hero-kicker {
+		margin: 0;
+		font-size: 0.72rem;
+		font-weight: 700;
+		letter-spacing: 0.16em;
+		text-transform: uppercase;
+		color: var(--accent-primary);
 	}
 
 	.settings-title {
-		font-size: 1.875rem;
-		font-weight: 680;
-		letter-spacing: -0.03em;
-		color: #1d1d1f;
-		margin-bottom: 2rem;
+		margin: 0;
+		font-size: clamp(2rem, 2.4vw, 2.55rem);
+		font-weight: 700;
+		letter-spacing: -0.05em;
+	}
+
+	.settings-subtitle {
+		margin: 0;
+		max-width: 22rem;
+		font-size: 0.95rem;
+		line-height: 1.6;
+		color: var(--text-secondary);
 	}
 
 	.settings-nav {
-		display: flex;
-		flex-direction: column;
-		gap: 0.25rem;
-		flex: 1;
+		display: grid;
+		gap: 0.55rem;
 	}
 
 	.nav-item {
-		position: relative;
 		display: flex;
 		align-items: center;
-		gap: 0.875rem;
-		padding: 0.875rem 1rem;
-		font-size: 0.875rem;
-		font-weight: 500;
-		color: #6b6b6b;
+		gap: 0.95rem;
+		padding: 0.92rem 1rem;
+		border: 1px solid transparent;
+		border-radius: 18px;
 		background: transparent;
-		border: none;
-		border-radius: 12px;
-		cursor: pointer;
-		transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+		color: var(--text-secondary);
 		text-align: left;
-		animation: slideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) backwards;
-		animation-delay: calc(var(--item-index) * 0.05s);
-	}
-
-	@keyframes slideIn {
-		from {
-			opacity: 0;
-			transform: translateX(-12px);
-		}
-		to {
-			opacity: 1;
-			transform: translateX(0);
-		}
+		cursor: pointer;
 	}
 
 	.nav-item:hover {
-		color: #1d1d1f;
-		background: rgba(0, 0, 0, 0.04);
+		background: color-mix(in srgb, var(--bg-hover) 80%, transparent);
+		border-color: color-mix(in srgb, var(--border-primary) 85%, transparent);
 		transform: translateX(2px);
 	}
 
 	.nav-item.active {
-		color: #1d1d1f;
-		background: rgba(0, 0, 0, 0.06);
-		font-weight: 560;
+		background: color-mix(in srgb, var(--accent-light) 86%, var(--bg-primary));
+		border-color: color-mix(in srgb, var(--accent-primary) 18%, var(--border-primary));
+		color: var(--text-primary);
+		box-shadow: var(--shadow-sm);
 	}
 
-	.icon-container {
+	.nav-icon {
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		width: 32px;
-		height: 32px;
-		border-radius: 9px;
-		color: white;
+		width: 2.35rem;
+		height: 2.35rem;
+		border-radius: 14px;
+		background: color-mix(in srgb, var(--accent-light) 90%, white);
+		color: var(--accent-primary);
 		flex-shrink: 0;
-		box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.15);
+	}
+
+	.nav-copy {
+		display: grid;
+		gap: 0.15rem;
 	}
 
 	.nav-label {
-		flex: 1;
-		letter-spacing: -0.01em;
+		font-size: 0.93rem;
+		font-weight: 650;
+		letter-spacing: -0.02em;
 	}
 
-	.active-indicator {
-		position: absolute;
-		left: 0.5rem;
-		width: 3px;
-		height: 20px;
-		background: #1d1d1f;
-		border-radius: 2px;
+	.nav-note {
+		font-size: 0.77rem;
+		color: var(--text-tertiary);
 	}
 
-	.sidebar-decoration {
-		padding-top: 2rem;
-	}
-
-	.decoration-line {
-		height: 1px;
-		background: linear-gradient(
-			to right,
-			rgba(0, 0, 0, 0.08),
-			transparent
-		);
-	}
-
-	/* Main Content */
 	.settings-main {
-		flex: 1;
+		min-width: 0;
 		overflow: auto;
-		position: relative;
 	}
 
-	.settings-main::before {
-		content: '';
-		position: absolute;
-		top: 0;
-		left: 0;
-		right: 0;
-		height: 1px;
-		background: linear-gradient(
-			to right,
-			transparent,
-			rgba(0, 0, 0, 0.04),
-			transparent
-		);
+	.main-grid {
+		max-width: 980px;
+		margin: 0 auto;
+		padding: 2rem clamp(1.1rem, 3vw, 3rem) 4rem;
+	}
+
+	.settings-hero {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 1rem;
+		margin-bottom: 1.4rem;
+		padding: 1rem 1.1rem;
+		border: 1px solid color-mix(in srgb, var(--border-primary) 88%, transparent);
+		border-radius: 22px;
+		background: color-mix(in srgb, var(--bg-primary) 80%, transparent);
+		backdrop-filter: blur(18px);
+		box-shadow: var(--shadow-xs);
+	}
+
+	.settings-hero h2 {
+		margin: 0.3rem 0 0;
+		font-size: clamp(1.25rem, 2vw, 1.75rem);
+		letter-spacing: -0.04em;
+	}
+
+	.hero-chip {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.55rem;
+		padding: 0.55rem 0.8rem;
+		border-radius: 999px;
+		background: color-mix(in srgb, var(--bg-secondary) 88%, transparent);
+		font-size: 0.8rem;
+		font-weight: 650;
+		color: var(--text-secondary);
+		white-space: nowrap;
+	}
+
+	.hero-dot {
+		width: 0.55rem;
+		height: 0.55rem;
+		border-radius: 999px;
+		background: var(--accent-primary);
+		box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent-light) 75%, transparent);
 	}
 
 	.content-wrapper {
-		max-width: 800px;
-		margin: 0 auto;
-		padding: 3rem 3rem 4rem;
+		min-width: 0;
 	}
 
-	/* Scrollbar */
-	.settings-main::-webkit-scrollbar {
-		width: 8px;
-	}
-
-	.settings-main::-webkit-scrollbar-track {
-		background: transparent;
-	}
-
-	.settings-main::-webkit-scrollbar-thumb {
-		background: rgba(0, 0, 0, 0.1);
-		border-radius: 4px;
-	}
-
-	.settings-main::-webkit-scrollbar-thumb:hover {
-		background: rgba(0, 0, 0, 0.15);
-	}
-
-	@keyframes contentFadeIn {
-		from {
-			opacity: 0;
-			transform: translateY(6px);
+	@media (max-width: 900px) {
+		.settings-shell {
+			grid-template-columns: minmax(0, 1fr);
 		}
-		to {
-			opacity: 1;
-			transform: translateY(0);
+
+		.settings-sidebar {
+			position: static;
+			height: auto;
+			padding-bottom: 1.1rem;
+			border-right: none;
+			border-bottom: 1px solid color-mix(in srgb, var(--border-primary) 78%, transparent);
+		}
+
+		.settings-nav {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+		}
+
+		.settings-hero {
+			flex-direction: column;
+			align-items: flex-start;
+		}
+	}
+
+	@media (max-width: 640px) {
+		.settings-sidebar {
+			padding: 1.2rem 1rem 1rem;
+		}
+
+		.settings-nav {
+			grid-template-columns: minmax(0, 1fr);
+		}
+
+		.main-grid {
+			padding: 1rem 1rem 2.5rem;
 		}
 	}
 </style>

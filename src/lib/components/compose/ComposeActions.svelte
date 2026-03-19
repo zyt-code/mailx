@@ -4,11 +4,12 @@
 	interface Props {
 		lastSaved: Date | null;
 		isSending: boolean;
+		sendWithModEnter: boolean;
 		onSend: () => void;
 		onDiscard: () => void;
 	}
 
-	let { lastSaved, isSending, onSend, onDiscard }: Props = $props();
+	let { lastSaved, isSending, sendWithModEnter, onSend, onDiscard }: Props = $props();
 
 	function formatLastSaved(date: Date): string {
 		const now = new Date();
@@ -57,6 +58,9 @@
 			{:else}
 				<Send class="size-3.5" strokeWidth={1.8} />
 				<span>Send</span>
+				{#if sendWithModEnter}
+					<span class="send-hint">Cmd/Ctrl+Enter</span>
+				{/if}
 			{/if}
 		</button>
 	</div>
@@ -129,5 +133,15 @@
 		opacity: 0.55;
 		cursor: not-allowed;
 		transform: none;
+	}
+
+	.send-hint {
+		padding: 0.2rem 0.45rem;
+		border-radius: 999px;
+		background: rgba(255, 255, 255, 0.18);
+		font-size: 10px;
+		font-weight: 700;
+		line-height: 1;
+		letter-spacing: 0.01em;
 	}
 </style>

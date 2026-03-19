@@ -28,6 +28,15 @@ class EventBus {
     this.listeners.get(event)!.add(callback);
   }
 
+  off(event: string, callback: EventCallback): void {
+    const callbacks = this.listeners.get(event);
+    if (!callbacks) return;
+    callbacks.delete(callback);
+    if (callbacks.size === 0) {
+      this.listeners.delete(event);
+    }
+  }
+
   /**
    * Emit an internal frontend event
    */
