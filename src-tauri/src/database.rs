@@ -88,7 +88,10 @@ impl Database {
         let attachments_root = app_data_dir.join("attachments");
         fs::create_dir_all(&attachments_root).expect("Failed to create attachments directory");
         let conn = Connection::open(db_path)?;
-        conn.execute_batch("PRAGMA journal_mode=WAL")?;
+        conn.execute_batch(
+            "PRAGMA journal_mode=WAL;
+             PRAGMA foreign_keys=ON;",
+        )?;
 
         let db = Database {
             conn: Mutex::new(conn),
