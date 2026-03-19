@@ -4,6 +4,7 @@ mod credentials;
 mod database;
 mod html_sanitize;
 mod imap_client;
+mod mail_provider;
 mod smtp_client;
 mod sync_manager;
 
@@ -12,7 +13,7 @@ use credentials::CredentialManager;
 use database::Database;
 use std::sync::Arc;
 use sync_manager::SyncManager;
-use tauri::{Manager, Emitter, menu::{Menu, MenuItem, PredefinedMenuItem, Submenu}};
+use tauri::{Manager, Emitter};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -169,6 +170,7 @@ pub fn run() {
             commands::update_mail,
             commands::delete_mail,
             commands::mark_mail_read,
+            commands::mark_mail_read_on_server,
             commands::move_to_trash,
             commands::archive_mail,
             commands::unarchive_mail,

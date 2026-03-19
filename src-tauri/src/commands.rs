@@ -1,4 +1,4 @@
-use crate::accounts::{Account, AccountManager, ImapConfig, SmtpConfig};
+use crate::accounts::{Account, AccountManager};
 use crate::credentials::CredentialManager;
 use crate::database::{Database, Mail};
 use crate::html_sanitize;
@@ -7,7 +7,7 @@ use crate::smtp_client::SmtpClient;
 use crate::sync_manager::{SyncManager, SyncStatus};
 use serde_json::json;
 use tauri::{AppHandle, Emitter, Manager, State};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 /// Sanitize html_body field on a Mail if present
 fn sanitize_mail_html(mut mail: Mail) -> Mail {
@@ -17,13 +17,14 @@ fn sanitize_mail_html(mut mail: Mail) -> Mail {
     mail
 }
 
-/// Get all mails, optionally filtered by folder
+/// Get all mails, optionally filtered by folder and account
 #[tauri::command]
 pub fn get_mails(
     folder: Option<String>,
+    account_id: Option<String>,
     db: State<'_, Database>,
 ) -> Result<Vec<Mail>, String> {
-    db.inner().get_mails(folder)
+    db.inner().get_mails(folder, account_id)
         .map(|mails| mails.into_iter().map(sanitize_mail_html).collect())
         .map_err(|e| format!("Failed to get mails: {}", e))
 }
@@ -80,6 +81,44 @@ pub fn mark_mail_read(
 ) -> Result<(), String> {
     db.inner().mark_mail_read(&id, read)
         .map_err(|e| format!("Failed to mark mail: {}", e))
+}
+
+/// Mark a mail as read on the IMAP server
+#[tauri::command]
+pub async fn mark_mail_read_on_server(
+    id: String,
+    account_id: String,
+    db: State<'_, Database>,
+    account_manager: State<'_, Arc<AccountManager>>,
+    credential_manager: State<'_, Arc<CredentialManager>>,
+) -> Result<(), String> {
+    // 1. Get the mail from database to retrieve UID and folder
+    let mail = db.inner().get_mail(&id)
+        .map_err(|e| format!("Failed to get mail: {}", e))?
+        .ok_or_else(|| format!("Mail with id '{}' not found", id))?;
+
+    // 2. Get the UID from the mail
+    let uid = mail.uid.ok_or_else(|| format!("Mail {} has no UID", id))?;
+
+    // 3. Get account credentials
+    let account = account_manager.get(&account_id)
+        .map_err(|e| format!("Failed to get account: {}", e))?;
+    let password = credential_manager.get_password(&account_id)
+        .map_err(|e| format!("Failed to get password: {}", e))?;
+    let imap_config = account_manager.get_imap_config(&account_id)
+        .map_err(|e| format!("Failed to get IMAP config: {}", e))?;
+
+    // 4. Create IMAP client and store the flag
+    let imap_client = ImapClient::new(imap_config, account.email, password);
+    imap_client.store_flags(&mail.folder, uid, "+FLAGS (\\Seen)")
+        .await
+        .map_err(|e| format!("Failed to store flags on server: {}", e))?;
+
+    // 5. Update local database
+    db.inner().mark_mail_read(&id, true)
+        .map_err(|e| format!("Failed to mark mail as read in database: {}", e))?;
+
+    Ok(())
 }
 
 /// Move a mail to trash (or permanent delete if already in trash)
