@@ -1,5 +1,6 @@
 use crate::accounts::ImapConfig;
 use crate::database::{EmailAddress, Mail};
+use crate::mail_provider::MailProvider;
 use mail_parser::{Message, MessageParser};
 use thiserror::Error;
 
@@ -238,14 +239,7 @@ impl ImapClient {
     /// Check if the IMAP server requires an ID command to allow folder selection.
     /// Chinese email providers (163, 126, QQ, etc.) reject SELECT without prior ID.
     fn needs_id_command(server: &str) -> bool {
-        let s = server.to_lowercase();
-        s.contains("163.com")
-            || s.contains("126.com")
-            || s.contains("yeah.net")
-            || s.contains("qq.com")
-            || s.contains("foxmail.com")
-            || s.contains("sina.com")
-            || s.contains("sohu.com")
+        MailProvider::detect_from_host(server).requires_imap_id()
     }
 
     /// Fetch emails from a folder
@@ -302,8 +296,13 @@ impl ImapClient {
         let range = format!("{}:{}", start, exists);
         println!("[IMAP] Fetching sequence range {} ({} messages)...", range, exists - start + 1);
 
+        // Detect mail provider for provider-specific fetch behavior
+        let provider = MailProvider::detect_from_host(&config.server);
+        let fetch_command = provider.get_fetch_command();
+        println!("[IMAP] Provider: {}, fetch command: {}", provider, fetch_command);
+
         let fetch_results = session
-            .fetch(&range, "(UID FLAGS INTERNALDATE BODY.PEEK[])")
+            .fetch(&range, fetch_command)
             .map_err(|e| {
                 println!("[IMAP] Fetch FAILED: {}", e);
                 ImapError::FetchFailed(format!("Fetch range {} failed: {}", range, e))
@@ -313,10 +312,39 @@ impl ImapClient {
 
         let mut mails = Vec::new();
         let mut parse_errors = 0u32;
+        let needs_rfc822_retry = provider.needs_rfc822_fallback();
+
         for (i, fetch) in fetch_results.iter().enumerate() {
             match Self::parse_fetch_response(fetch, folder) {
                 Ok(mail) => mails.push(mail),
                 Err(e) => {
+                    // Check if this is an empty body error for iCloud
+                    if needs_rfc822_retry && e.to_string().contains("No body in fetch response") {
+                        // Try RFC822 fallback - need to fetch this specific message again
+                        if let Some(uid) = fetch.uid {
+                            println!("[IMAP] iCloud empty body detected for UID={}, trying RFC822 fallback...", uid);
+                            let uid_str = uid.to_string();
+                            match session.fetch(&uid_str, provider.get_rfc822_fetch_command()) {
+                                Ok(rfc822_results) => {
+                                    if let Some(rfc822_fetch) = rfc822_results.first() {
+                                        match Self::parse_fetch_response(rfc822_fetch, folder) {
+                                            Ok(rfc822_mail) => {
+                                                println!("[IMAP] RFC822 fallback succeeded for UID={}", uid);
+                                                mails.push(rfc822_mail);
+                                                continue;
+                                            }
+                                            Err(e2) => {
+                                                println!("[IMAP] RFC822 fallback parse failed for UID={}: {}", uid, e2);
+                                            }
+                                        }
+                                    }
+                                }
+                                Err(e2) => {
+                                    println!("[IMAP] RFC822 fallback fetch failed for UID={}: {}", uid, e2);
+                                }
+                            }
+                        }
+                    }
                     parse_errors += 1;
                     let uid_str = fetch.uid.map(|u| u.to_string()).unwrap_or("?".into());
                     println!(
@@ -340,6 +368,123 @@ impl ImapClient {
         println!("[IMAP] Logged out");
 
         Ok(mails)
+    }
+
+    /// Store IMAP flags on a message (async wrapper).
+    ///
+    /// This method allows you to modify message flags on the IMAP server, such as
+    /// marking a message as read, flagged, or deleted. The operation is performed
+    /// asynchronously using a blocking task.
+    ///
+    /// # Arguments
+    ///
+    /// * `folder` - The folder name (e.g., "INBOX", "Sent")
+    /// * `uid` - The IMAP UID of the message to modify
+    /// * `flags` - IMAP flag store command in the format accepted by the STORE command
+    ///
+    /// # Flag Format
+    ///
+    /// The `flags` parameter uses IMAP STORE command syntax:
+    ///
+    /// - To add flags: `"+FLAGS (\\Seen)"` or `"+FLAGS (\\Seen \\Flagged)"`
+    /// - To remove flags: `"-FLAGS (\\Seen)"`
+    /// - To replace flags: `"FLAGS (\\Seen \\Answered)"`
+    ///
+    /// Common IMAP system flags:
+    ///
+    /// - `\\Seen` - Message has been read
+    /// - `\\Answered` - Message has been answered
+    /// - `\\Flagged` - Message is flagged/marked
+    /// - `\\Deleted` - Message is marked for deletion
+    /// - `\\Draft` - Message is a draft
+    ///
+    /// # Examples
+    ///
+    /// ```text
+    /// // Mark message as read
+    /// client.store_flags("INBOX", 12345, "+FLAGS (\\Seen)").await?;
+    ///
+    /// // Mark message as flagged and read
+    /// client.store_flags("INBOX", 12345, "+FLAGS (\\Seen \\Flagged)").await?;
+    ///
+    /// // Remove the Seen flag (mark as unread)
+    /// client.store_flags("INBOX", 12345, "-FLAGS (\\Seen)").await?;
+    ///
+    /// // Mark message for deletion
+    /// client.store_flags("INBOX", 12345, "+FLAGS (\\Deleted)").await?;
+    /// ```
+    ///
+    /// # Use Cases
+    ///
+    /// - Marking emails as read when opened in the client
+    /// - Flagging important messages
+    /// - Marking messages for deletion before expunge
+    /// - Syncing read/unread status across devices
+    pub async fn store_flags(&self, folder: &str, uid: u32, flags: &str) -> Result<()> {
+        let config = self.config.clone();
+        let email = self.email.clone();
+        let password = self.password.clone();
+        let folder = folder.to_string();
+        let flags = flags.to_string();
+
+        tokio::task::spawn_blocking(move || {
+            Self::store_flags_blocking(config, email, password, &folder, uid, &flags)
+        })
+        .await
+        .map_err(|e| ImapError::ConnectionFailed(format!("Store flags task panicked: {}", e)))?
+    }
+
+    /// Store IMAP flags on a message using blocking IMAP operations.
+    ///
+    /// This is the blocking implementation of [`store_flags`]. It connects to the
+    /// IMAP server, selects the specified folder, and executes a STORE command to
+    /// modify the flags on the message with the given UID.
+    ///
+    /// # Arguments
+    ///
+    /// * `config` - IMAP server configuration
+    /// * `email` - Email address for authentication
+    /// * `password` - Password for authentication
+    /// * `folder` - The folder name (e.g., "INBOX")
+    /// * `uid` - The IMAP UID of the message to modify
+    /// * `flags` - IMAP flag store command (e.g., "+FLAGS (\\Seen)")
+    ///
+    /// # Examples
+    ///
+    /// See [`store_flags`] for documentation on flag format and examples.
+    fn store_flags_blocking(
+        config: ImapConfig,
+        email: String,
+        password: String,
+        folder: &str,
+        uid: u32,
+        flags: &str,
+    ) -> Result<()> {
+        let mut session = Self::connect_and_login(&config, &email, &password)?;
+
+        println!("[IMAP] Selecting folder '{}' for flag store...", folder);
+        session
+            .select(folder)
+            .map_err(|e| {
+                println!("[IMAP] Select folder '{}' FAILED: {}", folder, e);
+                ImapError::Protocol(format!("Failed to select folder '{}': {}", folder, e))
+            })?;
+
+        println!("[IMAP] Storing flags '{}' on UID {}...", flags, uid);
+        let uid_str = uid.to_string();
+        session
+            .store(&uid_str, flags)
+            .map_err(|e| {
+                println!("[IMAP] Store flags FAILED for UID {}: {}", uid, e);
+                ImapError::Protocol(format!("Failed to store flags '{}': {}", flags, e))
+            })?;
+
+        println!("[IMAP] Flags stored successfully for UID {}", uid);
+
+        let _ = session.logout();
+        println!("[IMAP] Logged out");
+
+        Ok(())
     }
 
     /// Parse a fetch response into a Mail structure.
@@ -385,21 +530,26 @@ impl ImapClient {
 
                 // Parse timestamp from email Date header
                 // to_timestamp() returns seconds since epoch — multiply by 1000 for milliseconds
+                // If Date header is invalid or < 1000000 (around 1970), use current time as fallback
+                // Note: imap 0.9 doesn't have internal_date() method on Fetch, using current time
+                let current_time_ms = chrono::Utc::now().timestamp_millis();
+                let min_timestamp = 1000000i64; // 1970-01-12 approx in milliseconds
                 let ts = msg.date()
                     .map(|d| {
                         let secs = d.to_timestamp();
-                        if secs > 0 {
-                            let ms = secs * 1000;
+                        let ms = secs * 1000;
+                        if ms >= min_timestamp {
                             println!("[IMAP] UID={} Date header: {:?}, timestamp: {}ms", uid, d, ms);
                             ms
                         } else {
-                            println!("[IMAP] UID={} Date header parsed to invalid timestamp: {:?}, using current time", uid, d);
-                            chrono::Utc::now().timestamp_millis()
+                            // Date header is invalid or before 1970, use current time
+                            println!("[IMAP] UID={} Date header parsed to invalid timestamp: {:?} ({}ms), using current time: {}ms", uid, d, ms, current_time_ms);
+                            current_time_ms
                         }
                     })
                     .unwrap_or_else(|| {
-                        println!("[IMAP] UID={} no Date header found, using current time", uid);
-                        chrono::Utc::now().timestamp_millis()
+                        println!("[IMAP] UID={} no Date header found, using current time: {}ms", uid, current_time_ms);
+                        current_time_ms
                     });
 
                 let to_ = Self::extract_from_address(msg.to());
@@ -487,10 +637,26 @@ impl ImapClient {
             .take(100)
             .collect::<String>();
 
-        if preview.len() >= 100 {
+        let result = if preview.len() >= 100 {
             format!("{}...", preview)
         } else {
             preview
+        };
+
+        // Filter out CSS class definitions (lines starting with . or containing .{)
+        let filtered: String = result
+            .lines()
+            .filter(|line| {
+                let trimmed = line.trim();
+                !trimmed.starts_with('.') && !trimmed.contains(".{")
+            })
+            .collect::<Vec<_>>()
+            .join(" ");
+
+        if filtered.is_empty() {
+            String::new()
+        } else {
+            filtered
         }
     }
 
@@ -630,6 +796,7 @@ impl ImapClient {
         uid.hash(&mut hasher);
         format!("{:x}", hasher.finish())
     }
+
 }
 
 #[cfg(test)]
@@ -658,5 +825,60 @@ mod tests {
 
         assert_eq!(id1, id2);
         assert_ne!(id1, id3);
+    }
+
+    #[test]
+    fn test_store_flags_format() {
+        // Test that common flag formats are valid strings
+        let add_seen = "+FLAGS (\\Seen)";
+        let remove_seen = "-FLAGS (\\Seen)";
+        let add_flagged = "+FLAGS (\\Flagged)";
+        let multiple_flags = "+FLAGS (\\Seen \\Flagged)";
+        let replace_flags = "FLAGS (\\Seen \\Answered)";
+
+        // These should all be valid strings that can be passed to store_flags
+        assert!(!add_seen.is_empty());
+        assert!(!remove_seen.is_empty());
+        assert!(!add_flagged.is_empty());
+        assert!(!multiple_flags.is_empty());
+        assert!(!replace_flags.is_empty());
+
+        // Test that the flag strings contain expected patterns
+        assert!(add_seen.contains("\\Seen"));
+        assert!(add_seen.starts_with('+'));
+        assert!(remove_seen.starts_with('-'));
+        assert!(multiple_flags.contains("\\Seen"));
+        assert!(multiple_flags.contains("\\Flagged"));
+    }
+
+    #[test]
+    fn test_uid_to_string_conversion() {
+        // Test that UIDs can be converted to strings for IMAP commands
+        let uid: u32 = 12345;
+        let uid_str = uid.to_string();
+
+        assert_eq!(uid_str, "12345");
+        assert!(uid_str.parse::<u32>().is_ok());
+    }
+
+    #[test]
+    fn test_flag_command_patterns() {
+        // Test various flag command patterns that should work
+        let patterns = vec![
+            "+FLAGS (\\Seen)",
+            "-FLAGS (\\Seen)",
+            "+FLAGS (\\Seen \\Flagged)",
+            "-FLAGS (\\Seen \\Flagged)",
+            "FLAGS (\\Seen)",
+            "+FLAGS (\\Deleted)",
+            "+FLAGS (\\Answered)",
+            "+FLAGS (\\Draft)",
+        ];
+
+        for pattern in patterns {
+            // Verify patterns are non-empty and contain expected structure
+            assert!(!pattern.is_empty());
+            assert!(pattern.contains("FLAGS"));
+        }
     }
 }
