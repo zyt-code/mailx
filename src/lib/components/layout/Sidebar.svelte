@@ -19,7 +19,9 @@
 		RefreshCw,
 		Settings,
 		Lock,
-		Layers
+		Layers,
+		ChevronDown,
+		ChevronRight
 	} from 'lucide-svelte';
 	import { ComposeModal } from '$lib/components/compose/index.js';
 
@@ -57,6 +59,11 @@
 	let unreadCount = $state(0);
 	let allAccounts = $state<Account[]>([]);
 	let selectedAccountId = $state<string | null>(null); // null = All Inboxes
+	let accountsCollapsed = $state(false);
+
+	function toggleAccountsCollapse() {
+		accountsCollapsed = !accountsCollapsed;
+	}
 
 	// Subscribe to store changes
 	$effect(() => {
@@ -91,6 +98,25 @@
 			unsubAccounts();
 			unsubSelectedAccount();
 		};
+	});
+
+	// Persist collapse state to localStorage with safe initialization
+	$effect(() => {
+		// Load initial value from localStorage
+		const saved = localStorage.getItem('sidebar-accounts-collapsed');
+		if (saved !== null) {
+			accountsCollapsed = saved === 'true';
+		}
+	});
+
+	// Save collapse state to localStorage when it changes
+	$effect(() => {
+		try {
+			localStorage.setItem('sidebar-accounts-collapsed', String(accountsCollapsed));
+		} catch (e) {
+			// Silently fail if localStorage is not available (e.g., in incognito mode)
+			console.warn('Failed to save sidebar collapse state:', e);
+		}
 	});
 
 	// Format last sync time as HH:MM (must be declared after lastSync)
@@ -264,17 +290,33 @@
 		{#if hasMultipleAccounts && allAccounts.length > 0}
 			<!-- "All Inboxes" option -->
 			<button
-				onclick={() => handleAccountClick(null)}
+				onclick={() => {
+					if (selectedAccountId !== null) {
+						handleAccountClick(null);
+					}
+					toggleAccountsCollapse();
+				}}
 				class={cn(
-					"flex items-center gap-2 px-3 py-2 rounded-md mx-2 mt-1 relative z-10 transition-colors",
+					"flex items-center gap-2 px-3 py-2 rounded-md mx-2 mt-1 relative z-10 transition-[background-color] duration-150",
 					selectedAccountId === null
 						? "bg-zinc-100 text-zinc-900"
 						: "hover:bg-zinc-50 text-zinc-600"
 				)}
 				title="All Inboxes"
+				aria-expanded={!accountsCollapsed}
+				aria-controls="account-list"
 			>
-				<div class="flex size-7 items-center justify-center rounded-md bg-zinc-200 text-zinc-600">
-					<Layers class="size-[15px]" strokeWidth={1.5} />
+				<div class="relative">
+					<div class="flex size-7 items-center justify-center rounded-md bg-zinc-200 text-zinc-600">
+						<Layers class="size-[15px]" strokeWidth={1.5} />
+					</div>
+					<div class="absolute -top-1 -right-1 size-3 bg-zinc-300 rounded-full flex items-center justify-center">
+						{#if accountsCollapsed}
+							<ChevronRight class="size-[10px] text-zinc-600" strokeWidth={2.5} />
+						{:else}
+							<ChevronDown class="size-[10px] text-zinc-600" strokeWidth={2.5} />
+						{/if}
+					</div>
 				</div>
 				<div class="flex-1 min-w-0 text-left">
 					<p class="text-sm font-medium truncate">All Inboxes</p>
@@ -286,33 +328,43 @@
 				</div>
 			</button>
 
-			<!-- Individual accounts -->
-			{#each allAccounts as account}
-				<button
-					onclick={() => handleAccountClick(account.id)}
-					class={cn(
-						"flex items-center gap-2 px-3 py-2 rounded-md mx-1 relative z-10 transition-colors",
-						selectedAccountId === account.id
-							? "bg-zinc-100 text-zinc-900"
-							: "hover:bg-zinc-50 text-zinc-600"
-					)}
-					title={account.email}
-				>
-					<div class={cn(
-						"flex size-7 items-center justify-center rounded-full text-xs font-medium shrink-0",
-						getAccountColor(account.email)
-					)}>
-						{getInitials(account.name)}
-					</div>
-					<div class="flex-1 min-w-0 text-left">
-						<p class="text-sm font-medium truncate">{account.name}</p>
-						<p class="text-xs text-zinc-500 truncate">{account.email}</p>
-					</div>
-					{#if isRefreshing && selectedAccountId === account.id}
-						<RefreshCw class="size-3 text-zinc-400 animate-spin" strokeWidth={1.5} />
-					{/if}
-				</button>
-			{/each}
+			<!-- Individual accounts (collapsible) -->
+			<div
+				id="account-list"
+				role="region"
+				class={cn(
+					"overflow-hidden transition-[max-height] duration-200 ease-in-out",
+					accountsCollapsed ? "max-h-0" : "max-h-[800px]"
+				)}
+				aria-hidden={accountsCollapsed}
+			>
+				{#each allAccounts as account}
+					<button
+						onclick={() => handleAccountClick(account.id)}
+						class={cn(
+							"flex items-center gap-2 px-3 py-2 rounded-md mx-1 relative z-10 transition-colors",
+							selectedAccountId === account.id
+								? "bg-zinc-100 text-zinc-900"
+								: "hover:bg-zinc-50 text-zinc-600"
+						)}
+						title={account.email}
+					>
+						<div class={cn(
+							"flex size-7 items-center justify-center rounded-full text-xs font-medium shrink-0",
+							getAccountColor(account.email)
+						)}>
+							{getInitials(account.name)}
+						</div>
+						<div class="flex-1 min-w-0 text-left">
+							<p class="text-sm font-medium truncate">{account.name}</p>
+							<p class="text-xs text-zinc-500 truncate">{account.email}</p>
+						</div>
+						{#if isRefreshing && selectedAccountId === account.id}
+							<RefreshCw class="size-3 text-zinc-400 animate-spin" strokeWidth={1.5} />
+						{/if}
+					</button>
+				{/each}
+			</div>
 		{:else}
 			<!-- Single account display (original layout) -->
 			<div
