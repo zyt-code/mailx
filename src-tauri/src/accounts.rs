@@ -1,6 +1,5 @@
 use rusqlite::{Connection, Result as SqliteResult, params};
 use std::sync::Mutex;
-use tauri::AppHandle;
 use thiserror::Error;
 
 /// Account configuration for email providers

@@ -1,10 +1,9 @@
-use crate::accounts::{Account, AccountManager, ImapConfig};
+use crate::accounts::{Account, AccountManager};
 use crate::credentials::CredentialManager;
 use crate::database::Database;
 use crate::imap_client::ImapClient;
 use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::Duration;
 use tauri::{AppHandle, Emitter};
 use thiserror::Error;
 
