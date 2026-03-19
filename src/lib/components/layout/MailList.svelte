@@ -6,6 +6,7 @@
 	import { accounts } from '$lib/stores/accountStore.js';
 	import { displayedEmails, activeFolder as storeActiveFolder, markMailReadLocally } from '$lib/stores/mailStore.js';
 	import { markMailAsRead } from '$lib/db/index.js';
+	import { preferences } from '$lib/stores/preferencesStore.js';
 
 	interface Props {
 		selectedMailId: string | null;
@@ -33,10 +34,22 @@
 
 	// Use displayedEmails from mailStore (already filtered by folder and account)
 	let displayedMails = $state<Mail[]>([]);
+	let mailDensity = $state<'compact' | 'comfortable' | 'airy'>('comfortable');
+	let showPreviewSnippets = $state(true);
+	let showAccountColor = $state(true);
 
 	$effect(() => {
 		const unsub = displayedEmails.subscribe((mails) => {
 			displayedMails = mails;
+		});
+		return unsub;
+	});
+
+	$effect(() => {
+		const unsub = preferences.subscribe((value) => {
+			mailDensity = value.appearance.mailDensity;
+			showPreviewSnippets = value.appearance.showPreviewSnippets;
+			showAccountColor = value.appearance.showAccountColor;
 		});
 		return unsub;
 	});
@@ -203,6 +216,9 @@
 							<button
 								class={cn(
 									'relative flex w-full items-center text-left select-none [-webkit-user-select:none] [user-select:none] cursor-default mx-1 my-0.5 rounded-md transition-all duration-120 mail-item-button',
+									mailDensity === 'compact' && 'min-h-[68px] px-3 py-2',
+									mailDensity === 'comfortable' && 'min-h-[82px] px-3.5 py-3',
+									mailDensity === 'airy' && 'min-h-[96px] px-4 py-3.5',
 									isSelected
 										? 'bg-[var(--bg-selected)]'
 										: 'hover:bg-[var(--bg-hover)]'
@@ -215,7 +231,7 @@
 								{/if}
 
 									<!-- Account indicator dot (when multiple accounts) -->
-									{#if hasMultipleAccounts && mail.account_id}
+									{#if showAccountColor && hasMultipleAccounts && mail.account_id}
 										<div class="flex-shrink-0 mr-2">
 											<div
 												class={cn(
@@ -266,15 +282,18 @@
 											</span>
 										</div>
 
-										<!-- Bottom: Preview snippet - always 2 lines height -->
-										<div class="overflow-hidden">
-											<p class={cn(
-												'line-clamp-2 text-[12px] leading-snug',
-												isSelected ? 'text-[var(--text-secondary)]' : 'text-[var(--text-tertiary)]'
-											)}>
-												{mail.preview || ' '}
-											</p>
-										</div>
+										{#if showPreviewSnippets}
+											<!-- Bottom: Preview snippet -->
+											<div class="overflow-hidden">
+												<p class={cn(
+													mailDensity === 'compact' ? 'line-clamp-1' : 'line-clamp-2',
+													'text-[12px] leading-snug',
+													isSelected ? 'text-[var(--text-secondary)]' : 'text-[var(--text-tertiary)]'
+												)}>
+													{mail.preview || ' '}
+												</p>
+											</div>
+										{/if}
 									</div>
 
 									<!-- Attachment indicator -->

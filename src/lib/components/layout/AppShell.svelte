@@ -10,14 +10,16 @@
 	import * as db from '$lib/db/index.js';
 	import { hasAccounts, activeAccount } from '$lib/stores/accountStore.js';
 	import { initSyncStore, isSyncing } from '$lib/stores/syncStore.js';
-	import { initMailStore, switchFolder, setSelectedAccount, markMailReadLocally, markMailUnreadLocally } from '$lib/stores/mailStore.js';
-	import { initSyncHandlers } from '$lib/events/index.js';
+	import { initMailStore, switchFolder, setSelectedAccount, markMailReadLocally, markMailUnreadLocally, displayedEmails } from '$lib/stores/mailStore.js';
+	import { initSyncHandlers, eventBus } from '$lib/events/index.js';
 	import { initUnreadStore } from '$lib/stores/unreadStore.js';
 	import { syncAccount, syncAllAccounts } from '$lib/sync/index.js';
 	import { listen } from '@tauri-apps/api/event';
 	import { goto } from '$app/navigation';
 	import { browser } from '$app/environment';
 	import { get } from 'svelte/store';
+	import { onMount } from 'svelte';
+	import { preferences } from '$lib/stores/preferencesStore.js';
 
 	const STORAGE_KEY = 'mailx-layout';
 	const MIN_MAIL_WIDTH = 280;
@@ -232,6 +234,34 @@ const DEFAULTS = { sidebarCollapsed: false, mailListWidth: DEFAULT_MAIL_LIST_WID
 		mobileView = 'list';
 	}
 
+	function isTypingTarget(target: EventTarget | null): boolean {
+		const element = target as HTMLElement | null;
+		if (!element) return false;
+		const tagName = element.tagName;
+		return (
+			element.isContentEditable ||
+			tagName === 'INPUT' ||
+			tagName === 'TEXTAREA' ||
+			tagName === 'SELECT' ||
+			Boolean(element.closest('[contenteditable="true"]'))
+		);
+	}
+
+	function stepMailSelection(delta: number) {
+		const visibleMails = get(displayedEmails);
+		if (visibleMails.length === 0) return;
+
+		const currentIndex = visibleMails.findIndex((mail) => mail.id === selectedMailId);
+		const nextIndex =
+			currentIndex === -1
+				? delta > 0
+					? 0
+					: visibleMails.length - 1
+				: Math.max(0, Math.min(visibleMails.length - 1, currentIndex + delta));
+
+		void selectMail(visibleMails[nextIndex].id);
+	}
+
 	function openSettings() {
 		// If no accounts configured, go directly to add account page
 		if (!isAccountConfigured) {
@@ -299,6 +329,44 @@ const DEFAULTS = { sidebarCollapsed: false, mailListWidth: DEFAULT_MAIL_LIST_WID
 		// Trigger reload for the new account
 		loadMails();
 	}
+
+	onMount(() => {
+		const handleSingleKeyShortcuts = (event: KeyboardEvent) => {
+			const keyboardPreferences = get(preferences).keyboard;
+
+			if (!keyboardPreferences.singleKeyShortcuts) return;
+			if (event.defaultPrevented) return;
+			if (event.metaKey || event.ctrlKey || event.altKey) return;
+			if (isTypingTarget(event.target)) return;
+			if (document.querySelector('[aria-modal="true"]')) return;
+
+			switch (event.key.toLowerCase()) {
+				case 'j':
+					event.preventDefault();
+					stepMailSelection(1);
+					break;
+				case 'k':
+					event.preventDefault();
+					stepMailSelection(-1);
+					break;
+				case 'c':
+					event.preventDefault();
+					eventBus.emit('compose:open');
+					break;
+				case 'r':
+					event.preventDefault();
+					void syncAllAccounts().catch((error) => {
+						console.error('[AppShell] Shortcut sync failed:', error);
+					});
+					break;
+			}
+		};
+
+		window.addEventListener('keydown', handleSingleKeyShortcuts);
+		return () => {
+			window.removeEventListener('keydown', handleSingleKeyShortcuts);
+		};
+	});
 </script>
 
 <div class="flex flex-col h-screen w-screen overflow-hidden bg-[var(--bg-primary)]">
