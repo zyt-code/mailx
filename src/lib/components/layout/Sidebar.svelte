@@ -342,7 +342,7 @@
 					<button
 						onclick={() => handleAccountClick(account.id)}
 						class={cn(
-							"flex items-center gap-2 px-3 py-2 rounded-md mx-1 relative z-10 transition-colors",
+							"flex items-center gap-2 px-3 py-2 rounded-md mx-1 relative z-10 transition-[background-color] duration-150",
 							selectedAccountId === account.id
 								? "bg-zinc-100 text-zinc-900"
 								: "hover:bg-zinc-50 text-zinc-600"
