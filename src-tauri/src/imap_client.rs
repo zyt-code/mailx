@@ -589,6 +589,7 @@ impl ImapClient {
 
         Ok(Mail {
             id,
+            uid: Some(uid),
             from_name,
             from_email,
             subject,

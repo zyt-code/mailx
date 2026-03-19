@@ -4,6 +4,7 @@ use std::sync::Mutex;
 use std::collections::HashSet;
 use tauri::AppHandle;
 use tauri::Manager;
+use regex::Regex;
 
 /// Email address structure for recipients
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -28,6 +29,8 @@ pub struct Attachment {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Mail {
     pub id: String,
+    #[serde(default)]
+    pub uid: Option<u32>,
     pub from_name: String,
     pub from_email: String,
     pub subject: String,
@@ -236,69 +239,58 @@ impl Database {
     }
 
 
-    /// Get all mails, optionally filtered by folder
-    pub fn get_mails(&self, folder: Option<String>) -> SqliteResult<Vec<Mail>> {
+    /// Get all mails, optionally filtered by folder and account
+    pub fn get_mails(&self, folder: Option<String>, account_id: Option<String>) -> SqliteResult<Vec<Mail>> {
         let conn = self.conn.lock().unwrap();
 
-        let mut query = "SELECT id, from_name, from_email, subject, preview, body, timestamp, folder, unread, account_id, to_json, cc_json, bcc_json, html_body, reply_to_json, starred, has_attachments FROM mails".to_string();
-        let mut mails: Vec<Mail> = Vec::new();
+        let mut query = "SELECT id, uid, from_name, from_email, subject, preview, body, timestamp, folder, unread, account_id, to_json, cc_json, bcc_json, html_body, reply_to_json, starred, has_attachments FROM mails".to_string();
+        let mut params: Vec<&dyn rusqlite::ToSql> = Vec::new();
+        let mut conditions = Vec::new();
 
-        if let Some(folder) = folder {
-            query.push_str(" WHERE folder = ?1 ORDER BY timestamp DESC");
-            let mut stmt = conn.prepare(&query)?;
-            let mail_iter = stmt.query_map(params![&folder], |row| {
-                Ok(Mail {
-                    id: row.get(0)?,
-                    from_name: row.get(1)?,
-                    from_email: row.get(2)?,
-                    subject: row.get(3)?,
-                    preview: row.get(4)?,
-                    body: row.get(5)?,
-                    timestamp: row.get(6)?,
-                    folder: row.get(7)?,
-                    unread: row.get::<_, i32>(8)? == 1,
-                    account_id: row.get(9)?,
-                    to: parse_json_addresses(row.get(10)?),
-                    cc: parse_json_addresses(row.get(11)?),
-                    bcc: parse_json_addresses(row.get(12)?),
-                    html_body: row.get(13)?,
-                    reply_to: parse_json_addresses(row.get(14)?),
-                    starred: Some(row.get::<_, i32>(15).unwrap_or(0) == 1),
-                    has_attachments: Some(row.get::<_, i32>(16).unwrap_or(0) == 1),
-                    attachments: None, // Loaded separately
-                })
-            })?;
-            for mail in mail_iter {
-                mails.push(mail?);
-            }
-        } else {
-            query.push_str(" ORDER BY timestamp DESC");
-            let mut stmt = conn.prepare(&query)?;
-            let mail_iter = stmt.query_map([], |row| {
-                Ok(Mail {
-                    id: row.get(0)?,
-                    from_name: row.get(1)?,
-                    from_email: row.get(2)?,
-                    subject: row.get(3)?,
-                    preview: row.get(4)?,
-                    body: row.get(5)?,
-                    timestamp: row.get(6)?,
-                    folder: row.get(7)?,
-                    unread: row.get::<_, i32>(8)? == 1,
-                    account_id: row.get(9)?,
-                    to: parse_json_addresses(row.get(10)?),
-                    cc: parse_json_addresses(row.get(11)?),
-                    bcc: parse_json_addresses(row.get(12)?),
-                    html_body: row.get(13)?,
-                    reply_to: parse_json_addresses(row.get(14)?),
-                    starred: Some(row.get::<_, i32>(15).unwrap_or(0) == 1),
-                    has_attachments: Some(row.get::<_, i32>(16).unwrap_or(0) == 1),
-                    attachments: None, // Loaded separately
-                })
-            })?;
-            for mail in mail_iter {
-                mails.push(mail?);
-            }
+        // Build WHERE clause based on provided filters
+        if let Some(folder) = &folder {
+            conditions.push("folder = ?");
+            params.push(folder);
+        }
+        if let Some(account_id) = &account_id {
+            conditions.push("account_id = ?");
+            params.push(account_id);
+        }
+
+        if !conditions.is_empty() {
+            query.push_str(" WHERE ");
+            query.push_str(&conditions.join(" AND "));
+        }
+        query.push_str(" ORDER BY timestamp DESC");
+
+        let mut stmt = conn.prepare(&query)?;
+        let mail_iter = stmt.query_map(rusqlite::params_from_iter(params), |row| {
+            Ok(Mail {
+                id: row.get(0)?,
+                uid: row.get(1)?,
+                from_name: row.get(2)?,
+                from_email: row.get(3)?,
+                subject: row.get(4)?,
+                preview: row.get(5)?,
+                body: row.get(6)?,
+                timestamp: row.get(7)?,
+                folder: row.get(8)?,
+                unread: row.get::<_, i32>(9)? == 1,
+                account_id: row.get(10)?,
+                to: parse_json_addresses(row.get(11)?),
+                cc: parse_json_addresses(row.get(12)?),
+                bcc: parse_json_addresses(row.get(13)?),
+                html_body: row.get(14)?,
+                reply_to: parse_json_addresses(row.get(15)?),
+                starred: Some(row.get::<_, i32>(16).unwrap_or(0) == 1),
+                has_attachments: Some(row.get::<_, i32>(17).unwrap_or(0) == 1),
+                attachments: None, // Loaded separately
+            })
+        })?;
+
+        let mut mails = Vec::new();
+        for mail in mail_iter {
+            mails.push(mail?);
         }
 
         Ok(mails)
@@ -308,28 +300,30 @@ impl Database {
     pub fn get_mail(&self, id: &str) -> SqliteResult<Option<Mail>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT id, from_name, from_email, subject, preview, body, timestamp, folder, unread, to_json, cc_json, bcc_json, html_body, reply_to_json, starred, has_attachments
+            "SELECT id, uid, from_name, from_email, subject, preview, body, timestamp, folder, unread, account_id, to_json, cc_json, bcc_json, html_body, reply_to_json, starred, has_attachments
              FROM mails WHERE id = ?1"
         )?;
 
         let mail = stmt.query_row(params![id], |row| {
             Ok(Mail {
                 id: row.get(0)?,
-                from_name: row.get(1)?,
-                from_email: row.get(2)?,
-                subject: row.get(3)?,
-                preview: row.get(4)?,
-                body: row.get(5)?,
-                timestamp: row.get(6)?,
-                folder: row.get(7)?,
-                unread: row.get::<_, i32>(8)? == 1,
-                to: parse_json_addresses(row.get(9)?),
-                cc: parse_json_addresses(row.get(10)?),
-                bcc: parse_json_addresses(row.get(11)?),
-                html_body: row.get(12)?,
-                reply_to: parse_json_addresses(row.get(13)?),
-                starred: Some(row.get::<_, i32>(14).unwrap_or(0) == 1),
-                has_attachments: Some(row.get::<_, i32>(15).unwrap_or(0) == 1),
+                uid: row.get(1)?,
+                from_name: row.get(2)?,
+                from_email: row.get(3)?,
+                subject: row.get(4)?,
+                preview: row.get(5)?,
+                body: row.get(6)?,
+                timestamp: row.get(7)?,
+                folder: row.get(8)?,
+                unread: row.get::<_, i32>(9)? == 1,
+                account_id: row.get(10)?,
+                to: parse_json_addresses(row.get(11)?),
+                cc: parse_json_addresses(row.get(12)?),
+                bcc: parse_json_addresses(row.get(13)?),
+                html_body: row.get(14)?,
+                reply_to: parse_json_addresses(row.get(15)?),
+                starred: Some(row.get::<_, i32>(16).unwrap_or(0) == 1),
+                has_attachments: Some(row.get::<_, i32>(17).unwrap_or(0) == 1),
                 attachments: None, // Loaded separately
             })
         });
@@ -351,10 +345,11 @@ impl Database {
         let reply_to_json = serialize_addresses(&mail.reply_to);
         let clean_preview = strip_html(&mail.preview);
         conn.execute(
-            "INSERT INTO mails (id, from_name, from_email, subject, preview, body, timestamp, folder, unread, created_at, to_json, cc_json, bcc_json, html_body, reply_to_json, starred, has_attachments)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)",
+            "INSERT INTO mails (id, uid, from_name, from_email, subject, preview, body, timestamp, folder, unread, account_id, created_at, to_json, cc_json, bcc_json, html_body, reply_to_json, starred, has_attachments)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)",
             params![
                 &mail.id,
+                &mail.uid,
                 &mail.from_name,
                 &mail.from_email,
                 &mail.subject,
@@ -363,6 +358,7 @@ impl Database {
                 &mail.timestamp,
                 &mail.folder,
                 if mail.unread { 1 } else { 0 },
+                &mail.account_id,
                 now,
                 to_json,
                 cc_json,
@@ -386,23 +382,26 @@ impl Database {
         let clean_preview = strip_html(&mail.preview);
         conn.execute(
             "UPDATE mails SET
-             from_name = ?1,
-             from_email = ?2,
-             subject = ?3,
-             preview = ?4,
-             body = ?5,
-             timestamp = ?6,
-             folder = ?7,
-             unread = ?8,
-             to_json = ?9,
-             cc_json = ?10,
-             bcc_json = ?11,
-             html_body = ?12,
-             reply_to_json = ?13,
-             starred = ?14,
-             has_attachments = ?15
-             WHERE id = ?16",
+             uid = ?1,
+             from_name = ?2,
+             from_email = ?3,
+             subject = ?4,
+             preview = ?5,
+             body = ?6,
+             timestamp = ?7,
+             folder = ?8,
+             unread = ?9,
+             account_id = ?10,
+             to_json = ?11,
+             cc_json = ?12,
+             bcc_json = ?13,
+             html_body = ?14,
+             reply_to_json = ?15,
+             starred = ?16,
+             has_attachments = ?17
+             WHERE id = ?18",
             params![
+                &mail.uid,
                 &mail.from_name,
                 &mail.from_email,
                 &mail.subject,
@@ -411,6 +410,7 @@ impl Database {
                 &mail.timestamp,
                 &mail.folder,
                 if mail.unread { 1 } else { 0 },
+                &mail.account_id,
                 to_json,
                 cc_json,
                 bcc_json,
@@ -518,10 +518,18 @@ fn serialize_addresses(addresses: &Option<Vec<EmailAddress>>) -> Option<String> 
 /// Strip HTML tags from text, returning plain text only
 /// Uses ammonia to safely remove HTML/CSS while preserving text content
 fn strip_html(html: &str) -> String {
-    // Configure ammonia to allow basic text formatting but remove all styling
+    // First remove style and script tags with their content
+    let style_re = Regex::new(r"(?is)<style.*?>.*?</style>").unwrap();
+    let script_re = Regex::new(r"(?is)<script.*?>.*?</script>").unwrap();
+
+    let mut cleaned = html.to_string();
+    cleaned = style_re.replace_all(&cleaned, "").to_string();
+    cleaned = script_re.replace_all(&cleaned, "").to_string();
+
+    // Configure ammonia to remove all HTML tags
     let clean = ammonia::Builder::default()
         .tags(HashSet::new()) // Remove all HTML tags
-        .clean(html)
+        .clean(&cleaned)
         .to_string();
 
     // Clean up extra whitespace that may result from HTML removal
