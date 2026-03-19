@@ -131,6 +131,41 @@ interface ListProps<T> {
 4. **Accessibility:** WCAG AA compliant by default
 5. **Performance:** Lazy load routes, optimize assets
 
+## Strict TDD Process (Required)
+
+All development must follow **Test-Driven Development**. Use this exact flow for every feature and bugfix:
+
+1. **Red: write the test first**
+   - Define expected behavior in an automated test before editing production code.
+   - Backend tests go in `src-tauri/test/*_tests.rs` and are linked via existing `#[cfg(test)]` modules.
+   - For frontend behavior changes, add/extend automated tests for the affected logic (if no harness exists, add one first).
+   - Run only the targeted test and verify it fails for the correct reason.
+2. **Green: implement minimal code**
+   - Modify only the necessary production files (`src/`, `src-tauri/src/`) to satisfy the failing test.
+   - Keep changes minimal; avoid mixed refactor/feature commits in this step.
+3. **Refactor: improve safely**
+   - Refactor structure/naming after tests pass.
+   - Keep behavior unchanged; rerun tests after each meaningful refactor.
+4. **Gate: full verification before commit**
+   - `cargo test --manifest-path src-tauri/Cargo.toml`
+   - `npm run check`
+5. **PR must show TDD evidence**
+   - Include the failing test scenario (Red), passing result after implementation (Green), and final gate command results.
+
+### TDD Command Template
+
+```bash
+# 1) Red: run targeted test (expected fail)
+cargo test --manifest-path src-tauri/Cargo.toml test_name
+
+# 2) Green/Refactor: rerun targeted test until pass
+cargo test --manifest-path src-tauri/Cargo.toml test_name
+
+# 3) Gate: run full checks before commit/push
+cargo test --manifest-path src-tauri/Cargo.toml
+npm run check
+```
+
 ## Key Files to Edit
 
 | Task | File |
