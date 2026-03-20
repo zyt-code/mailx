@@ -3,11 +3,15 @@
 	import { themeStore, type Theme } from '$lib/stores/themeStore.js';
 	import { preferences, ACCENT_PRESETS, type AccentTone, type MailDensity, type AppearancePreferences } from '$lib/stores/preferencesStore.js';
 
-	const themes: { id: Theme; label: string; description: string; icon: typeof Sun }[] = [
-		{ id: 'light', label: 'Light', description: 'Bright canvas, sharp contrast', icon: Sun },
-		{ id: 'dark', label: 'Dark', description: 'Low-glare reading environment', icon: Moon },
-		{ id: 'system', label: 'System', description: 'Follow the OS automatically', icon: Monitor }
+	import { getIsTransitioning } from '$lib/stores/themeStore.js';
+
+	const themes: { id: Theme; label: string; description: string; icon: typeof Sun; previewClass: string }[] = [
+		{ id: 'light', label: 'Light', description: 'Bright canvas, sharp contrast', icon: Sun, previewClass: 'bg-white border border-[var(--border-primary)]' },
+		{ id: 'dark', label: 'Dark', description: 'Low-glare reading environment', icon: Moon, previewClass: 'bg-[var(--bg-primary)] border border-[var(--border-primary)]' },
+		{ id: 'system', label: 'System', description: 'Automatically match your system light/dark mode', icon: Monitor, previewClass: 'system-preview' }
 	];
+
+	let isTransitioning = $derived(getIsTransitioning());
 
 	const accentOptions = Object.entries(ACCENT_PRESETS).map(([id, palette]) => ({
 		id: id as AccentTone,
@@ -55,15 +59,37 @@
 				<button
 					class="theme-option"
 					class:active={activeTheme === theme.id}
+					class:transitioning={isTransitioning && activeTheme === theme.id}
 					onclick={() => themeStore.set(theme.id)}
+					disabled={isTransitioning}
+					aria-label={`Switch to ${theme.label} theme`}
+					aria-pressed={activeTheme === theme.id}
 				>
+					<div class="theme-preview">
+						{#if theme.id === 'system'}
+							<div class="system-preview">
+								<div class="system-preview-light"></div>
+								<div class="system-preview-dark"></div>
+							</div>
+						{:else}
+							<div class={`simple-preview ${theme.previewClass}`}></div>
+						{/if}
+					</div>
+
 					<div class="theme-icon">
 						<theme.icon class="size-4" strokeWidth={1.7} />
 					</div>
-					<div>
+
+					<div class="theme-info">
 						<p class="option-label">{theme.label}</p>
 						<p class="option-description">{theme.description}</p>
 					</div>
+
+					{#if activeTheme === theme.id}
+						<div class="selection-indicator">
+							<Check class="check-icon" strokeWidth={2.2} />
+						</div>
+					{/if}
 				</button>
 			{/each}
 		</div>
@@ -276,7 +302,7 @@
 	}
 
 	.theme-option {
-		grid-template-columns: auto 1fr;
+		/* Grid will be set by enhanced styles, default for fallback */
 		align-items: center;
 	}
 
@@ -429,6 +455,89 @@
 		}
 	}
 
+	/* Enhanced theme option styles */
+	.theme-option {
+		position: relative;
+		grid-template-columns: auto 1fr auto;
+		align-items: start;
+	}
+
+	.theme-preview {
+		grid-column: 1 / -1;
+		height: 4.5rem;
+		border-radius: 12px;
+		margin-bottom: 0.75rem;
+		overflow: hidden;
+		background: var(--bg-secondary);
+	}
+
+	.simple-preview {
+		width: 100%;
+		height: 100%;
+		border-radius: 10px;
+	}
+
+	.system-preview {
+		display: flex;
+		width: 100%;
+		height: 100%;
+	}
+
+	.system-preview-light {
+		flex: 1;
+		background: white;
+		border-right: 1px solid var(--border-primary);
+	}
+
+	.system-preview-dark {
+		flex: 1;
+		background: #1c1c1e;
+	}
+
+	.theme-icon {
+		grid-column: 1;
+		grid-row: 2;
+	}
+
+	.theme-info {
+		grid-column: 2;
+		grid-row: 2;
+	}
+
+	.selection-indicator {
+		grid-column: 3;
+		grid-row: 2;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 1.6rem;
+		height: 1.6rem;
+		border-radius: 999px;
+		background: var(--accent-primary);
+		color: white;
+		margin-left: 0.5rem;
+	}
+
+	.check-icon {
+		width: 0.9rem;
+		height: 0.9rem;
+	}
+
+	/* Transitioning state */
+	.theme-option.transitioning {
+		opacity: 0.8;
+		cursor: wait;
+	}
+
+	.theme-option.transitioning .theme-preview {
+		animation: pulse-subtle 1.5s ease-in-out infinite;
+	}
+
+	@keyframes pulse-subtle {
+		0%, 100% { opacity: 1; }
+		50% { opacity: 0.7; }
+	}
+
 	@media (max-width: 640px) {
 		.page-header {
 			flex-direction: column;
@@ -437,5 +546,163 @@
 		.toggle-row {
 			align-items: flex-start;
 		}
+
+		.theme-option {
+			grid-template-columns: auto 1fr;
+		}
+
+		.theme-preview {
+			grid-column: 1 / -1;
+		}
+
+		.selection-indicator {
+			grid-column: 2;
+			justify-self: end;
+		}
+	}
+
+	/* Enhanced theme switching animations and UI refinements */
+	.theme-option.active {
+		position: relative;
+		z-index: 1;
+		border-color: var(--accent-primary);
+		background: color-mix(in srgb, var(--accent-light) 92%, var(--bg-primary));
+		box-shadow:
+			0 0 0 1px color-mix(in srgb, var(--accent-primary) 30%, transparent),
+			0 4px 12px color-mix(in srgb, var(--accent-light) 40%, transparent);
+		animation: theme-select-pulse 0.4s cubic-bezier(0.2, 0, 0, 1);
+	}
+
+	@keyframes theme-select-pulse {
+		0% {
+			transform: translateY(0);
+			box-shadow:
+				0 0 0 1px color-mix(in srgb, var(--accent-primary) 30%, transparent),
+				0 0 0 0 color-mix(in srgb, var(--accent-light) 0%, transparent);
+		}
+		50% {
+			transform: translateY(-2px);
+			box-shadow:
+				0 0 0 1px color-mix(in srgb, var(--accent-primary) 40%, transparent),
+				0 8px 20px color-mix(in srgb, var(--accent-light) 60%, transparent);
+		}
+		100% {
+			transform: translateY(0);
+			box-shadow:
+				0 0 0 1px color-mix(in srgb, var(--accent-primary) 30%, transparent),
+				0 4px 12px color-mix(in srgb, var(--accent-light) 40%, transparent);
+		}
+	}
+
+	.theme-option:hover:not(.active) {
+		transform: translateY(-1px);
+		border-color: color-mix(in srgb, var(--accent-primary) 35%, var(--border-primary));
+		box-shadow: 0 4px 12px color-mix(in srgb, var(--border-primary) 20%, transparent);
+	}
+
+	/* System preview animation */
+	.system-preview {
+		position: relative;
+		overflow: hidden;
+	}
+
+	.system-preview::after {
+		content: '';
+		position: absolute;
+		top: 0;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		background: linear-gradient(90deg,
+			transparent 0%,
+			color-mix(in srgb, white 15%, transparent) 50%,
+			transparent 100%
+		);
+		opacity: 0;
+		animation: system-shimmer 3s ease-in-out infinite;
+	}
+
+	@keyframes system-shimmer {
+		0%, 100% {
+			opacity: 0;
+			transform: translateX(-100%);
+		}
+		10%, 90% {
+			opacity: 0.4;
+		}
+		50% {
+			opacity: 0.4;
+			transform: translateX(100%);
+		}
+	}
+
+	/* Enhanced transitioning state */
+	.theme-option.transitioning {
+		opacity: 0.9;
+		cursor: wait;
+	}
+
+	.theme-option.transitioning .theme-preview {
+		position: relative;
+		overflow: hidden;
+	}
+
+	.theme-option.transitioning .theme-preview::before {
+		content: '';
+		position: absolute;
+		top: 0;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		background: linear-gradient(90deg,
+			transparent 0%,
+			color-mix(in srgb, var(--accent-primary) 15%, transparent) 50%,
+			transparent 100%
+		);
+		z-index: 1;
+		animation: transition-shimmer 1.5s ease-in-out infinite;
+	}
+
+	@keyframes transition-shimmer {
+		0% {
+			transform: translateX(-100%);
+		}
+		100% {
+			transform: translateX(100%);
+		}
+	}
+
+	/* Theme selection indicator refinement */
+	.selection-indicator {
+		animation: check-pop 0.3s cubic-bezier(0.2, 0, 0, 1);
+	}
+
+	@keyframes check-pop {
+		0% {
+			transform: scale(0);
+			opacity: 0;
+		}
+		80% {
+			transform: scale(1.1);
+		}
+		100% {
+			transform: scale(1);
+			opacity: 1;
+		}
+	}
+
+	/* Theme preview subtle scale animation on hover */
+	.theme-preview {
+		transition: transform 0.3s cubic-bezier(0.2, 0, 0, 1);
+	}
+
+	.theme-option:hover .theme-preview {
+		transform: scale(1.02);
+	}
+
+	/* Active theme preview enhancement */
+	.theme-option.active .theme-preview {
+		transform: scale(1.03);
+		box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-primary) 20%, transparent);
 	}
 </style>

@@ -60,3 +60,38 @@ class ResizeObserver {
 }
 
 window.ResizeObserver = ResizeObserver;
+
+// Mock Svelte 5 runes for tests
+if (typeof globalThis !== 'undefined') {
+	function $state<T>(initial: T) {
+		let value = initial;
+		return {
+			get current() {
+				return value;
+			},
+			set current(newValue: T) {
+				value = newValue;
+			}
+		};
+	}
+	// Add static properties to match Svelte 5 $state type
+	Object.assign($state, {
+		eager: $state,
+		raw: $state,
+		snapshot: $state
+	});
+
+	globalThis.$state = $state as any;
+	// Make it accessible as a property for assignment
+	Object.defineProperty(globalThis, '$state', {
+		value: globalThis.$state,
+		writable: false
+	});
+}
+
+if (typeof window !== 'undefined') {
+	Object.defineProperty(window, '$state', {
+		value: globalThis.$state,
+		writable: false
+	});
+}

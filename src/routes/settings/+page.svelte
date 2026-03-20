@@ -236,7 +236,7 @@
 	<div class="accounts-grid">
 		{#each accounts as account (account.id)}
 			{@const syncStatus = getSyncStatus(account.id)}
-			{@const statusInfo = getSyncStatus(syncStatus)}
+			{@const statusInfo = getSyncStatusInfo(syncStatus)}
 			<div
 				onclick={() => editAccount(account.id)}
 				class="account-card"

@@ -56,6 +56,7 @@ const DEFAULTS = { sidebarCollapsed: false, mailListWidth: DEFAULT_MAIL_LIST_WID
 	let mails: Mail[] = $state([]);
 	let isLoading = $state(true);
 	let error = $state<string | null>(null);
+	let lastLoadedFolder: Folder | null = $state(null);
 
 	// Account state - subscribe to store
 	let isAccountConfigured = $state(false);
@@ -138,6 +139,12 @@ const DEFAULTS = { sidebarCollapsed: false, mailListWidth: DEFAULT_MAIL_LIST_WID
 			mails = [];
 			isLoading = false;
 			error = null;
+			lastLoadedFolder = null;
+			return;
+		}
+
+		// Skip if already loading the same folder
+		if (isLoading && lastLoadedFolder === activeFolder) {
 			return;
 		}
 
@@ -145,10 +152,12 @@ const DEFAULTS = { sidebarCollapsed: false, mailListWidth: DEFAULT_MAIL_LIST_WID
 		error = null;
 		try {
 			mails = await db.getMails(activeFolder);
-			console.log('[AppShell] Loaded mails:', mails.length, 'for folder:', activeFolder);
+			lastLoadedFolder = activeFolder;
+			// console.log('[AppShell] Loaded mails:', mails.length, 'for folder:', activeFolder);
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to load mails';
 			console.error('Failed to load mails:', e);
+			lastLoadedFolder = null;
 		} finally {
 			isLoading = false;
 		}
@@ -156,13 +165,13 @@ const DEFAULTS = { sidebarCollapsed: false, mailListWidth: DEFAULT_MAIL_LIST_WID
 
 	// Load mails when component mounts
 	$effect(() => {
-		console.log('[AppShell] Effect triggered: mounting/loading mails');
+		// console.log('[AppShell] Effect triggered: mounting/loading mails');
 		loadMails();
 	});
 
 	// Reload when account configuration changes
 	$effect(() => {
-		console.log('[AppShell] isAccountConfigured changed:', isAccountConfigured);
+		// console.log('[AppShell] isAccountConfigured changed:', isAccountConfigured);
 		if (isAccountConfigured) {
 			loadMails();
 		}
@@ -170,7 +179,7 @@ const DEFAULTS = { sidebarCollapsed: false, mailListWidth: DEFAULT_MAIL_LIST_WID
 
 	// Reload when folder changes
 	$effect(() => {
-		console.log('[AppShell] activeFolder changed:', activeFolder);
+		// console.log('[AppShell] activeFolder changed:', activeFolder);
 		loadMails();
 	});
 

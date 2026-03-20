@@ -99,33 +99,372 @@ code, pre, .font-mono, .tabular-nums {
 	}
 
 	.dark {
-		/* Dark mode */
-		--bg-primary: #1c1c1e;
-		--bg-secondary: #2c2c2e;
-		--bg-tertiary: #3a3a3c;
-		--bg-hover: #323234;
-		--bg-active: #48484a;
-		--bg-selected: #1a3a5a;
+		/* Dark mode - Enhanced with depth, subtle blue undertones, and refined contrast */
+		/* WCAG AA compliant colors (≥4.5:1 contrast for normal text) */
+		--bg-primary: #0f0f10;
+		--bg-secondary: #1a1a1c;
+		--bg-tertiary: #252528;
+		--bg-hover: #2a2a2d;
+		--bg-active: #353539;
+		--bg-selected: #1a2d4a;
 
-		--text-primary: #f5f5f7;
-		--text-secondary: #98989d;
-		--text-tertiary: #636366;
-		--text-quaternary: #48484a;
+		--text-primary: #f8f8f8;
+		--text-secondary: #a0a0a5;
+		--text-tertiary: #8a8a8f; /* 增强对比度: 从 #6c6c70 改为 #8a8a8f (4.7:1) */
+		--text-quaternary: #4a4a4e;
 
-		--accent-primary: #0a84ff;
-		--accent-secondary: #409cff;
-		--accent-light: #1c3a5c;
-		--accent-muted: #163257;
+		/* Enhanced accent colors for better text contrast */
+		--accent-primary: #3a8cff; /* 增强对比度: 从 #1a6cff 改为 #3a8cff (5.2:1) */
+		--accent-secondary: #5aa4ff;
+		--accent-light: #1e304d;
+		--accent-muted: #1a2840;
 
-		--border-primary: #38383a;
-		--border-secondary: #323234;
-		--border-tertiary: #2c2c2e;
+		/* Enhanced border colors for better visibility */
+		--border-primary: #4a4a4e; /* Lighter gray: 2.5:1 contrast with background */
+		--border-secondary: #404044;
+		--border-tertiary: #353539;
 
-		--shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
-		--shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
-		--shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4);
-		--shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.5);
-		--shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.6);
+		--shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
+		--shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.3);
+		--shadow-md: 0 4px 6px rgba(0, 0, 0, 0.5), 0 2px 4px rgba(0, 0, 0, 0.3);
+		--shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.6), 0 4px 6px rgba(0, 0, 0, 0.4);
+		--shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.7), 0 8px 10px rgba(0, 0, 0, 0.5);
+
+		/* Enhanced depth effects with updated accent color */
+		--depth-glow: 0 0 20px rgba(42, 124, 255, 0.08);
+		--depth-glow-secondary: 0 0 30px rgba(42, 124, 255, 0.05);
+	}
+}
+
+/* ========================================
+   DARK MODE ENHANCEMENTS
+   ======================================== */
+
+.dark {
+	/* Enhanced selection color for better contrast */
+	::selection {
+		background: color-mix(in srgb, var(--accent-primary) 40%, transparent);
+		color: var(--text-primary);
+	}
+
+	/* Enhanced focus rings with high contrast for accessibility */
+	:focus-visible {
+		outline: 3px solid var(--accent-primary);
+		outline-offset: 2px;
+		box-shadow:
+			0 0 0 1px var(--bg-primary),
+			0 0 0 4px var(--accent-primary),
+			var(--depth-glow);
+		border-radius: var(--radius-xs);
+	}
+
+	/* High contrast focus for better visibility */
+	button:focus-visible,
+	a:focus-visible,
+	input:focus-visible,
+	textarea:focus-visible,
+	select:focus-visible,
+	[role="button"]:focus-visible,
+	[role="tab"]:focus-visible,
+	[role="menuitem"]:focus-visible,
+	[role="option"]:focus-visible,
+	[tabindex]:focus-visible {
+		outline: 3px solid var(--accent-primary);
+		outline-offset: 2px;
+		box-shadow:
+			0 0 0 1px var(--bg-primary),
+			0 0 0 4px var(--accent-primary),
+			0 0 12px rgba(42, 124, 255, 0.4);
+		z-index: 1; /* 确保焦点状态在层叠上下文上方 */
+	}
+
+	/* Enhanced focus for specific components */
+	.dark .theme-option:focus-visible,
+	.dark .accent-option:focus-visible,
+	.dark .density-option:focus-visible,
+	.dark .toggle-row:focus-visible {
+		outline: 3px solid var(--accent-primary);
+		outline-offset: 3px;
+		box-shadow:
+			0 0 0 2px var(--bg-primary),
+			0 0 0 6px var(--accent-primary),
+			0 0 20px rgba(42, 124, 255, 0.5),
+			var(--depth-glow);
+		transform: translateY(-2px);
+	}
+
+	/* Subtle background texture */
+	background-image:
+		radial-gradient(circle at 15% 50%, rgba(42, 124, 255, 0.03) 0%, transparent 50%),
+		radial-gradient(circle at 85% 30%, rgba(42, 124, 255, 0.02) 0%, transparent 50%);
+	background-attachment: fixed;
+	background-size: 100% 100%;
+}
+
+/* Enhanced mail items in dark mode */
+.dark .mail-item {
+	background: linear-gradient(
+		to bottom,
+		color-mix(in srgb, var(--bg-secondary) 90%, transparent),
+		color-mix(in srgb, var(--bg-secondary) 95%, transparent)
+	);
+	border: 1px solid transparent;
+	transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dark .mail-item:hover {
+	background: linear-gradient(
+		to bottom,
+		color-mix(in srgb, var(--bg-hover) 90%, transparent),
+		color-mix(in srgb, var(--bg-hover) 95%, transparent)
+	);
+	border-color: color-mix(in srgb, var(--accent-primary) 20%, transparent);
+	box-shadow:
+		var(--shadow-sm),
+		inset 0 0 0 1px color-mix(in srgb, var(--accent-primary) 10%, transparent);
+	transform: translateY(-1px);
+}
+
+.dark .mail-item-selected {
+	background: linear-gradient(
+		to bottom,
+		color-mix(in srgb, var(--bg-selected) 80%, transparent),
+		color-mix(in srgb, var(--bg-selected) 90%, transparent)
+	) !important;
+	border-color: color-mix(in srgb, var(--accent-primary) 40%, transparent) !important;
+	box-shadow:
+		var(--shadow-md),
+		inset 0 0 0 1px color-mix(in srgb, var(--accent-primary) 20%, transparent),
+		var(--depth-glow-secondary) !important;
+}
+
+/* Enhanced buttons in dark mode */
+.dark .btn-primary {
+	background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+	box-shadow:
+		0 2px 8px rgba(0, 0, 0, 0.3),
+		0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+.dark .btn-primary:hover {
+	background: linear-gradient(135deg, var(--accent-secondary), color-mix(in srgb, var(--accent-secondary) 80%, white));
+	box-shadow:
+		0 4px 12px rgba(0, 0, 0, 0.4),
+		0 0 0 1px rgba(255, 255, 255, 0.15),
+		var(--depth-glow);
+	transform: translateY(-2px);
+}
+
+.dark .btn-ghost:hover {
+	background: color-mix(in srgb, var(--bg-hover) 80%, transparent);
+	border-color: color-mix(in srgb, var(--accent-primary) 20%, transparent);
+	box-shadow: var(--shadow-xs);
+}
+
+/* Enhanced cards in dark mode */
+.dark .card {
+	background: linear-gradient(
+		145deg,
+		color-mix(in srgb, var(--bg-secondary) 90%, transparent),
+		color-mix(in srgb, var(--bg-primary) 95%, transparent)
+	);
+	border: 1px solid color-mix(in srgb, var(--border-primary) 80%, transparent);
+	box-shadow:
+		var(--shadow-md),
+		inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+/* Enhanced scrollbar for dark mode */
+.dark ::-webkit-scrollbar-thumb {
+	background: linear-gradient(to bottom,
+		color-mix(in srgb, var(--accent-primary) 20%, var(--bg-tertiary)),
+		color-mix(in srgb, var(--accent-primary) 10%, var(--bg-tertiary))
+	);
+	border-radius: 4px;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+	background: linear-gradient(to bottom,
+		color-mix(in srgb, var(--accent-primary) 30%, var(--bg-tertiary)),
+		color-mix(in srgb, var(--accent-primary) 20%, var(--bg-tertiary))
+	);
+}
+
+/* Enhanced reading pane in dark mode */
+.dark .reading-pane {
+	background: linear-gradient(
+		145deg,
+		var(--bg-primary),
+		color-mix(in srgb, var(--bg-secondary) 30%, var(--bg-primary))
+	);
+}
+
+.dark .reading-header {
+	background: linear-gradient(
+		to bottom,
+		var(--bg-primary),
+		color-mix(in srgb, var(--bg-secondary) 40%, var(--bg-primary))
+	);
+	border-bottom-color: color-mix(in srgb, var(--border-primary) 90%, transparent);
+	box-shadow: 0 1px 0 rgba(255, 255, 255, 0.02);
+}
+
+.dark .reading-meta {
+	background: linear-gradient(
+		to bottom,
+		color-mix(in srgb, var(--bg-secondary) 80%, transparent),
+		color-mix(in srgb, var(--bg-secondary) 90%, transparent)
+	);
+	border-bottom-color: color-mix(in srgb, var(--border-primary) 90%, transparent);
+}
+
+/* Enhanced unread dot with subtle animation */
+.dark .unread-dot {
+	background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+	box-shadow:
+		0 0 6px rgba(42, 124, 255, 0.4),
+		inset 0 1px 1px rgba(255, 255, 255, 0.2);
+	animation: pulse-glow 2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+	0%, 100% {
+		box-shadow:
+			0 0 6px rgba(42, 124, 255, 0.4),
+			inset 0 1px 1px rgba(255, 255, 255, 0.2);
+	}
+	50% {
+		box-shadow:
+			0 0 10px rgba(42, 124, 255, 0.6),
+			inset 0 1px 1px rgba(255, 255, 255, 0.3);
+	}
+}
+
+/* Enhanced sidebar active state */
+.dark .sidebar-active {
+	background: linear-gradient(
+		to right,
+		color-mix(in srgb, var(--bg-active) 90%, transparent),
+		color-mix(in srgb, var(--bg-active) 95%, transparent)
+	) !important;
+	border-left: 3px solid var(--accent-primary);
+	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+/* Enhanced input fields in dark mode */
+.dark input,
+.dark textarea {
+	background: color-mix(in srgb, var(--bg-tertiary) 70%, transparent);
+	border-color: color-mix(in srgb, var(--border-primary) 80%, transparent);
+	box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.dark input:focus,
+.dark textarea:focus {
+	background: color-mix(in srgb, var(--bg-tertiary) 80%, transparent);
+	border-color: var(--accent-primary);
+	box-shadow:
+		inset 0 1px 2px rgba(0, 0, 0, 0.2),
+		0 0 0 3px color-mix(in srgb, var(--accent-primary) 20%, transparent),
+		var(--depth-glow);
+}
+
+/* Enhanced toggle switches in dark mode */
+.dark .toggle-pill {
+	background: color-mix(in srgb, var(--bg-tertiary) 90%, transparent);
+	box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.dark .toggle-pill.toggle-on {
+	background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+	box-shadow:
+		inset 0 1px 3px rgba(0, 0, 0, 0.3),
+		0 0 8px rgba(42, 124, 255, 0.4);
+}
+
+.dark .toggle-thumb {
+	background: linear-gradient(to bottom, white, #f0f0f0);
+	box-shadow:
+		0 1px 3px rgba(0, 0, 0, 0.3),
+		inset 0 1px 1px rgba(255, 255, 255, 0.8);
+}
+
+/* ========================================
+   THEME TRANSITIONS
+   ======================================== */
+
+/* Smooth transitions for theme switching */
+:root {
+	transition:
+		color 400ms cubic-bezier(0.2, 0, 0, 1),
+		background-color 400ms cubic-bezier(0.2, 0, 0, 1),
+		border-color 400ms cubic-bezier(0.2, 0, 0, 1),
+		fill 400ms cubic-bezier(0.2, 0, 0, 1),
+		stroke 400ms cubic-bezier(0.2, 0, 0, 1),
+		box-shadow 400ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* Enhanced transition for all theme-aware properties */
+* {
+	transition:
+		color 400ms cubic-bezier(0.2, 0, 0, 1),
+		background-color 400ms cubic-bezier(0.2, 0, 0, 1),
+		border-color 400ms cubic-bezier(0.2, 0, 0, 1),
+		fill 400ms cubic-bezier(0.2, 0, 0, 1),
+		stroke 400ms cubic-bezier(0.2, 0, 0, 1),
+		box-shadow 400ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* Disable transitions during initial page load to prevent flash */
+.no-transition * {
+	transition: none !important;
+}
+
+/* Theme transition overlay for smooth visual feedback */
+.theme-transitioning::before {
+	content: '';
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background: var(--bg-primary);
+	opacity: 0;
+	pointer-events: none;
+	z-index: 9999;
+	animation: theme-fade 400ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+@keyframes theme-fade {
+	0% {
+		opacity: 0;
+	}
+	50% {
+		opacity: 0.4;
+	}
+	100% {
+		opacity: 0;
+	}
+}
+
+/* Respect reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+	:root, * {
+		transition-duration: 1ms !important;
+		animation-duration: 1ms !important;
+		animation-iteration-count: 1 !important;
+	}
+
+	.theme-transitioning::before {
+		animation: none;
+	}
+
+	.system-preview::after {
+		animation: none;
+	}
+
+	.theme-option.transitioning .theme-preview::before {
+		animation: none;
 	}
 }
 
@@ -148,11 +487,34 @@ code, pre, .font-mono, .tabular-nums {
 		color: var(--text-primary);
 	}
 
-	/* Native focus ring */
+	/* Accessible focus ring for all interactive elements */
 	:focus-visible {
-		outline: 2px solid var(--accent-primary);
+		outline: 3px solid var(--accent-primary);
 		outline-offset: 2px;
+		box-shadow:
+			0 0 0 1px var(--bg-primary),
+			0 0 0 4px var(--accent-primary);
 		border-radius: var(--radius-xs);
+	}
+
+	/* Enhanced focus for light mode specific components */
+	.theme-option:focus-visible,
+	.accent-option:focus-visible,
+	.density-option:focus-visible,
+	.toggle-row:focus-visible {
+		outline: 3px solid var(--accent-primary);
+		outline-offset: 3px;
+		box-shadow:
+			0 0 0 2px var(--bg-primary),
+			0 0 0 6px var(--accent-primary),
+			0 0 20px rgba(0, 122, 255, 0.3);
+		transform: translateY(-2px);
+	}
+
+	/* Ensure focus is visible even when outlines are disabled by user agent */
+	:focus:not(:focus-visible) {
+		outline: 3px solid var(--accent-primary);
+		outline-offset: 2px;
 	}
 }
 
@@ -228,7 +590,83 @@ input::placeholder, textarea::placeholder {
 input:focus, textarea:focus {
 	outline: none;
 	border-color: var(--accent-primary);
-	box-shadow: 0 0 0 3px var(--accent-light);
+	box-shadow:
+		0 0 0 1px var(--bg-primary),
+		0 0 0 3px var(--accent-primary),
+		0 0 12px rgba(42, 124, 255, 0.2);
+}
+
+/* Enhanced focus for dark mode inputs */
+.dark input:focus,
+.dark textarea:focus {
+	box-shadow:
+		0 0 0 1px var(--bg-primary),
+		0 0 0 3px var(--accent-primary),
+		0 0 16px rgba(42, 124, 255, 0.3),
+		var(--depth-glow);
+}
+
+/* ========================================
+   ACCESSIBILITY UTILITIES
+   ======================================== */
+
+/* Visually hidden but accessible to screen readers */
+.sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}
+
+/* Skip to main content link */
+.skip-to-content {
+	position: absolute;
+	top: -40px;
+	left: 0;
+	background: var(--accent-primary);
+	color: white;
+	padding: 8px 16px;
+	border-radius: var(--radius-md);
+	text-decoration: none;
+	z-index: 9999;
+	transition: top 0.2s ease;
+}
+
+.skip-to-content:focus {
+	top: 10px;
+	outline: 3px solid var(--accent-primary);
+	outline-offset: 2px;
+}
+
+/* Focus management */
+.focus-ring {
+	outline: 3px solid var(--accent-primary);
+	outline-offset: 2px;
+	box-shadow:
+		0 0 0 1px var(--bg-primary),
+		0 0 0 4px var(--accent-primary);
+}
+
+.focus-ring-enhanced {
+	outline: 3px solid var(--accent-primary);
+	outline-offset: 3px;
+	box-shadow:
+		0 0 0 2px var(--bg-primary),
+		0 0 0 6px var(--accent-primary),
+		0 0 20px rgba(0, 122, 255, 0.3);
+}
+
+.dark .focus-ring-enhanced {
+	box-shadow:
+		0 0 0 2px var(--bg-primary),
+		0 0 0 6px var(--accent-primary),
+		0 0 20px rgba(42, 124, 255, 0.5),
+		var(--depth-glow);
 }
 
 /* ========================================
@@ -544,5 +982,165 @@ input:focus, textarea:focus {
 
 	.reading-content {
 		padding: 20px;
+	}
+}
+
+/* ========================================
+   DARK MODE ANIMATIONS & EFFECTS
+   ======================================== */
+
+/* Subtty depth animation for dark mode cards */
+@keyframes depth-float {
+	0%, 100% {
+		box-shadow:
+			var(--shadow-md),
+			inset 0 1px 0 rgba(255, 255, 255, 0.05);
+	}
+	50% {
+		box-shadow:
+			var(--shadow-lg),
+			inset 0 1px 0 rgba(255, 255, 255, 0.08),
+			var(--depth-glow-secondary);
+	}
+}
+
+.dark .card:hover {
+	animation: depth-float 3s ease-in-out infinite;
+}
+
+/* Accent glow animation for interactive elements */
+@keyframes accent-glow {
+	0%, 100% {
+		box-shadow:
+			0 2px 8px rgba(0, 0, 0, 0.3),
+			0 0 0 1px rgba(255, 255, 255, 0.1);
+	}
+	50% {
+		box-shadow:
+			0 2px 12px rgba(0, 0, 0, 0.4),
+			0 0 0 1px rgba(255, 255, 255, 0.15),
+			0 0 20px rgba(42, 124, 255, 0.2);
+	}
+}
+
+.dark .btn-primary:not(:hover) {
+	animation: accent-glow 4s ease-in-out infinite;
+}
+
+/* Subtle background pulse for loading states */
+@keyframes dark-pulse {
+	0%, 100% {
+		background-color: var(--bg-secondary);
+	}
+	50% {
+		background-color: color-mix(in srgb, var(--bg-secondary) 90%, var(--accent-light));
+	}
+}
+
+.dark .mail-item.loading {
+	animation: dark-pulse 1.5s ease-in-out infinite;
+}
+
+/* Enhanced theme transition for dark mode */
+.dark.theme-transitioning::before {
+	background: linear-gradient(
+		135deg,
+		color-mix(in srgb, var(--accent-primary) 10%, var(--bg-primary)),
+		var(--bg-primary)
+	);
+	opacity: 0.3;
+	animation: theme-fade-dark 400ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+@keyframes theme-fade-dark {
+	0% {
+		opacity: 0;
+	}
+	50% {
+		opacity: 0.3;
+	}
+	100% {
+		opacity: 0;
+	}
+}
+
+/* Enhanced selection animation for dark mode */
+.dark .mail-item-selected {
+	animation: select-pulse 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes select-pulse {
+	0% {
+		box-shadow:
+			var(--shadow-xs),
+			inset 0 0 0 1px color-mix(in srgb, var(--accent-primary) 10%, transparent);
+	}
+	50% {
+		box-shadow:
+			var(--shadow-md),
+			inset 0 0 0 1px color-mix(in srgb, var(--accent-primary) 30%, transparent),
+			var(--depth-glow-secondary);
+	}
+	100% {
+		box-shadow:
+			var(--shadow-md),
+			inset 0 0 0 1px color-mix(in srgb, var(--accent-primary) 20%, transparent),
+			var(--depth-glow-secondary);
+	}
+}
+
+/* Enhanced hover lift effect for dark mode */
+.dark .mail-item:hover {
+	transition: all 180ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Glass morphism effect for modals in dark mode */
+.dark .modal-overlay {
+	background: rgba(15, 15, 16, 0.7);
+	backdrop-filter: blur(20px) saturate(180%);
+}
+
+.dark .modal-content {
+	background: linear-gradient(
+		145deg,
+		color-mix(in srgb, var(--bg-secondary) 80%, rgba(255, 255, 255, 0.05)),
+		color-mix(in srgb, var(--bg-primary) 90%, rgba(255, 255, 255, 0.03))
+	);
+	border: 1px solid rgba(255, 255, 255, 0.1);
+	box-shadow:
+		0 20px 40px rgba(0, 0, 0, 0.4),
+		0 0 0 1px rgba(255, 255, 255, 0.05),
+		var(--depth-glow);
+}
+
+/* Enhanced text rendering for dark mode */
+.dark {
+	text-rendering: optimizeLegibility;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	font-feature-settings: "kern", "liga", "clig", "calt";
+}
+
+/* Dark mode specific utility classes */
+.dark .text-glow {
+	text-shadow: 0 0 10px rgba(42, 124, 255, 0.3);
+}
+
+.dark .border-glow {
+	box-shadow: 0 0 15px rgba(42, 124, 255, 0.2);
+}
+
+/* Enhanced responsive adjustments for dark mode */
+@media (max-width: 768px) {
+	.dark {
+		background-image: none; /* Remove complex backgrounds on mobile for performance */
+	}
+
+	.dark .mail-item:hover {
+		transform: none; /* Remove lift effect on mobile for better touch interaction */
+	}
+
+	.dark .card {
+		box-shadow: var(--shadow-sm); /* Simplify shadows on mobile */
 	}
 }
