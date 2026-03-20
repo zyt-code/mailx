@@ -27,11 +27,6 @@
 			action: 'Send draft',
 			combo: ['Cmd/Ctrl', 'Enter'],
 			description: 'Works inside the compose modal when the send shortcut is enabled.'
-		},
-		{
-			action: 'Open settings',
-			combo: ['Cmd/Ctrl', ','],
-			description: 'Exposed through the native app menu.'
 		}
 	];
 

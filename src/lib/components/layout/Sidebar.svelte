@@ -279,9 +279,6 @@
 				aria-label="Refresh"
 			>
 				<RefreshCw class={cn('size-[15px]', isRefreshing && 'animate-spin')} strokeWidth={1.8} />
-				{#if showShortcutHints && isAccountConfigured}
-					<span class="ml-0.5 rounded-[6px] border border-[var(--border-primary)] bg-[var(--bg-primary)] px-1.5 py-0.5 text-[10px] font-semibold leading-none text-[var(--text-tertiary)] shadow-sm">R</span>
-				{/if}
 			</button>
 		{/if}
 	</div>
@@ -303,9 +300,6 @@
 				{#if isAccountConfigured}
 					<SquarePen class="size-[15px]" strokeWidth={1.8} />
 					<span>New Message</span>
-					{#if showShortcutHints}
-						<span class="ml-auto rounded-[6px] border border-white/18 bg-white/12 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white/92">C</span>
-					{/if}
 				{:else}
 					<Lock class="size-[15px]" strokeWidth={1.8} />
 					<span>Add Account</span>
@@ -473,12 +467,10 @@
 				onclick={navigateToSettings}
 				class="settings-icon group flex items-center gap-2 w-full px-2.5 py-1.5 rounded-md text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-all duration-120 relative z-10 cursor-pointer"
 				aria-label="Settings"
+				title={showShortcutHints ? 'Cmd/Ctrl+,' : 'Settings'}
 			>
 				<Settings class="size-[17px] transition-transform duration-300 group-hover:rotate-45" strokeWidth={1.8} />
 				<span class="text-sm">Settings</span>
-				{#if showShortcutHints}
-					<span class="ml-auto rounded-[6px] border border-[var(--border-primary)] bg-[var(--bg-primary)] px-1.5 py-0.5 text-[10px] font-semibold leading-none text-[var(--text-tertiary)] shadow-sm">Cmd/Ctrl+,</span>
-				{/if}
 			</button>
 		</div>
 	{:else}
@@ -539,6 +531,7 @@
 				onclick={navigateToSettings}
 				class="settings-icon group flex size-8 items-center justify-center rounded-md text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-all duration-120 relative z-10 cursor-pointer"
 				aria-label="Settings"
+				title={showShortcutHints ? 'Cmd/Ctrl+,' : 'Settings'}
 			>
 				<Settings class="size-[17px] transition-transform duration-300 group-hover:rotate-45" strokeWidth={1.8} />
 			</button>
