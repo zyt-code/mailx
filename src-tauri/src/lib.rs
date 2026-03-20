@@ -70,9 +70,6 @@ pub fn run() {
                 // Create app menu (the menu with app name)
                 let about_item =
                     MenuItem::with_id(app, "about", "About Mailx", true, None::<&str>)?;
-                let settings_item =
-                    MenuItem::with_id(app, "settings", "Settings...", true, Some("Cmd+,"))?;
-                let empty_separator = MenuItem::new(app, "-", true, None::<&str>)?;
 
                 // Create File menu
                 let close_item =
@@ -91,7 +88,7 @@ pub fn run() {
                     app,
                     "Mailx",
                     true,
-                    &[&about_item, &settings_item, &empty_separator],
+                    &[&about_item],
                 )?;
                 let file_menu = Submenu::with_items(app, "File", true, &[&close_item])?;
                 let edit_menu = Submenu::with_items(
@@ -133,10 +130,6 @@ pub fn run() {
                 // Windows/Linux: Create minimal menu with Settings
                 use tauri::menu::{Menu, MenuItem, Submenu};
 
-                // Create Tools menu with Settings
-                let settings_item =
-                    MenuItem::with_id(app, "settings", "Settings...", true, Some("Ctrl+,"))?;
-
                 let tools_menu = Submenu::with_items(app, "Tools", true, &[&settings_item])?;
 
                 let menu = Menu::with_items(app, &[&tools_menu])?;
@@ -144,17 +137,11 @@ pub fn run() {
 
                 // Handle menu events for Windows/Linux
                 app.on_menu_event(|app, event| match event.id.as_ref() {
-                    "settings" => {
-                        if let Some(window) = app.get_webview_window("main") {
-                            let _ = window.emit("navigate", "/settings");
-                        }
-                    }
                     "about" => {
                         if let Some(window) = app.get_webview_window("main") {
                             let _ = window.emit("navigate", "/about");
                         }
                     }
-                    _ => {}
                 });
             }
 
