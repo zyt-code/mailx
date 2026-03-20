@@ -34,7 +34,11 @@
 		editor = new Editor({
 			element: editorElement,
 			extensions: [
-				StarterKit,
+				StarterKit.configure({
+					heading: {
+						levels: [1, 2, 3]
+					}
+				}),
 				Underline,
 				Link.configure({
 					openOnClick: false
@@ -73,7 +77,9 @@
 
 	// Update content when prop changes (but only if different from current content)
 	$effect(() => {
-		if (editor && content !== editor.getHTML()) {
+		if (!editor) return;
+		const currentHtml = editor.getHTML();
+		if (content && content !== currentHtml) {
 			editor.commands.setContent(content);
 		}
 	});
@@ -86,8 +92,9 @@
 	});
 
 	// Focus editor when clicking on the wrapper or any child element
-	function handleWrapperClick(): void {
+	function handleWrapperClick(event: MouseEvent): void {
 		if (!editor) return;
+		// Always focus to ensure commands apply to the editor
 		editor.chain().focus().run();
 	}
 

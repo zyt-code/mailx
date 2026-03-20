@@ -89,11 +89,8 @@
 	}
 
 	function handleContentUpdate(html: string) {
-		const tempDiv = typeof document !== 'undefined' ? document.createElement('div') : null;
-		if (tempDiv) {
-			tempDiv.innerHTML = html;
-			value = tempDiv.textContent || tempDiv.innerText || html;
-		} else {
+		// Only update if content actually changed to prevent loops
+		if (value !== html) {
 			value = html;
 		}
 	}
