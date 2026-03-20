@@ -111,17 +111,11 @@ pub fn run() {
 
                 // Handle menu events
                 app.on_menu_event(|app, event| match event.id.as_ref() {
-                    "settings" => {
-                        if let Some(window) = app.get_webview_window("main") {
-                            let _ = window.emit("navigate", "/settings");
-                        }
-                    }
                     "about" => {
                         if let Some(window) = app.get_webview_window("main") {
                             let _ = window.emit("navigate", "/about");
                         }
                     }
-                    _ => {}
                 });
             }
 
