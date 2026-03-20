@@ -52,6 +52,11 @@
 			],
 			content,
 			editable,
+			editorProps: {
+				attributes: {
+					class: 'rich-editor-prose'
+				}
+			},
 			onUpdate: () => {
 				if (editor && onContentChange) {
 					onContentChange(editor.getHTML());
@@ -142,7 +147,8 @@
 
 	/* Ensure the entire editor area is clickable */
 	.rich-editor-content :global(.ProseMirror),
-	.rich-editor-content :global(.tiptap) {
+	.rich-editor-content :global(.tiptap),
+	.rich-editor-content :global(.rich-editor-prose) {
 		min-height: 400px;
 		height: 100%;
 		outline: none !important;
@@ -210,15 +216,26 @@
 	}
 
 	/* Lists */
-	.rich-editor-content :global(ul),
 	.rich-editor-content :global(ol) {
-		padding-left: 1.5em;
+		list-style-type: decimal !important;
+		padding-left: 1.75rem !important;
+		margin-bottom: 0.75em;
+	}
+
+	.rich-editor-content :global(ul) {
+		list-style-type: disc !important;
+		padding-left: 1.75rem !important;
 		margin-bottom: 0.75em;
 	}
 
 	.rich-editor-content :global(li) {
 		margin-bottom: 0.25em;
 		line-height: 1.6;
+	}
+
+	/* Ensure list markers are visible */
+	.rich-editor-content :global(li::marker) {
+		color: #6B7280;
 	}
 
 	/* Links */
