@@ -368,6 +368,56 @@ pub async fn test_account_connection(
     Ok(())
 }
 
+/// Test connection with credentials before creating an account
+/// Used by the "Add Account" form to verify credentials work
+#[tauri::command]
+pub async fn test_connection_credentials(
+    email: String,
+    password: String,
+    imap_server: String,
+    smtp_server: String,
+    imap_port: Option<u16>,
+    smtp_port: Option<u16>,
+    imap_use_ssl: Option<bool>,
+    smtp_use_ssl: Option<bool>,
+) -> Result<String, String> {
+    use crate::accounts::{ImapConfig, SmtpConfig};
+
+    let imap_port = imap_port.unwrap_or(993);
+    let smtp_port = smtp_port.unwrap_or(587);
+    let imap_use_ssl = imap_use_ssl.unwrap_or(true);
+    let smtp_use_ssl = smtp_use_ssl.unwrap_or(true);
+
+    // Test IMAP connection
+    let imap_config = ImapConfig {
+        server: imap_server.clone(),
+        port: imap_port,
+        use_ssl: imap_use_ssl,
+    };
+    let imap_client = ImapClient::new(imap_config, email.clone(), password.clone());
+    imap_client
+        .test_connection()
+        .await
+        .map_err(|e| format!("IMAP connection test failed: {}", e))?;
+
+    // Test SMTP connection
+    let smtp_config = SmtpConfig {
+        server: smtp_server.clone(),
+        port: smtp_port,
+        use_ssl: smtp_use_ssl,
+    };
+    let smtp_client = SmtpClient::new(smtp_config, email, password);
+    smtp_client
+        .test_connection()
+        .await
+        .map_err(|e| format!("SMTP connection test failed: {}", e))?;
+
+    Ok(format!(
+        "Successfully connected to IMAP ({}:{}) and SMTP ({}:{})",
+        imap_server, imap_port, smtp_server, smtp_port
+    ))
+}
+
 // ============================================================================
 // Sync Commands
 // ============================================================================
@@ -533,6 +583,22 @@ pub fn clear_database(db: State<'_, Database>) -> Result<(), String> {
     db.inner()
         .clear_all_mails()
         .map_err(|e| format!("Failed to clear database: {}", e))
+}
+
+/// Get the size of the database file in bytes
+#[tauri::command]
+pub fn get_database_size(db: State<'_, Database>) -> Result<u64, String> {
+    db.inner()
+        .get_database_size()
+        .map_err(|e| format!("Failed to get database size: {}", e))
+}
+
+/// Compact the database by running VACUUM
+#[tauri::command]
+pub fn compact_database(db: State<'_, Database>) -> Result<(), String> {
+    db.inner()
+        .compact_database()
+        .map_err(|e| format!("Failed to compact database: {}", e))
 }
 
 /// Lookup provider defaults shared with the frontend configuration.

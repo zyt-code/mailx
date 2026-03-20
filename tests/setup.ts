@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { vi } from 'vitest';
+import { writable } from 'svelte/store';
 
 // Mock Tauri APIs
 vi.mock('@tauri-apps/api/core', () => ({
@@ -35,7 +36,7 @@ vi.mock('$app/navigation', () => ({
 }));
 
 vi.mock('$app/stores', () => {
-	const { writable } = require('svelte/store');
+	// Use imported writable function
 	return {
 		page: writable({
 			url: new URL('http://localhost'),

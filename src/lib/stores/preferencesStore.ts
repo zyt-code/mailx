@@ -25,10 +25,23 @@ export interface KeyboardPreferences {
 	sendWithModEnter: boolean;
 }
 
+export interface PrivacyPreferences {
+	blockExternalImages: boolean;
+	blockRemoteFonts: boolean;
+	remoteContentAction: 'always_ask' | 'never_load' | 'always_load';
+	readReceiptPolicy: 'never_send' | 'always_send' | 'ask_me';
+	htmlRenderingMode: 'plain_text' | 'sanitized' | 'full';
+	blockFormsInEmails: boolean;
+	showSecurityWarnings: boolean;
+	warnBeforeSuspiciousLinks: boolean;
+	showFullUrlOnHover: boolean;
+}
+
 export interface UserPreferences {
 	appearance: AppearancePreferences;
 	notifications: NotificationPreferences;
 	keyboard: KeyboardPreferences;
+	privacy: PrivacyPreferences;
 }
 
 const STORAGE_KEY = 'mailx-preferences';
@@ -97,6 +110,17 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
 		singleKeyShortcuts: true,
 		showShortcutHints: true,
 		sendWithModEnter: true
+	},
+	privacy: {
+		blockExternalImages: true,
+		blockRemoteFonts: true,
+		remoteContentAction: 'always_ask',
+		readReceiptPolicy: 'never_send',
+		htmlRenderingMode: 'sanitized',
+		blockFormsInEmails: true,
+		showSecurityWarnings: true,
+		warnBeforeSuspiciousLinks: true,
+		showFullUrlOnHover: true
 	}
 };
 
@@ -111,6 +135,9 @@ function mergePreferences(raw: unknown): UserPreferences {
 	const keyboard = typeof source.keyboard === 'object' && source.keyboard !== null
 		? source.keyboard
 		: {};
+	const privacy = typeof source.privacy === 'object' && source.privacy !== null
+		? source.privacy
+		: {};
 
 	return {
 		appearance: {
@@ -124,6 +151,10 @@ function mergePreferences(raw: unknown): UserPreferences {
 		keyboard: {
 			...DEFAULT_PREFERENCES.keyboard,
 			...keyboard
+		},
+		privacy: {
+			...DEFAULT_PREFERENCES.privacy,
+			...privacy
 		}
 	};
 }

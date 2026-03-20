@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
-	import { ArrowLeft, Check, Loader2, Mail, Lock, Server, Trash2, Eye, EyeOff } from 'lucide-svelte';
+	import { invoke } from '@tauri-apps/api/core';
+	import { ArrowLeft, Check, Loader2, Mail, Lock, Server, Trash2, Eye, EyeOff, ShieldCheck, RefreshCw } from 'lucide-svelte';
 	import * as accounts from '$lib/accounts/index.js';
+	import { syncAccount } from '$lib/sync/index.js';
 	import type { Account } from '$lib/types.js';
 
 	let account = $state<Account | null>(null);
@@ -10,14 +12,22 @@
 	let error = $state<string | null>(null);
 	let isSubmitting = $state(false);
 	let isDeleting = $state(false);
+	let isTesting = $state(false);
+	let isSyncing = $state(false);
 	let showDeleteConfirm = $state(false);
 	let showPassword = $state(false);
+	let testResult = $state<string | null>(null);
 
 	let email = $state('');
 	let name = $state('');
 	let password = $state('');
 	let imapServer = $state('');
+	let imapPort = $state(993);
+	let imapUseSsl = $state(true);
 	let smtpServer = $state('');
+	let smtpPort = $state(587);
+	let smtpUseSsl = $state(true);
+	let syncInterval = $state(15); // minutes
 
 	// Get account ID from URL
 	let accountId = $derived($page.url.pathname.split('/').pop());
@@ -38,7 +48,11 @@
 			email = account.email;
 			name = account.name;
 			imapServer = account.imap_server;
+			imapPort = account.imap_port || 993;
+			imapUseSsl = account.imap_use_ssl !== false;
 			smtpServer = account.smtp_server;
+			smtpPort = account.smtp_port || 587;
+			smtpUseSsl = account.smtp_use_ssl !== false;
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to load account';
 			console.error('Failed to load account:', e);
@@ -67,11 +81,11 @@
 				email,
 				name,
 				imap_server: imapServer,
-				imap_port: 993,
-				imap_use_ssl: true,
+				imap_port: imapPort,
+				imap_use_ssl: imapUseSsl,
 				smtp_server: smtpServer,
-				smtp_port: 587,
-				smtp_use_ssl: true
+				smtp_port: smtpPort,
+				smtp_use_ssl: smtpUseSsl
 			});
 
 			// Reload account data
@@ -96,6 +110,41 @@
 			error = e instanceof Error ? e.message : 'Failed to delete account';
 			isDeleting = false;
 			showDeleteConfirm = false;
+		}
+	}
+
+	async function testConnection() {
+		if (!account) return;
+
+		isTesting = true;
+		error = null;
+		testResult = null;
+
+		try {
+			const result = await invoke('test_account_connection', {
+				id: account.id
+			});
+			testResult = 'Connection successful! Both IMAP and SMTP are working.';
+		} catch (e) {
+			error = e instanceof Error ? e.message : 'Connection test failed';
+		} finally {
+			isTesting = false;
+		}
+	}
+
+	async function handleSync() {
+		if (!account) return;
+
+		isSyncing = true;
+		error = null;
+
+		try {
+			await syncAccount(account.id);
+			testResult = 'Sync completed successfully.';
+		} catch (e) {
+			error = e instanceof Error ? e.message : 'Sync failed';
+		} finally {
+			isSyncing = false;
 		}
 	}
 </script>
@@ -287,6 +336,32 @@
 							</div>
 						</div>
 
+						<!-- IMAP Port & SSL -->
+						<div class="field-row">
+							<div class="field-group">
+								<label for="imap-port" class="field-label">IMAP Port</label>
+								<div class="input-wrapper">
+									<input
+										id="imap-port"
+										type="number"
+										bind:value={imapPort}
+										placeholder="993"
+										class="field-input"
+									/>
+								</div>
+							</div>
+							<div class="field-group">
+								<label class="field-label">
+									<input
+										type="checkbox"
+										bind:checked={imapUseSsl}
+										class="checkbox-input"
+									/>
+									<span>Use SSL/TLS</span>
+								</label>
+							</div>
+						</div>
+
 						<!-- SMTP Server -->
 						<div class="field-group">
 							<label for="smtp" class="field-label">SMTP Server</label>
@@ -299,6 +374,108 @@
 									class="field-input"
 								/>
 							</div>
+						</div>
+
+						<!-- SMTP Port & SSL -->
+						<div class="field-row">
+							<div class="field-group">
+								<label for="smtp-port" class="field-label">SMTP Port</label>
+								<div class="input-wrapper">
+									<input
+										id="smtp-port"
+										type="number"
+										bind:value={smtpPort}
+										placeholder="587"
+										class="field-input"
+									/>
+								</div>
+							</div>
+							<div class="field-group">
+								<label class="field-label">
+									<input
+										type="checkbox"
+										bind:checked={smtpUseSsl}
+										class="checkbox-input"
+									/>
+									<span>Use SSL/TLS</span>
+								</label>
+							</div>
+						</div>
+
+						<!-- Test Connection & Sync Buttons -->
+						<div class="field-row">
+							<button
+								type="button"
+								onclick={testConnection}
+								disabled={isTesting || isSubmitting}
+								class="action-link-button"
+							>
+								{#if isTesting}
+									<Loader2 class="size-4 animate-spin" />
+								{:else}
+									<ShieldCheck class="size-4" />
+								{/if}
+								<span>{isTesting ? 'Testing...' : 'Test Connection'}</span>
+							</button>
+							<button
+								type="button"
+								onclick={handleSync}
+								disabled={isSyncing || isSubmitting}
+								class="action-link-button"
+							>
+								{#if isSyncing}
+									<Loader2 class="size-4 animate-spin" />
+								{:else}
+									<RefreshCw class="size-4" />
+								{/if}
+								<span>{isSyncing ? 'Syncing...' : 'Sync Now'}</span>
+							</button>
+						</div>
+
+						{#if testResult}
+							<p class="test-success">{testResult}</p>
+						{/if}
+					</div>
+				</div>
+
+				<div class="form-divider">
+					<div class="divider-line"></div>
+					<span class="divider-text">Sync Settings</span>
+					<div class="divider-line"></div>
+				</div>
+
+				<div class="form-section">
+					<div class="section-header">
+						<div class="section-icon section-icon-accent">
+							<RefreshCw class="size-5" />
+						</div>
+						<div>
+							<h3 class="section-title">Automatic Sync</h3>
+							<p class="section-subtitle">Configure how often Mailx checks for new messages</p>
+						</div>
+					</div>
+
+					<div class="form-fields">
+						<div class="field-group">
+							<label for="sync-interval" class="field-label">Sync Interval</label>
+							<div class="input-wrapper">
+								<select
+									id="sync-interval"
+									bind:value={syncInterval}
+									class="field-input"
+								>
+									<option value={5}>Every 5 minutes</option>
+									<option value={15}>Every 15 minutes</option>
+									<option value={30}>Every 30 minutes</option>
+									<option value={60}>Every hour</option>
+									<option value={0}>Manual only</option>
+								</select>
+							</div>
+							<p class="field-hint">
+								{syncInterval === 0
+									? 'Auto-sync is disabled. Use the Sync Now button to check for new messages.'
+									: `Mailx will automatically check for new messages every ${syncInterval} minutes.`}
+							</p>
 						</div>
 					</div>
 				</div>
@@ -567,6 +744,11 @@
 		box-shadow: 0 3px 10px -2px rgba(107, 114, 128, 0.25);
 	}
 
+	.section-icon-accent {
+		background: linear-gradient(135deg, #0ea5e9 0%, #38bdf8 100%);
+		box-shadow: 0 3px 10px -2px rgba(14, 165, 233, 0.25);
+	}
+
 	.section-title {
 		font-size: 1rem;
 		font-weight: 600;
@@ -671,6 +853,69 @@
 		color: #9ca3af;
 		margin-top: -0.25rem;
 		line-height: 1.4;
+	}
+
+	/* Field row for side-by-side inputs */
+	.field-row {
+		display: flex;
+		gap: 1rem;
+		align-items: flex-end;
+	}
+
+	.field-row .field-group {
+		flex: 1;
+	}
+
+	.field-row .field-group:last-child {
+		flex: 0 0 auto;
+	}
+
+	/* Checkbox input */
+	.checkbox-input {
+		margin-right: 0.5rem;
+		width: 16px;
+		height: 16px;
+		accent-color: #8b5cf6;
+	}
+
+	/* Action link buttons */
+	.action-link-button {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.5rem 0.75rem;
+		font-size: 0.8125rem;
+		font-weight: 500;
+		color: #8b5cf6;
+		background: rgba(139, 92, 246, 0.08);
+		border: 1px solid rgba(139, 92, 246, 0.2);
+		border-radius: 8px;
+		cursor: pointer;
+		transition: all 0.2s ease;
+	}
+
+	.action-link-button:hover:not(:disabled) {
+		background: rgba(139, 92, 246, 0.12);
+		border-color: rgba(139, 92, 246, 0.3);
+	}
+
+	.action-link-button:disabled {
+		opacity: 0.6;
+		cursor: not-allowed;
+	}
+
+	.test-success {
+		font-size: 0.8125rem;
+		color: #16a34a;
+		margin-top: 0.5rem;
+		display: flex;
+		align-items: center;
+		gap: 0.25rem;
+	}
+
+	.test-success::before {
+		content: '✓';
+		font-weight: 600;
 	}
 
 	/* Form Divider */

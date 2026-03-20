@@ -135,6 +135,9 @@
 				<h3 class="section-title">Thread Details</h3>
 				<p class="section-description">Decide how much context the list reveals at a glance.</p>
 			</div>
+			<button class="reset-button" onclick={() => preferences.resetSection('appearance')}>
+				Reset appearance
+			</button>
 		</div>
 
 		<div class="toggle-stack">

@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
-	import { ArrowLeft, Check, Loader2, Mail, Lock, Server, Eye, EyeOff } from 'lucide-svelte';
+	import { invoke } from '@tauri-apps/api/core';
+	import { ArrowLeft, Check, Loader2, Mail, Lock, Server, Eye, EyeOff, ShieldCheck } from 'lucide-svelte';
 	import * as accounts from '$lib/accounts/index.js';
 	import { syncAccount } from '$lib/sync/index.js';
 
@@ -10,6 +11,8 @@
 	let imapServer = $state('');
 	let smtpServer = $state('');
 	let isSubmitting = $state(false);
+	let isTesting = $state(false);
+	let testResult = $state<string | null>(null);
 	let error = $state<string | null>(null);
 	let showPassword = $state(false);
 
@@ -29,6 +32,42 @@
 
 			imapServer = imapDefaults.server;
 			smtpServer = smtpDefaults.server;
+		}
+		// Clear previous test result when email changes
+		testResult = null;
+	}
+
+	async function testConnection() {
+		if (!email || !password) {
+			error = 'Please enter email and password first';
+			return;
+		}
+
+		if (!imapServer || !smtpServer) {
+			error = 'Please enter or auto-detect server settings first';
+			return;
+		}
+
+		isTesting = true;
+		error = null;
+		testResult = null;
+
+		try {
+			const result = await invoke('test_connection_credentials', {
+				email,
+				password,
+				imapServer,
+				smtpServer,
+				imapPort: 993,
+				smtpPort: 587,
+				imapUseSsl: true,
+				smtpUseSsl: true
+			});
+			testResult = result as string;
+		} catch (e) {
+			error = e instanceof Error ? e.message : 'Connection test failed';
+		} finally {
+			isTesting = false;
 		}
 	}
 
@@ -224,6 +263,26 @@
 							/>
 						</div>
 						<p class="field-hint">Leave empty to auto-detect (supports Gmail, Outlook, QQ, 163, 126, etc.)</p>
+					</div>
+
+					<!-- Test Connection -->
+					<div class="field-group">
+						<button
+							type="button"
+							onclick={testConnection}
+							disabled={isTesting || isSubmitting}
+							class="test-connection-button"
+						>
+							{#if isTesting}
+								<Loader2 class="size-4 animate-spin" />
+							{:else}
+								<ShieldCheck class="size-4" />
+							{/if}
+							<span>{isTesting ? 'Testing...' : 'Test Connection'}</span>
+						</button>
+						{#if testResult}
+							<p class="test-success">{testResult}</p>
+						{/if}
 					</div>
 				</div>
 			</div>
@@ -545,6 +604,46 @@
 	.cancel-button:hover:not(:disabled) {
 		background: rgba(0, 0, 0, 0.04);
 		color: #1d1d1f;
+	}
+
+	/* Test Connection Button */
+	.test-connection-button {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.625rem 1rem;
+		font-size: 0.8125rem;
+		font-weight: 500;
+		color: #16a34a;
+		background: rgba(22, 163, 74, 0.08);
+		border: 1px solid rgba(22, 163, 74, 0.2);
+		border-radius: 10px;
+		cursor: pointer;
+		transition: all 0.2s ease;
+	}
+
+	.test-connection-button:hover:not(:disabled) {
+		background: rgba(22, 163, 74, 0.12);
+		border-color: rgba(22, 163, 74, 0.3);
+	}
+
+	.test-connection-button:disabled {
+		opacity: 0.6;
+		cursor: not-allowed;
+	}
+
+	.test-success {
+		font-size: 0.75rem;
+		color: #16a34a;
+		margin-top: 0.5rem;
+		display: flex;
+		align-items: center;
+		gap: 0.25rem;
+	}
+
+	.test-success::before {
+		content: '✓';
+		font-weight: 600;
 	}
 
 	/* Security Hint */

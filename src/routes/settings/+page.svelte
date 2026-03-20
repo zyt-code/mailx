@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { invoke } from '@tauri-apps/api/core';
-	import { Plus, Loader2, AtSign, Trash2 } from 'lucide-svelte';
+	import { Plus, Loader2, AtSign, Trash2, RefreshCw, Edit, MoreVertical, CheckCircle, XCircle, Clock } from 'lucide-svelte';
 	import * as db from '$lib/db/index.js';
+	import { syncAccount } from '$lib/sync/index.js';
+	import type { SyncStatus } from '$lib/types.js';
 
 	interface Account {
 		id: string;
@@ -14,9 +16,18 @@
 	}
 
 	let accounts = $state<Account[]>([]);
+	let syncStatuses = $state<Record<string, SyncStatus>>({});
 	let isLoading = $state(true);
 	let error = $state<string | null>(null);
 	let isClearing = $state(false);
+	let syncingAccountId = $state<string | null>(null);
+
+	interface StatusInfo {
+		text: string;
+		iconName: string;
+		colorClass: string;
+		animate?: boolean;
+	}
 
 	async function loadAccounts() {
 		isLoading = true;
@@ -24,6 +35,8 @@
 		try {
 			const result = await invoke('get_accounts');
 			accounts = result as Account[];
+			// Load sync status for each account
+			await loadSyncStatus();
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to load accounts';
 		} finally {
@@ -31,8 +44,22 @@
 		}
 	}
 
+	async function loadSyncStatus() {
+		try {
+			const statuses = await invoke<SyncStatus[]>('get_sync_status');
+			syncStatuses = Object.fromEntries(
+				statuses.map(s => [s.account_id, s])
+			);
+		} catch (e) {
+			console.error('Failed to load sync status:', e);
+		}
+	}
+
 	$effect(() => {
 		loadAccounts();
+		// Poll sync status every 5 seconds
+		const interval = setInterval(loadSyncStatus, 5000);
+		return () => clearInterval(interval);
 	});
 
 	function openAddForm() {
@@ -51,6 +78,38 @@
 		return account.name || account.email;
 	}
 
+	function getSyncStatus(accountId: string) {
+		return syncStatuses[accountId];
+	}
+
+	function formatLastSync(timestamp?: number): string {
+		if (!timestamp) return 'Never';
+		const now = Date.now();
+		const diff = now - timestamp;
+		if (diff < 60000) return 'Just now';
+		if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+		if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+		return `${Math.floor(diff / 86400000)}d ago`;
+	}
+
+	function getSyncStatusInfo(status: SyncStatus | undefined): StatusInfo {
+		if (!status) {
+			return { text: 'Unknown', iconName: 'Clock', colorClass: 'text-gray-500' };
+		}
+		switch (status.status) {
+			case 'idle':
+				return { text: `Synced ${formatLastSync(status.last_sync)}`, iconName: 'CheckCircle', colorClass: 'text-green-500' };
+			case 'syncing':
+				return { text: 'Syncing...', iconName: 'Loader2', colorClass: 'text-blue-500', animate: true };
+			case 'failed':
+				return { text: status.error_message || 'Failed', iconName: 'XCircle', colorClass: 'text-red-500' };
+			case 'cancelled':
+				return { text: 'Cancelled', iconName: 'XCircle', colorClass: 'text-gray-500' };
+			default:
+				return { text: 'Unknown', iconName: 'Clock', colorClass: 'text-gray-500' };
+		}
+	}
+
 	async function handleClearDatabase() {
 		if (!confirm('Are you sure you want to clear all emails from the database? This will delete all synced emails and cannot be undone.')) {
 			return;
@@ -63,6 +122,26 @@
 			alert('Failed to clear database: ' + (e instanceof Error ? e.message : String(e)));
 		} finally {
 			isClearing = false;
+		}
+	}
+
+	async function handleSyncAccount(accountId: string, event: Event) {
+		event.stopPropagation();
+		syncingAccountId = accountId;
+		try {
+			await syncAccount(accountId);
+		} catch (e) {
+			console.error('Sync failed:', e);
+			alert('Sync failed: ' + (e instanceof Error ? e.message : String(e)));
+		} finally {
+			syncingAccountId = null;
+		}
+	}
+
+	function handleDeleteAccount(accountId: string, event: Event) {
+		event.stopPropagation();
+		if (confirm('Are you sure you want to delete this account? This will remove the account and all its locally cached emails.')) {
+			goto(`/settings/accounts/${accountId}/delete`);
 		}
 	}
 </script>
@@ -156,9 +235,14 @@
 	<!-- Accounts List -->
 	<div class="accounts-grid">
 		{#each accounts as account (account.id)}
-			<button
+			{@const syncStatus = getSyncStatus(account.id)}
+			{@const statusInfo = getSyncStatus(syncStatus)}
+			<div
 				onclick={() => editAccount(account.id)}
 				class="account-card"
+				role="button"
+				tabindex="0"
+				onkeydown={(e) => e.key === 'Enter' && editAccount(account.id)}
 			>
 				<div class="account-avatar">
 					<span class="avatar-text">{getInitials(account.email)}</span>
@@ -167,17 +251,49 @@
 					<h4 class="account-name">{getDisplayName(account)}</h4>
 					<p class="account-email">{account.email}</p>
 				</div>
-				<div class="account-status">
-					<div class="status-dot"></div>
-					<span class="status-text">Connected</span>
+				<div class="account-status" class:syncing={syncStatus?.status === 'syncing'}>
+					<div class="status-icon" class:animate={statusInfo.animate}>
+						{#if statusInfo.iconName === 'CheckCircle'}
+							<CheckCircle class="size-3.5" strokeWidth={2} />
+						{:else if statusInfo.iconName === 'Loader2'}
+							<Loader2 class="size-3.5 animate-spin" strokeWidth={2} />
+						{:else if statusInfo.iconName === 'XCircle'}
+							<XCircle class="size-3.5" strokeWidth={2} />
+						{:else}
+							<Clock class="size-3.5" strokeWidth={2} />
+						{/if}
+					</div>
+					<span class="status-text">{statusInfo.text}</span>
 				</div>
-				<div class="account-action">
-					<span>Manage</span>
-					<svg class="arrow-icon" width="16" height="16" viewBox="0 0 16 16" fill="none">
-						<path d="M6 3L11 8L6 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-					</svg>
+				<div class="account-actions">
+					<button
+						onclick={(e) => handleSyncAccount(account.id, e)}
+						disabled={syncingAccountId === account.id}
+						class="action-button sync-button"
+						title="Sync account"
+					>
+						{#if syncingAccountId === account.id}
+							<Loader2 class="size-4 animate-spin" />
+						{:else}
+							<RefreshCw class="size-4" />
+						{/if}
+					</button>
+					<button
+						onclick={() => editAccount(account.id)}
+						class="action-button edit-button"
+						title="Edit account"
+					>
+						<Edit class="size-4" />
+					</button>
+					<button
+						onclick={(e) => handleDeleteAccount(account.id, e)}
+						class="action-button delete-button"
+						title="Delete account"
+					>
+						<Trash2 class="size-4" />
+					</button>
 				</div>
-			</button>
+			</div>
 		{/each}
 	</div>
 {/if}
@@ -473,22 +589,35 @@
 		border-radius: 8px;
 		position: relative;
 		z-index: 1;
+		transition: background 0.2s ease;
 	}
 
-	.status-dot {
-		width: 6px;
-		height: 6px;
-		background: #22c55e;
-		border-radius: 50%;
-		animation: pulse 2s ease-in-out infinite;
+	.account-status.syncing {
+		background: rgba(59, 130, 246, 0.1);
 	}
 
-	@keyframes pulse {
-		0%, 100% {
-			opacity: 1;
+	.status-icon {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+	}
+
+	.account-status:not(.syncing) .status-icon {
+		color: #16a34a;
+	}
+
+	.account-status.syncing .status-icon {
+		color: #3b82f6;
+		animation: spin 1s linear infinite;
+	}
+
+	@keyframes spin {
+		from {
+			transform: rotate(0deg);
 		}
-		50% {
-			opacity: 0.5;
+		to {
+			transform: rotate(360deg);
 		}
 	}
 
@@ -498,30 +627,64 @@
 		color: #16a34a;
 	}
 
-	.account-action {
+	.account-status.syncing .status-text {
+		color: #3b82f6;
+	}
+
+	.account-actions {
 		display: flex;
 		align-items: center;
 		gap: 0.375rem;
-		padding: 0.5rem 0.75rem;
+		position: relative;
+		z-index: 1;
+	}
+
+	.action-button {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 32px;
+		height: 32px;
+		padding: 0;
 		font-size: 0.8125rem;
 		color: #6b6b6b;
 		background: transparent;
 		border: none;
 		border-radius: 8px;
-		position: relative;
-		z-index: 1;
+		cursor: pointer;
+		transition: all 0.2s ease;
 		opacity: 0;
 		transform: translateX(-8px);
-		transition: all 0.25s ease;
 	}
 
-	.account-card:hover .account-action {
+	.account-card:hover .action-button {
 		opacity: 1;
 		transform: translateX(0);
 	}
 
-	.arrow-icon {
-		color: #6b6b6b;
+	.action-button:hover {
+		background: rgba(0, 0, 0, 0.06);
+		transform: scale(1.05);
+	}
+
+	.action-button.sync-button:hover {
+		color: #8b5cf6;
+		background: rgba(139, 92, 246, 0.1);
+	}
+
+	.action-button.edit-button:hover {
+		color: #0ea5e9;
+		background: rgba(14, 165, 233, 0.1);
+	}
+
+	.action-button.delete-button:hover {
+		color: #ef4444;
+		background: rgba(239, 68, 68, 0.1);
+	}
+
+	.action-button:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
 	}
 
 	/* Animations */

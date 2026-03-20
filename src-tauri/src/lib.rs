@@ -13,6 +13,11 @@ use accounts::AccountManager;
 use credentials::CredentialManager;
 use database::Database;
 use std::sync::Arc;
+
+// Menu and navigation constants
+const MENU_ID_ABOUT: &str = "about";
+const WINDOW_ID_MAIN: &str = "main";
+const NAV_ROUTE_ABOUT: &str = "/about";
 use sync_manager::SyncManager;
 use tauri::{Emitter, Manager};
 
@@ -69,7 +74,7 @@ pub fn run() {
 
                 // Create app menu (the menu with app name)
                 let about_item =
-                    MenuItem::with_id(app, "about", "About Mailx", true, None::<&str>)?;
+                    MenuItem::with_id(app, MENU_ID_ABOUT, "About Mailx", true, None::<&str>)?;
 
                 // Create File menu
                 let close_item =
@@ -111,31 +116,34 @@ pub fn run() {
 
                 // Handle menu events
                 app.on_menu_event(|app, event| match event.id.as_ref() {
-                    "about" => {
-                        if let Some(window) = app.get_webview_window("main") {
-                            let _ = window.emit("navigate", "/about");
+                    MENU_ID_ABOUT => {
+                        if let Some(window) = app.get_webview_window(WINDOW_ID_MAIN) {
+                            let _ = window.emit("navigate", NAV_ROUTE_ABOUT);
                         }
                     }
+                    _ => {}
                 });
             }
 
             #[cfg(not(target_os = "macos"))]
             {
-                // Windows/Linux: Create minimal menu with Settings
+                // Windows/Linux: Hide menu bar by using empty menu
                 use tauri::menu::{Menu, MenuItem, Submenu};
 
-                let tools_menu = Submenu::with_items(app, "Tools", true, &[&settings_item])?;
+                let about_item = MenuItem::with_id(app, MENU_ID_ABOUT, "About", true, None::<&str>)?;
+                let tools_menu = Submenu::with_items(app, "Tools", true, &[&about_item])?;
 
                 let menu = Menu::with_items(app, &[&tools_menu])?;
                 app.set_menu(menu)?;
 
                 // Handle menu events for Windows/Linux
                 app.on_menu_event(|app, event| match event.id.as_ref() {
-                    "about" => {
-                        if let Some(window) = app.get_webview_window("main") {
-                            let _ = window.emit("navigate", "/about");
+                    MENU_ID_ABOUT => {
+                        if let Some(window) = app.get_webview_window(WINDOW_ID_MAIN) {
+                            let _ = window.emit("navigate", NAV_ROUTE_ABOUT);
                         }
                     }
+                    _ => {}
                 });
             }
 
@@ -159,6 +167,8 @@ pub fn run() {
             commands::toggle_star,
             commands::get_unread_count,
             commands::clear_database,
+            commands::get_database_size,
+            commands::compact_database,
             // Account commands
             commands::get_accounts,
             commands::get_account,
@@ -166,6 +176,7 @@ pub fn run() {
             commands::update_account,
             commands::delete_account,
             commands::test_account_connection,
+            commands::test_connection_credentials,
             commands::provider_defaults_for_email,
             // Sync commands
             commands::sync_account,

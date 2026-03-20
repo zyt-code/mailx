@@ -239,7 +239,7 @@
 							<ContextMenu.Trigger>
 								<button
 									class={cn(
-										'relative flex w-full items-stretch gap-3 overflow-hidden rounded-xl border text-left select-none [-webkit-user-select:none] [user-select:none] cursor-default transition-all duration-120 shadow-[var(--shadow-xs)]',
+										'mail-item relative flex w-full items-stretch gap-3 overflow-hidden rounded-xl border text-left select-none [-webkit-user-select:none] [user-select:none] cursor-default transition-all duration-120 shadow-[var(--shadow-xs)]',
 										mailDensity === 'compact' && 'h-[68px] px-3 py-2',
 										mailDensity === 'comfortable' && 'h-[82px] px-3.5 py-3',
 										mailDensity === 'airy' && 'h-[96px] px-4 py-3.5',

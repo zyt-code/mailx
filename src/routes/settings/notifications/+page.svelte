@@ -119,6 +119,9 @@
 				<h3 class="section-title">In-App Sync Feedback</h3>
 				<p class="section-description">Tune how loudly Mailx reports background sync work.</p>
 			</div>
+			<button class="reset-button" onclick={() => preferences.resetSection('notifications')}>
+				Reset notifications
+			</button>
 		</div>
 
 		<div class="toggle-stack">

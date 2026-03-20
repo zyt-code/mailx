@@ -350,6 +350,32 @@ input:focus, textarea:focus {
    COMPONENT STYLES
    ======================================== */
 
+/* Mail Density Styles */
+[data-mail-density="compact"] .mail-item {
+	height: 68px;
+	padding: 8px 12px;
+}
+
+[data-mail-density="comfortable"] .mail-item {
+	height: 82px;
+	padding: 10px 12px;
+}
+
+[data-mail-density="airy"] .mail-item {
+	height: 96px;
+	padding: 14px 12px;
+}
+
+/* Preview snippets line clamp based on density */
+[data-mail-density="compact"] .mail-preview {
+	-webkit-line-clamp: 1;
+}
+
+[data-mail-density="comfortable"] .mail-preview,
+[data-mail-density="airy"] .mail-preview {
+	-webkit-line-clamp: 2;
+}
+
 /* Sidebar active state */
 .sidebar-active {
 	background: var(--bg-active) !important;

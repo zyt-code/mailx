@@ -821,6 +821,26 @@ impl Database {
         Ok(())
     }
 
+    /// Get the size of the database file in bytes
+    pub fn get_database_size(&self) -> SqliteResult<u64> {
+        let conn = self.conn.lock().unwrap();
+        let path_opt = conn.path();
+        let path_str = path_opt.ok_or_else(|| rusqlite::Error::InvalidPath(PathBuf::from("Database path not available")))?;
+        let path = PathBuf::from(path_str);
+        drop(conn);
+
+        let metadata = fs::metadata(&path)
+            .map_err(|e| rusqlite::Error::InvalidPath(PathBuf::from(format!("Failed to get database size: {}", e))))?;
+        Ok(metadata.len())
+    }
+
+    /// Compact the database by running VACUUM
+    pub fn compact_database(&self) -> SqliteResult<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute("VACUUM", [])?;
+        Ok(())
+    }
+
     /// Mark a mail as read or unread
     pub fn mark_mail_read(&self, id: &str, read: bool) -> SqliteResult<()> {
         let conn = self.conn.lock().unwrap();
