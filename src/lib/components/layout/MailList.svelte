@@ -1,10 +1,16 @@
 <script lang="ts">
+	import { VList } from 'virtua/svelte';
 	import { cn } from '$lib/utils.js';
 	import * as ContextMenu from '$lib/components/ui/context-menu/index.js';
 	import { Search, Paperclip, MailOpen, Mail as MailIcon, Archive, Trash2, FolderInput, Inbox, Send, FileText } from 'lucide-svelte';
 	import type { Mail, Folder, Account } from '$lib/types.js';
 	import { accounts } from '$lib/stores/accountStore.js';
-	import { displayedEmails, activeFolder as storeActiveFolder, markMailReadLocally } from '$lib/stores/mailStore.js';
+	import {
+		displayedEmails,
+		activeFolder as storeActiveFolder,
+		markMailReadLocally,
+		selectedAccountId as selectedAccountFilterId
+	} from '$lib/stores/mailStore.js';
 	import { markMailAsRead } from '$lib/db/index.js';
 	import { preferences } from '$lib/stores/preferencesStore.js';
 
@@ -20,23 +26,37 @@
 		isSyncing?: boolean;
 	}
 
+	const PAGE_SIZE = 30;
+
+	const ESTIMATED_HEIGHTS = {
+		compact: 68,
+		comfortable: 82,
+		airy: 96
+	};
+
 	let { selectedMailId, onSelectMail, onMarkRead, onDelete, onArchive, onMoveTo, width, isAccountConfigured = true, isSyncing = false }: Props = $props();
 
-	// Get all accounts for account indicators
+	// State
 	let allAccounts = $state<Account[]>([]);
+	let displayedMails = $state<Mail[]>([]);
+	let currentSelectedAccountId = $state<string | null>(null);
+	let activeFolder: Folder = $state('inbox');
+	let searchQuery = $state('');
+	let visibleMailCount = $state(PAGE_SIZE);
+	let isLoadingMore = $state(false);
 
+	// Appearance preferences
+	let mailDensity = $state<'compact' | 'comfortable' | 'airy'>('comfortable');
+	let showPreviewSnippets = $state(true);
+	let showAccountColor = $state(true);
+
+	// Subscriptions
 	$effect(() => {
 		const unsub = accounts.subscribe((accs) => {
 			allAccounts = accs;
 		});
 		return unsub;
 	});
-
-	// Use displayedEmails from mailStore (already filtered by folder and account)
-	let displayedMails = $state<Mail[]>([]);
-	let mailDensity = $state<'compact' | 'comfortable' | 'airy'>('comfortable');
-	let showPreviewSnippets = $state(true);
-	let showAccountColor = $state(true);
 
 	$effect(() => {
 		const unsub = displayedEmails.subscribe((mails) => {
@@ -54,8 +74,12 @@
 		return unsub;
 	});
 
-	// Get activeFolder from store for label display
-	let activeFolder: Folder = $state('inbox');
+	$effect(() => {
+		const unsub = selectedAccountFilterId.subscribe((accountId) => {
+			currentSelectedAccountId = accountId;
+		});
+		return unsub;
+	});
 
 	$effect(() => {
 		const unsub = storeActiveFolder.subscribe((folder) => {
@@ -64,8 +88,7 @@
 		return unsub;
 	});
 
-	let searchQuery = $state('');
-
+	// Derived
 	let filteredMails = $derived(
 		searchQuery.trim()
 			? displayedMails.filter((m) => {
@@ -80,9 +103,25 @@
 			: displayedMails
 	);
 
-	// No date grouping - flat list like Apple Mail
-	let flatMails = $derived(filteredMails);
+	let visibleMails = $derived(
+		searchQuery.trim() ? filteredMails : filteredMails.slice(0, visibleMailCount)
+	);
 
+	let canLoadMore = $derived(
+		!searchQuery.trim() && visibleMailCount < filteredMails.length
+	);
+
+	// Virtualization - using svelte-virtua
+
+	// Reset visible count when search or folder changes
+	$effect(() => {
+		activeFolder;
+		currentSelectedAccountId;
+		searchQuery;
+		visibleMailCount = PAGE_SIZE;
+	});
+
+	// Logic
 	const folderLabels: Record<Folder, string> = {
 		inbox: 'Inbox',
 		sent: 'Sent',
@@ -104,25 +143,16 @@
 			return 'Yesterday';
 		} else if (diffDays < 7) {
 			return mailDate.toLocaleDateString('en-US', { weekday: 'short' });
-		} else {
-			return mailDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 		}
+		return mailDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 	}
 
-	// Get account color for a mail based on account_id
 	function getAccountColor(mail: Mail): string {
 		if (!mail.account_id) return 'bg-zinc-300';
 		const colors = [
-			'bg-blue-500',
-			'bg-green-500',
-			'bg-purple-500',
-			'bg-orange-500',
-			'bg-pink-500',
-			'bg-teal-500',
-			'bg-cyan-500',
-			'bg-red-500'
+			'bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-orange-500',
+			'bg-pink-500', 'bg-teal-500', 'bg-cyan-500', 'bg-red-500'
 		];
-		// Use account_id to generate consistent color
 		let hash = 0;
 		for (let i = 0; i < mail.account_id.length; i++) {
 			hash = mail.account_id.charCodeAt(i) + ((hash << 5) - hash);
@@ -130,41 +160,30 @@
 		return colors[Math.abs(hash) % colors.length];
 	}
 
-	// Get account for a mail
 	function getAccountForMail(mail: Mail): Account | undefined {
 		if (!mail.account_id) return undefined;
 		return allAccounts.find((acc) => acc.id === mail.account_id);
 	}
 
-	// Check if multiple accounts exist
 	let hasMultipleAccounts = $derived(allAccounts.length > 1);
 
-	// Handle mail selection with server read sync
 	function handleSelectMail(mailId: string) {
-		// Step 1: UI feedback — highlight immediately
 		onSelectMail(mailId);
-
 		const mail = displayedMails.find((m) => m.id === mailId);
 		if (!mail) return;
-
-		const wasUnread = !(mail.is_read ?? false);
-
-		if (wasUnread) {
-			// Step 2: Local optimistic update
+		if (!(mail.is_read ?? false)) {
 			markMailReadLocally(mailId);
-
-			// Step 3: Background sync — fire and forget
 			if (mail.account_id && typeof mail.uid === 'number') {
 				markMailAsRead(mail.uid, mail.account_id).catch((error) => {
 					console.error('[MailList] Failed to sync read status:', error);
 				});
-			} else {
-				console.warn('[MailList] Missing account_id or uid, skipping server sync', {
-					accountId: mail.account_id,
-					uid: mail.uid
-				});
 			}
 		}
+	}
+
+	function maybeLoadMore() {
+		if (!canLoadMore || isLoadingMore) return;
+		visibleMailCount = Math.min(filteredMails.length, visibleMailCount + PAGE_SIZE);
 	}
 </script>
 
@@ -173,7 +192,6 @@
 	style:width={width !== undefined ? `${width}px` : undefined}
 	class:w-full={width === undefined}
 >
-	<!-- Search -->
 	<div class="flex items-center gap-2 px-3 py-2 border-b border-[var(--border-primary)] shrink-0 sticky top-0 bg-[var(--bg-primary)] z-10">
 		<Search class={cn(
 			"size-4 shrink-0",
@@ -193,112 +211,111 @@
 		/>
 	</div>
 
-	<!-- Sync loading bar -->
 	{#if isSyncing}
 		<div class="shrink-0 h-[1px] w-full bg-[var(--border-primary)] overflow-hidden">
 			<div class="h-full w-1/4 bg-[var(--accent-primary)] animate-shimmer"></div>
 		</div>
 	{/if}
 
-	<!-- Mail items - independent scroll -->
-	<div class="flex-1 overflow-y-auto min-h-0">
+	<div class="flex-1 min-h-0">
 		{#if filteredMails.length === 0}
 			<div class="flex flex-col items-center justify-center px-6 py-16">
 				<p class="text-[13px] text-[var(--text-tertiary)]">No emails found</p>
 			</div>
 		{:else}
-			<div class="px-2 py-1">
-				{#each flatMails as mail}
+			<VList
+				data={visibleMails}
+				style="height: 100%;"
+				getKey={(mail: Mail) => mail.id}
+				itemSize={ESTIMATED_HEIGHTS[mailDensity]}
+				bufferSize={200}
+				onscrollend={maybeLoadMore}
+			>
+				{#snippet children(mail: Mail, index: number)}
 					{@const isSelected = mail.id === selectedMailId}
 					{@const isUnread = !(mail.is_read ?? false)}
-					<ContextMenu.Root>
-						<ContextMenu.Trigger>
-							<button
-								class={cn(
-									'relative flex w-full items-center text-left select-none [-webkit-user-select:none] [user-select:none] cursor-default mx-1 my-0.5 rounded-md transition-all duration-120 mail-item-button',
-									mailDensity === 'compact' && 'min-h-[68px] px-3 py-2',
-									mailDensity === 'comfortable' && 'min-h-[82px] px-3.5 py-3',
-									mailDensity === 'airy' && 'min-h-[96px] px-4 py-3.5',
-									isSelected
-										? 'bg-[var(--bg-selected)]'
-										: 'hover:bg-[var(--bg-hover)]'
-								)}
-								onclick={() => handleSelectMail(mail.id)}
-							>
-								<!-- Unread dot - only show when not selected -->
-								{#if isUnread && !isSelected}
-									<div class="absolute left-2.5 top-1/2 -translate-y-1/2 unread-dot"></div>
-								{/if}
-
-									<!-- Account indicator dot (when multiple accounts) -->
-									{#if showAccountColor && hasMultipleAccounts && mail.account_id}
-										<div class="flex-shrink-0 mr-2">
-											<div
-												class={cn(
-													'size-2 rounded-full',
-													getAccountColor(mail),
-													isSelected && 'opacity-60'
-												)}
-												title={getAccountForMail(mail)?.email || 'Unknown account'}
-											></div>
-										</div>
+					<div class="px-2 py-1">
+						<ContextMenu.Root>
+							<ContextMenu.Trigger>
+								<button
+									class={cn(
+										'relative flex w-full items-stretch gap-3 overflow-hidden rounded-xl border text-left select-none [-webkit-user-select:none] [user-select:none] cursor-default transition-all duration-120 shadow-[var(--shadow-xs)]',
+										mailDensity === 'compact' && 'h-[68px] px-3 py-2',
+										mailDensity === 'comfortable' && 'h-[82px] px-3.5 py-3',
+										mailDensity === 'airy' && 'h-[96px] px-4 py-3.5',
+										isSelected
+											? 'border-[var(--accent-muted)] bg-[var(--bg-selected)] shadow-[var(--shadow-sm)]'
+											: 'border-transparent hover:border-[var(--border-secondary)] hover:bg-[var(--bg-hover)]'
+									)}
+									onclick={() => handleSelectMail(mail.id)}
+								>
+									{#if isUnread && !isSelected}
+										<div class="absolute left-2.5 top-5 unread-dot"></div>
 									{/if}
 
-									<!-- Content - fixed height container -->
-									<div class="flex-1 min-w-0 flex flex-col justify-center h-full overflow-hidden">
-										<!-- Top: Sender + Time -->
-										<div class="flex items-baseline justify-between gap-2 overflow-hidden">
-											<span
-												class={cn(
-													'truncate text-[13px]',
+									<div class="flex min-w-0 flex-1 gap-3">
+										<div class="flex w-3 shrink-0 items-start justify-center pt-1">
+											{#if showAccountColor && hasMultipleAccounts && mail.account_id}
+												<div
+													class={cn(
+														'size-2 rounded-full',
+														getAccountColor(mail),
+														isSelected && 'opacity-70'
+													)}
+													title={getAccountForMail(mail)?.email || 'Unknown account'}
+												></div>
+											{/if}
+										</div>
+
+										<div class="flex min-w-0 flex-1 flex-col justify-between overflow-hidden">
+											<div class="flex items-start justify-between gap-3">
+												<span
+													class={cn(
+														'truncate text-[13px] leading-5',
+														isSelected
+															? 'text-[var(--accent-primary)] font-semibold'
+															: isUnread
+																? 'font-semibold text-[var(--text-primary)]'
+																: 'font-medium text-[var(--text-secondary)]'
+													)}
+												>
+													{mail.from_name || mail.from_email}
+												</span>
+												<span class={cn(
+													'text-[11px] leading-5 tabular-nums shrink-0',
+													isSelected ? 'text-[var(--accent-primary)]' : 'text-[var(--text-tertiary)]'
+												)}>
+													{formatMailTime(mail.timestamp)}
+												</span>
+											</div>
+
+											<div class="min-w-0">
+												<span class={cn(
+													'block truncate text-[13px] leading-5',
 													isSelected
-														? 'text-[var(--accent-primary)] font-semibold'
+														? 'text-[var(--text-primary)] font-semibold'
 														: isUnread
 															? 'font-semibold text-[var(--text-primary)]'
 															: 'font-medium text-[var(--text-secondary)]'
-												)}
-											>
-												{mail.from_name}
-											</span>
-											<span class={cn(
-												'text-[11px] tabular-nums shrink-0',
-												isSelected ? 'text-[var(--accent-primary)]' : 'text-[var(--text-tertiary)]'
-											)}>
-												{formatMailTime(mail.timestamp)}
-											</span>
-										</div>
+												)}>
+													{mail.subject}
+												</span>
+											</div>
 
-										<!-- Middle: Subject - single line truncate -->
-										<div class="overflow-hidden">
-											<span class={cn(
-												'block truncate text-[13px]',
-												isSelected
-													? 'text-[var(--text-primary)] font-semibold'
-													: isUnread
-														? 'font-semibold text-[var(--text-primary)]'
-														: 'font-medium text-[var(--text-secondary)]'
-											)}>
-												{mail.subject}
-											</span>
-										</div>
-
-										{#if showPreviewSnippets}
-											<!-- Bottom: Preview snippet -->
-											<div class="overflow-hidden">
+											{#if showPreviewSnippets}
 												<p class={cn(
 													mailDensity === 'compact' ? 'line-clamp-1' : 'line-clamp-2',
-													'text-[12px] leading-snug',
+													'text-[12px] leading-5',
 													isSelected ? 'text-[var(--text-secondary)]' : 'text-[var(--text-tertiary)]'
 												)}>
-													{mail.preview || ' '}
+													{mail.preview || 'No preview available'}
 												</p>
-											</div>
-										{/if}
+											{/if}
+										</div>
 									</div>
 
-									<!-- Attachment indicator -->
 									{#if mail.has_attachments}
-										<div class="flex-shrink-0 mx-2">
+										<div class="flex shrink-0 items-start pt-1">
 											<Paperclip class={cn(
 												'size-3.5',
 												isSelected ? 'text-[var(--accent-primary)]' : 'text-[var(--text-quaternary)]'
@@ -309,7 +326,6 @@
 							</ContextMenu.Trigger>
 
 							<ContextMenu.Content>
-								<!-- Mark Read/Unread -->
 								{#if !(mail.is_read ?? false)}
 									<ContextMenu.Item onclick={() => onMarkRead?.(mail, true)}>
 										<MailOpen class="size-4 text-zinc-500" strokeWidth={1.5} />
@@ -324,13 +340,11 @@
 
 								<ContextMenu.Separator />
 
-								<!-- Archive -->
 								<ContextMenu.Item onclick={() => onArchive?.(mail)}>
 									<Archive class="size-4 text-zinc-500" strokeWidth={1.5} />
 									{mail.folder === 'archive' ? 'Move to Inbox' : 'Archive'}
 								</ContextMenu.Item>
 
-								<!-- Move to... -->
 								<ContextMenu.Sub>
 									<ContextMenu.SubTrigger>
 										<FolderInput class="size-4 text-zinc-500" strokeWidth={1.5} />
@@ -372,15 +386,16 @@
 
 								<ContextMenu.Separator />
 
-								<!-- Delete -->
 								<ContextMenu.Item class="text-red-500 data-[highlighted]:text-red-600" onclick={() => onDelete?.(mail)}>
 									<Trash2 class="size-4" strokeWidth={1.5} />
 									Delete
 								</ContextMenu.Item>
 							</ContextMenu.Content>
 						</ContextMenu.Root>
-				{/each}
-			</div>
+					</div>
+				{/snippet}
+			</VList>
 		{/if}
 	</div>
 </div>
+
