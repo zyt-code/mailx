@@ -86,14 +86,9 @@
 	});
 
 	// Focus editor when clicking on the wrapper or any child element
-	function handleWrapperClick(event: MouseEvent): void {
+	function handleWrapperClick(): void {
 		if (!editor) return;
-		
-		// Focus the editor when clicking anywhere in the wrapper
-		// This includes clicks on the editor content area
-		if (!isFocused) {
-			editor.chain().focus().run();
-		}
+		editor.chain().focus().run();
 	}
 
 	// Expose editor to parent component
