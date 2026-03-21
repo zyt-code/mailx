@@ -24,8 +24,7 @@
 		Settings,
 		Lock,
 		Layers,
-		ChevronDown,
-		ChevronRight
+		ChevronDown
 	} from 'lucide-svelte';
 	import { ComposeModal } from '$lib/components/compose/index.js';
 
@@ -139,21 +138,23 @@
 	// Check if multiple accounts exist
 	let hasMultipleAccounts = $derived(allAccounts.length > 1);
 
-	// Get account color for avatar
-	function getAccountColor(email: string): string {
-		const colors = [
-			'bg-blue-100 text-blue-700',
-			'bg-green-100 text-green-700',
-			'bg-purple-100 text-purple-700',
-			'bg-orange-100 text-orange-700',
-			'bg-pink-100 text-pink-700',
-			'bg-teal-100 text-teal-700'
+	// Get account color for avatar — vivid gradient pairs for clear differentiation
+	function getAccountColor(email: string): { bg: string; text: string } {
+		const palettes = [
+			{ bg: '#3B82F6', text: '#FFFFFF' }, // Blue
+			{ bg: '#8B5CF6', text: '#FFFFFF' }, // Violet
+			{ bg: '#EC4899', text: '#FFFFFF' }, // Pink
+			{ bg: '#F97316', text: '#FFFFFF' }, // Orange
+			{ bg: '#10B981', text: '#FFFFFF' }, // Emerald
+			{ bg: '#06B6D4', text: '#FFFFFF' }, // Cyan
+			{ bg: '#EF4444', text: '#FFFFFF' }, // Red
+			{ bg: '#6366F1', text: '#FFFFFF' }, // Indigo
 		];
 		let hash = 0;
 		for (let i = 0; i < email.length; i++) {
 			hash = email.charCodeAt(i) + ((hash << 5) - hash);
 		}
-		return colors[Math.abs(hash) % colors.length];
+		return palettes[Math.abs(hash) % palettes.length];
 	}
 
 	// Get initials for avatar
@@ -282,14 +283,14 @@
 
 	{#if !collapsed || isMobile}
 		<!-- Compose Button -->
-		<div class="px-2.5 mt-2">
+		<div class="px-2.5 mt-2.5">
 			<button
 				onclick={openCompose}
 				disabled={!isAccountConfigured}
 				class={cn(
-					"flex items-center justify-center gap-2 w-full px-3 py-2 rounded-md transition-all duration-120 font-medium text-sm",
+					"flex items-center justify-center gap-2 w-full px-3 py-2 rounded-lg transition-all duration-150 font-semibold text-[13px]",
 					isAccountConfigured
-						? "bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-secondary)] shadow-sm hover:shadow-md active:scale-[0.98]"
+						? "bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-secondary)] shadow-sm hover:shadow-md active:scale-[0.97]"
 						: "bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] cursor-not-allowed"
 				)}
 				aria-label={$_('nav.newMessage')}
@@ -315,80 +316,90 @@
 					toggleAccountsCollapse();
 				}}
 				class={cn(
-					"flex items-center gap-2 px-2.5 py-1.5 rounded-md mx-2.5 mt-2 relative z-10 transition-all duration-120",
+					"group flex items-center gap-2.5 px-2.5 py-2 rounded-lg mx-2 mt-3 relative transition-all duration-150",
 					selectedAccountId === null
-						? "bg-[var(--bg-active)] text-[var(--text-primary)]"
+						? "bg-[var(--bg-active)] text-[var(--text-primary)] shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
 						: "hover:bg-[var(--bg-hover)] text-[var(--text-secondary)]"
 				)}
 				title={$_('nav.allInboxes')}
 				aria-expanded={!accountsCollapsed}
 				aria-controls="account-list"
 			>
-				<div class="relative">
-					<div class="flex size-7 items-center justify-center rounded-md bg-[var(--bg-tertiary)] text-[var(--text-secondary)]">
-						<Layers class="size-[15px]" strokeWidth={1.8} />
-					</div>
-					<div class="absolute -top-0.5 -right-0.5 size-3.5 bg-[var(--accent-primary)] rounded-full flex items-center justify-center shadow-sm">
-						{#if accountsCollapsed}
-							<ChevronRight class="size-[8px] text-white" strokeWidth={2.5} />
-						{:else}
-							<ChevronDown class="size-[8px] text-white" strokeWidth={2.5} />
-						{/if}
-					</div>
+				{#if selectedAccountId === null}
+					<div class="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full bg-[var(--accent-primary)] transition-all duration-200"></div>
+				{/if}
+				<div class="flex size-7 items-center justify-center rounded-md bg-[var(--bg-tertiary)] text-[var(--text-secondary)] transition-colors duration-150 group-hover:bg-[var(--bg-hover)]">
+					<Layers class="size-[15px]" strokeWidth={1.8} />
 				</div>
 				<div class="flex-1 min-w-0 text-left">
-					<p class="text-sm font-medium truncate">{$_('nav.allInboxes')}</p>
+					<p class="text-[13px] font-semibold truncate">{$_('nav.allInboxes')}</p>
 					{#if formattedLastSync && selectedAccountId === null}
 						<p class="text-[11px] text-[var(--text-tertiary)] tabular-nums">
 							{formattedLastSync}
 						</p>
 					{/if}
 				</div>
+				<div class={cn(
+					"transition-transform duration-200 text-[var(--text-quaternary)]",
+					accountsCollapsed ? "-rotate-90" : "rotate-0"
+				)}>
+					<ChevronDown class="size-3.5" strokeWidth={1.8} />
+				</div>
 			</button>
 
-			<!-- Individual accounts (collapsible) -->
+			<!-- Individual accounts (collapsible with CSS grid) -->
 			<div
 				id="account-list"
 				role="region"
-				class={cn(
-					"overflow-hidden transition-[max-height] duration-150 ease-out",
-					accountsCollapsed ? "max-h-0" : "max-h-[800px]"
-				)}
+				class="account-collapse-wrapper mx-2"
+				class:collapsed={accountsCollapsed}
 				aria-hidden={accountsCollapsed}
 			>
-				{#each allAccounts as account}
-					<button
-						onclick={() => handleAccountClick(account.id)}
-						class={cn(
-							"flex items-center gap-2 px-2.5 py-1.5 rounded-md mx-1.5 relative z-10 transition-all duration-120",
-							selectedAccountId === account.id
-								? "bg-[var(--bg-active)] text-[var(--text-primary)]"
-								: "hover:bg-[var(--bg-hover)] text-[var(--text-secondary)]"
-						)}
-						title={account.email}
-					>
-						<div class={cn(
-							"flex size-7 items-center justify-center rounded-full text-xs font-semibold shrink-0",
-							getAccountColor(account.email)
-						)}>
-							{getInitials(account.name)}
-						</div>
-						<div class="flex-1 min-w-0 text-left">
-							<p class="text-sm font-medium truncate">{account.name}</p>
-							<p class="text-xs text-[var(--text-tertiary)] truncate">{account.email}</p>
-						</div>
-						{#if isRefreshing && selectedAccountId === account.id}
-							<RefreshCw class="size-3 text-[var(--accent-primary)] animate-spin" strokeWidth={1.8} />
-						{/if}
-					</button>
-				{/each}
+				<div class="overflow-hidden">
+					<div class="pt-1 space-y-0.5">
+						{#each allAccounts as account}
+							{@const color = getAccountColor(account.email)}
+							<button
+								onclick={() => handleAccountClick(account.id)}
+								class={cn(
+									"group flex items-center gap-2.5 px-2.5 py-2 rounded-lg w-full relative transition-all duration-150",
+									selectedAccountId === account.id
+										? "bg-[var(--bg-active)] text-[var(--text-primary)] shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
+										: "hover:bg-[var(--bg-hover)] text-[var(--text-secondary)]"
+								)}
+								title={account.email}
+							>
+								{#if selectedAccountId === account.id}
+									<div class="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full bg-[var(--accent-primary)] transition-all duration-200"></div>
+								{/if}
+								<div
+									class="flex size-7 items-center justify-center rounded-md text-[11px] font-bold shrink-0 transition-transform duration-150 group-hover:scale-105 group-active:scale-95"
+									style:background-color={color.bg}
+									style:color={color.text}
+								>
+									{getInitials(account.name)}
+								</div>
+								<div class="flex-1 min-w-0 text-left">
+									<p class="text-[13px] font-medium truncate">{account.name}</p>
+									<p class="text-[11px] text-[var(--text-tertiary)] truncate">{account.email}</p>
+								</div>
+								{#if isRefreshing && (selectedAccountId === account.id || selectedAccountId === null)}
+									<RefreshCw class="size-3 text-[var(--accent-primary)] animate-spin shrink-0" strokeWidth={1.8} />
+								{/if}
+							</button>
+						{/each}
+					</div>
+				</div>
 			</div>
+
+			<!-- Separator -->
+			<div class="mx-4 mt-2 mb-1 h-px bg-[var(--border-primary)] opacity-60"></div>
 		{:else}
 			<!-- Single account display (original layout) -->
 			<div
 				class={cn(
-					"flex items-center gap-2 px-3 py-2 rounded-md mx-2 mt-1 relative z-10",
-					isAccountConfigured ? "hover:bg-zinc-100/50" : "opacity-60"
+					"flex items-center gap-2.5 px-2.5 py-2 rounded-lg mx-2 mt-3 relative",
+					isAccountConfigured ? "hover:bg-[var(--bg-hover)]" : "opacity-60"
 				)}
 			>
 				<div class={cn(
@@ -428,28 +439,34 @@
 		{/if}
 
 		<!-- Navigation -->
-		<nav class="flex-1 overflow-y-auto px-2.5 mt-2">
+		<nav class="flex-1 overflow-y-auto px-2 mt-1">
 			<div class="space-y-0.5 pb-2">
 				{#each navItems as item}
 					<button
 						class={cn(
-							'group flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-sm relative z-10 transition-all duration-120',
+							'group flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-[13px] relative transition-all duration-150',
 							isAccountConfigured && item.folder === activeFolder
-								? 'bg-[var(--bg-active)] text-[var(--text-primary)] font-medium'
+								? 'bg-[var(--bg-active)] text-[var(--text-primary)] font-semibold shadow-[0_1px_2px_rgba(0,0,0,0.04)]'
 								: '',
 							isAccountConfigured
-								? 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] cursor-pointer'
+								? 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] cursor-pointer active:scale-[0.98]'
 								: 'text-[var(--text-quaternary)] cursor-not-allowed'
 						)}
 						onclick={() => handleFolderClick(item.folder)}
 						disabled={!isAccountConfigured}
 					>
-						<item.icon class="size-[17px] shrink-0" strokeWidth={1.8} />
+						{#if isAccountConfigured && item.folder === activeFolder}
+							<div class="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full bg-[var(--accent-primary)] transition-all duration-200"></div>
+						{/if}
+						<item.icon class={cn(
+							"size-[17px] shrink-0 transition-colors duration-150",
+							isAccountConfigured && item.folder === activeFolder && "text-[var(--accent-primary)]"
+						)} strokeWidth={1.8} />
 						<span class="flex-1 text-left truncate">
 							{item.label}
 						</span>
 						{#if item.folder === 'inbox' && unreadCount > 0}
-							<span class="text-[11px] font-semibold text-[var(--accent-primary)] bg-[var(--accent-light)] rounded-full px-1.5 py-0.5 min-w-[20px] text-center">
+							<span class="text-[11px] font-semibold text-[var(--accent-primary)] bg-[var(--accent-light)] rounded-full px-1.5 py-0.5 min-w-[20px] text-center tabular-nums">
 								{unreadCount}
 							</span>
 						{/if}
@@ -459,15 +476,16 @@
 		</nav>
 
 		<!-- Footer -->
-		<div class="shrink-0 px-2.5 pb-2.5 pt-1">
+		<div class="shrink-0 px-2 pb-2.5 pt-1">
+			<div class="mx-2 h-px bg-[var(--border-primary)] opacity-40 mb-2"></div>
 			<button
 				onclick={navigateToSettings}
-				class="settings-icon group flex items-center gap-2 w-full px-2.5 py-1.5 rounded-md text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-all duration-120 relative z-10 cursor-pointer"
+				class="settings-icon group flex items-center gap-2.5 w-full px-2.5 py-1.5 rounded-lg text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-all duration-150 cursor-pointer active:scale-[0.98]"
 				aria-label={$_('settings.title')}
 				title={showShortcutHints ? 'Cmd/Ctrl+,' : $_('settings.title')}
 			>
 				<Settings class="size-[17px] transition-transform duration-300 group-hover:rotate-45" strokeWidth={1.8} />
-				<span class="text-sm">{$_('settings.title')}</span>
+				<span class="text-[13px]">{$_('settings.title')}</span>
 			</button>
 		</div>
 	{:else}
@@ -544,3 +562,20 @@
 	/>
 </aside>
 {/if}
+
+<style>
+	/* CSS grid-based collapse animation — height-aware, smooth */
+	.account-collapse-wrapper {
+		display: grid;
+		grid-template-rows: 1fr;
+		transition: grid-template-rows 200ms cubic-bezier(0.4, 0, 0.2, 1);
+	}
+
+	.account-collapse-wrapper.collapsed {
+		grid-template-rows: 0fr;
+	}
+
+	.account-collapse-wrapper > div {
+		min-height: 0;
+	}
+</style>
