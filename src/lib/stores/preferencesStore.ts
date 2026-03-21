@@ -1,4 +1,5 @@
 import { writable, get } from 'svelte/store';
+import type { SupportedLocale } from './i18nStore.svelte';
 
 export type AccentTone = 'blue' | 'sunset' | 'forest' | 'graphite';
 export type MailDensity = 'compact' | 'comfortable' | 'airy';
@@ -37,11 +38,17 @@ export interface PrivacyPreferences {
 	showFullUrlOnHover: boolean;
 }
 
+export interface LanguagePreferences {
+	locale: SupportedLocale;
+	autoDetect: boolean;
+}
+
 export interface UserPreferences {
 	appearance: AppearancePreferences;
 	notifications: NotificationPreferences;
 	keyboard: KeyboardPreferences;
 	privacy: PrivacyPreferences;
+	language: LanguagePreferences;
 }
 
 const STORAGE_KEY = 'mailx-preferences';
@@ -91,6 +98,11 @@ export const ACCENT_PRESETS: Record<
 	}
 };
 
+export const DEFAULT_LANGUAGE_PREFERENCES: LanguagePreferences = {
+	locale: 'en',
+	autoDetect: true
+};
+
 export const DEFAULT_PREFERENCES: UserPreferences = {
 	appearance: {
 		accentTone: 'blue',
@@ -121,7 +133,8 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
 		showSecurityWarnings: true,
 		warnBeforeSuspiciousLinks: true,
 		showFullUrlOnHover: true
-	}
+	},
+	language: DEFAULT_LANGUAGE_PREFERENCES
 };
 
 function mergePreferences(raw: unknown): UserPreferences {
@@ -137,6 +150,9 @@ function mergePreferences(raw: unknown): UserPreferences {
 		: {};
 	const privacy = typeof source.privacy === 'object' && source.privacy !== null
 		? source.privacy
+		: {};
+	const language = typeof source.language === 'object' && source.language !== null
+		? source.language
 		: {};
 
 	return {
@@ -155,6 +171,10 @@ function mergePreferences(raw: unknown): UserPreferences {
 		privacy: {
 			...DEFAULT_PREFERENCES.privacy,
 			...privacy
+		},
+		language: {
+			...DEFAULT_PREFERENCES.language,
+			...language
 		}
 	};
 }

@@ -2,6 +2,8 @@
 	import { getCurrentWindow } from '@tauri-apps/api/window';
 	import { browser } from '$app/environment';
 	import { X, Minus, Square } from 'lucide-svelte';
+	import { _ } from 'svelte-i18n';
+	import { i18nStore } from '$lib/stores/i18nStore.svelte.js';
 
 	// Platform detection using navigator (works in Tauri webview)
 	let platform = $state<'windows' | 'macos' | 'linux'>('linux');
@@ -37,7 +39,8 @@
 	}
 </script>
 
-{#if platform === 'windows'}
+{#if !i18nStore.isLoading}
+	{#if platform === 'windows'}
 	<!-- Windows 11 Style Titlebar -->
 	<div class="titlebar titlebar-windows">
 		<div class="titlebar-drag-region" data-tauri-drag-region></div>
@@ -57,21 +60,21 @@
 			<button
 				onclick={minimizeWindow}
 				class="caption-button"
-				aria-label="Minimize"
+				aria-label={$_('titlebar.minimize')}
 			>
 				<Minus class="size-3" strokeWidth={1.5} />
 			</button>
 			<button
 				onclick={maximizeWindow}
 				class="caption-button"
-				aria-label="Maximize"
+				aria-label={$_('titlebar.maximize')}
 			>
 				<Square class="size-3" strokeWidth={1.5} />
 			</button>
 			<button
 				onclick={closeWindow}
 				class="caption-button caption-close"
-				aria-label="Close"
+				aria-label={$_('titlebar.close')}
 			>
 				<X class="size-3" strokeWidth={1.5} />
 			</button>
@@ -84,11 +87,12 @@
 
 		<!-- Traffic Lights (left side) -->
 		<div class="titlebar-controls">
-			<button onclick={closeWindow} class="traffic-light traffic-light-close" aria-label="Close"></button>
-			<button onclick={minimizeWindow} class="traffic-light traffic-light-minimize" aria-label="Minimize"></button>
-			<button onclick={maximizeWindow} class="traffic-light traffic-light-maximize" aria-label="Maximize"></button>
+			<button onclick={closeWindow} class="traffic-light traffic-light-close" aria-label={$_('titlebar.close')}></button>
+			<button onclick={minimizeWindow} class="traffic-light traffic-light-minimize" aria-label={$_('titlebar.minimize')}></button>
+			<button onclick={maximizeWindow} class="traffic-light traffic-light-maximize" aria-label={$_('titlebar.maximize')}></button>
 		</div>
 	</div>
+	{/if}
 {/if}
 
 <style>

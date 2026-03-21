@@ -5,6 +5,7 @@
 	import * as db from '$lib/db/index.js';
 	import { syncAccount } from '$lib/sync/index.js';
 	import type { SyncStatus } from '$lib/types.js';
+	import { _ } from 'svelte-i18n';
 
 	interface Account {
 		id: string;
@@ -83,41 +84,41 @@
 	}
 
 	function formatLastSync(timestamp?: number): string {
-		if (!timestamp) return 'Never';
+		if (!timestamp) return $_('common.never');
 		const now = Date.now();
 		const diff = now - timestamp;
-		if (diff < 60000) return 'Just now';
-		if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
-		if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
-		return `${Math.floor(diff / 86400000)}d ago`;
+		if (diff < 60000) return $_('account.justNow');
+		if (diff < 3600000) return $_('account.minutesAgo', { values: { n: Math.floor(diff / 60000) } });
+		if (diff < 86400000) return $_('account.hoursAgo', { values: { n: Math.floor(diff / 3600000) } });
+		return $_('account.daysAgo', { values: { n: Math.floor(diff / 86400000) } });
 	}
 
 	function getSyncStatusInfo(status: SyncStatus | undefined): StatusInfo {
 		if (!status) {
-			return { text: 'Unknown', iconName: 'Clock', colorClass: 'text-gray-500' };
+			return { text: $_('common.unknown'), iconName: 'Clock', colorClass: 'text-gray-500' };
 		}
 		switch (status.status) {
 			case 'idle':
-				return { text: `Synced ${formatLastSync(status.last_sync)}`, iconName: 'CheckCircle', colorClass: 'text-green-500' };
+				return { text: $_('account.synced', { values: { time: formatLastSync(status.last_sync) } }), iconName: 'CheckCircle', colorClass: 'text-green-500' };
 			case 'syncing':
-				return { text: 'Syncing...', iconName: 'Loader2', colorClass: 'text-blue-500', animate: true };
+				return { text: $_('account.syncing'), iconName: 'Loader2', colorClass: 'text-blue-500', animate: true };
 			case 'failed':
-				return { text: status.error_message || 'Failed', iconName: 'XCircle', colorClass: 'text-red-500' };
+				return { text: status.error_message || $_('account.syncFailed'), iconName: 'XCircle', colorClass: 'text-red-500' };
 			case 'cancelled':
-				return { text: 'Cancelled', iconName: 'XCircle', colorClass: 'text-gray-500' };
+				return { text: $_('account.cancelled'), iconName: 'XCircle', colorClass: 'text-gray-500' };
 			default:
-				return { text: 'Unknown', iconName: 'Clock', colorClass: 'text-gray-500' };
+				return { text: $_('common.unknown'), iconName: 'Clock', colorClass: 'text-gray-500' };
 		}
 	}
 
 	async function handleClearDatabase() {
-		if (!confirm('Are you sure you want to clear all emails from the database? This will delete all synced emails and cannot be undone.')) {
+		if (!confirm($_('account.clearDbConfirm'))) {
 			return;
 		}
 		isClearing = true;
 		try {
 			await db.clearDatabase();
-			alert('Database cleared successfully. Please re-sync your accounts to fetch clean emails.');
+			alert($_('account.clearDbSuccess'));
 		} catch (e) {
 			alert('Failed to clear database: ' + (e instanceof Error ? e.message : String(e)));
 		} finally {
@@ -140,7 +141,7 @@
 
 	function handleDeleteAccount(accountId: string, event: Event) {
 		event.stopPropagation();
-		if (confirm('Are you sure you want to delete this account? This will remove the account and all its locally cached emails.')) {
+		if (confirm($_('account.deleteConfirm'))) {
 			goto(`/settings/accounts/${accountId}/delete`);
 		}
 	}
@@ -153,11 +154,11 @@
 			<AtSign class="size-6" />
 		</div>
 		<div>
-			<h2 class="page-title">Accounts</h2>
+			<h2 class="page-title">{$_('settings.accounts')}</h2>
 			<p class="page-subtitle">
 				{accounts.length === 0
-					? 'Add your email account to get started'
-					: `${accounts.length} ${accounts.length === 1 ? 'account' : 'accounts'} connected`}
+					? $_('account.addDescription')
+					: `${accounts.length} ${accounts.length === 1 ? $_('account.single') : $_('account.multiple')}`}
 			</p>
 		</div>
 	</div>
@@ -167,15 +168,15 @@
 			class="add-account-button"
 		>
 			<Plus class="size-4" />
-			<span>Add Account</span>
+			<span>{$_('account.add')}</span>
 		</button>
 	{/if}
 </header>
 
 <!-- Developer Tools Section -->
 <div class="devtools-section">
-	<h3 class="devtools-title">Developer Tools</h3>
-	<p class="devtools-description">Temporary tools for testing and development</p>
+	<h3 class="devtools-title">{$_('account.devTools')}</h3>
+	<p class="devtools-description">{$_('account.devToolsDescription')}</p>
 	<button
 		onclick={handleClearDatabase}
 		disabled={isClearing}
@@ -186,9 +187,9 @@
 		{:else}
 			<Trash2 class="size-4" />
 		{/if}
-		<span>{isClearing ? 'Clearing...' : 'Clear Database'}</span>
+		<span>{isClearing ? $_('account.clearingDatabase') : $_('account.clearDatabase')}</span>
 	</button>
-	<p class="devtools-hint">Clears all emails from the database. Re-sync accounts to fetch clean data.</p>
+	<p class="devtools-hint">{$_('account.clearDbHint')}</p>
 </div>
 
 <!-- Error State -->
@@ -196,7 +197,7 @@
 	<div class="error-banner">
 		<div class="error-icon">⚠️</div>
 		<div>
-			<p class="error-title">Error loading accounts</p>
+			<p class="error-title">{$_('account.errorLoading')}</p>
 			<p class="error-message">{error}</p>
 		</div>
 	</div>
@@ -206,7 +207,7 @@
 {#if isLoading}
 	<div class="loading-state">
 		<Loader2 class="size-8 animate-spin text-violet-500" />
-		<p class="loading-text">Loading your accounts...</p>
+		<p class="loading-text">{$_('account.loadingAccounts')}</p>
 	</div>
 {:else if accounts.length === 0}
 	<!-- Empty State -->
@@ -216,20 +217,19 @@
 				<AtSign class="size-12 text-violet-500" />
 			</div>
 		</div>
-		<h3 class="empty-title">No accounts yet</h3>
+		<h3 class="empty-title">{$_('account.noAccountsYet')}</h3>
 		<p class="empty-description">
-			Connect your first email account to start sending and receiving messages.
-			We support IMAP providers like Gmail, Outlook, and more.
+			{$_('account.noAccountsDescription')}
 		</p>
 		<button
 			onclick={openAddForm}
 			class="empty-cta"
 		>
 			<Plus class="size-5" />
-			<span>Add Your First Account</span>
+			<span>{$_('account.addFirstAccount')}</span>
 		</button>
 
-		<p class="empty-hint-text">Your credentials are stored securely on this device</p>
+		<p class="empty-hint-text">{$_('account.credentialsSecure')}</p>
 	</div>
 {:else}
 	<!-- Accounts List -->
@@ -270,7 +270,7 @@
 						onclick={(e) => handleSyncAccount(account.id, e)}
 						disabled={syncingAccountId === account.id}
 						class="action-button sync-button"
-						title="Sync account"
+						title={$_('account.syncAccount')}
 					>
 						{#if syncingAccountId === account.id}
 							<Loader2 class="size-4 animate-spin" />
@@ -281,14 +281,14 @@
 					<button
 						onclick={() => editAccount(account.id)}
 						class="action-button edit-button"
-						title="Edit account"
+						title={$_('account.editAccount')}
 					>
 						<Edit class="size-4" />
 					</button>
 					<button
 						onclick={(e) => handleDeleteAccount(account.id, e)}
 						class="action-button delete-button"
-						title="Delete account"
+						title={$_('account.deleteAccount')}
 					>
 						<Trash2 class="size-4" />
 					</button>

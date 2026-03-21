@@ -9,6 +9,8 @@
 	import { syncAllAccounts, syncAccount } from '$lib/sync/index.js';
 	import { eventBus } from '$lib/events/index.js';
 	import { preferences } from '$lib/stores/preferencesStore.js';
+	import { _ } from 'svelte-i18n';
+	import { i18nStore } from '$lib/stores/i18nStore.svelte.js';
 	import {
 		Inbox,
 		Send,
@@ -41,13 +43,14 @@
 
 	let { collapsed, isMobile, activeFolder, onToggle, onSelectFolder, onRefresh, currentRoute = '/', onOpenSettings, onSelectAccount }: Props = $props();
 
-	const navItems: { icon: typeof Inbox; label: string; folder: Folder }[] = [
-		{ icon: Inbox, label: 'Inbox', folder: 'inbox' },
-		{ icon: Send, label: 'Sent', folder: 'sent' },
-		{ icon: FileEdit, label: 'Drafts', folder: 'drafts' },
-		{ icon: Archive, label: 'Archive', folder: 'archive' },
-		{ icon: Trash2, label: 'Trash', folder: 'trash' }
-	];
+	// Reactive navigation items with i18n
+	const navItems = $derived([
+		{ icon: Inbox, label: $_('nav.inbox'), folder: 'inbox' as const },
+		{ icon: Send, label: $_('nav.sent'), folder: 'sent' as const },
+		{ icon: FileEdit, label: $_('nav.drafts'), folder: 'drafts' as const },
+		{ icon: Archive, label: $_('nav.archive'), folder: 'archive' as const },
+		{ icon: Trash2, label: $_('nav.trash'), folder: 'trash' as const }
+	] as const);
 
 	const SIDEBAR_COLLAPSED_WIDTH = 56;
 
@@ -240,12 +243,13 @@
 	});
 </script>
 
-{#if isMobile && !collapsed}
+{#if !i18nStore.isLoading}
+	{#if isMobile && !collapsed}
 	<button
 		type="button"
 		class="fixed inset-0 z-30 bg-black/5 backdrop-blur-[2px] transition-opacity duration-100"
 		onclick={onToggle}
-		aria-label="Close sidebar"
+		aria-label={$_('common.close')}
 	></button>
 {/if}
 
@@ -263,7 +267,7 @@
 		<button
 			onclick={onToggle}
 			class="flex size-7 items-center justify-center rounded-md text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-all"
-			aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+			aria-label={collapsed ? $_('sidebar.expand') : $_('sidebar.collapse')}
 		>
 			{#if collapsed && !isMobile}
 				<PanelLeftOpen class="size-[16px]" strokeWidth={1.8} />
@@ -276,7 +280,7 @@
 				onclick={handleRefresh}
 				disabled={!isAccountConfigured}
 				class="flex size-auto min-w-7 items-center justify-center gap-1 rounded-md px-2 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-				aria-label="Refresh"
+				aria-label={$_('mail.refresh')}
 			>
 				<RefreshCw class={cn('size-[15px]', isRefreshing && 'animate-spin')} strokeWidth={1.8} />
 			</button>
@@ -295,14 +299,14 @@
 						? "bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-secondary)] shadow-sm hover:shadow-md active:scale-[0.98]"
 						: "bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] cursor-not-allowed"
 				)}
-				aria-label="New Message"
+				aria-label={$_('nav.newMessage')}
 			>
 				{#if isAccountConfigured}
 					<SquarePen class="size-[15px]" strokeWidth={1.8} />
-					<span>New Message</span>
+					<span>{$_('nav.newMessage')}</span>
 				{:else}
 					<Lock class="size-[15px]" strokeWidth={1.8} />
-					<span>Add Account</span>
+					<span>{$_('account.add')}</span>
 				{/if}
 			</button>
 		</div>
@@ -323,7 +327,7 @@
 						? "bg-[var(--bg-active)] text-[var(--text-primary)]"
 						: "hover:bg-[var(--bg-hover)] text-[var(--text-secondary)]"
 				)}
-				title="All Inboxes"
+				title={$_('nav.allInboxes')}
 				aria-expanded={!accountsCollapsed}
 				aria-controls="account-list"
 			>
@@ -340,7 +344,7 @@
 					</div>
 				</div>
 				<div class="flex-1 min-w-0 text-left">
-					<p class="text-sm font-medium truncate">All Inboxes</p>
+					<p class="text-sm font-medium truncate">{$_('nav.allInboxes')}</p>
 					{#if formattedLastSync && selectedAccountId === null}
 						<p class="text-[11px] text-[var(--text-tertiary)] tabular-nums">
 							{formattedLastSync}
@@ -466,11 +470,11 @@
 			<button
 				onclick={navigateToSettings}
 				class="settings-icon group flex items-center gap-2 w-full px-2.5 py-1.5 rounded-md text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-all duration-120 relative z-10 cursor-pointer"
-				aria-label="Settings"
-				title={showShortcutHints ? 'Cmd/Ctrl+,' : 'Settings'}
+				aria-label={$_('settings.title')}
+				title={showShortcutHints ? 'Cmd/Ctrl+,' : $_('settings.title')}
 			>
 				<Settings class="size-[17px] transition-transform duration-300 group-hover:rotate-45" strokeWidth={1.8} />
-				<span class="text-sm">Settings</span>
+				<span class="text-sm">{$_('settings.title')}</span>
 			</button>
 		</div>
 	{:else}
@@ -485,7 +489,7 @@
 						? "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] cursor-pointer"
 						: "text-[var(--text-quaternary)] cursor-not-allowed"
 				)}
-				aria-label="Compose"
+				aria-label={$_('mail.compose')}
 			>
 				{#if isAccountConfigured}
 					<SquarePen class="size-[16px]" strokeWidth={1.8} />
@@ -530,8 +534,8 @@
 			<button
 				onclick={navigateToSettings}
 				class="settings-icon group flex size-8 items-center justify-center rounded-md text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-all duration-120 relative z-10 cursor-pointer"
-				aria-label="Settings"
-				title={showShortcutHints ? 'Cmd/Ctrl+,' : 'Settings'}
+				aria-label={$_('settings.title')}
+				title={showShortcutHints ? 'Cmd/Ctrl+,' : $_('settings.title')}
 			>
 				<Settings class="size-[17px] transition-transform duration-300 group-hover:rotate-45" strokeWidth={1.8} />
 			</button>
@@ -546,3 +550,4 @@
 		onSent={onComposeSent}
 	/>
 </aside>
+{/if}

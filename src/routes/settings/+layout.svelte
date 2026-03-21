@@ -2,7 +2,9 @@
 	import type { Snippet } from 'svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
-	import { ArrowLeft, User, Palette, Bell, Shield, Keyboard } from 'lucide-svelte';
+	import { ArrowLeft, User, Palette, Bell, Shield, Keyboard, Globe } from 'lucide-svelte';
+	import { _ } from 'svelte-i18n';
+	import { i18nStore } from '$lib/stores/i18nStore.svelte.js';
 
 	interface Props {
 		children: Snippet;
@@ -10,13 +12,14 @@
 
 	let { children }: Props = $props();
 
-	const menuItems = [
-		{ id: 'accounts', label: 'Accounts', icon: User, href: '/settings', note: 'Identity, servers, sync' },
-		{ id: 'appearance', label: 'Appearance', icon: Palette, href: '/settings/appearance', note: 'Theme, density, accents' },
-		{ id: 'notifications', label: 'Notifications', icon: Bell, href: '/settings/notifications', note: 'Alerts, toasts, quiet hours' },
-		{ id: 'privacy', label: 'Privacy', icon: Shield, href: '/settings/privacy', note: 'Security controls' },
-		{ id: 'keyboard', label: 'Keyboard', icon: Keyboard, href: '/settings/keyboard', note: 'Shortcuts, hints, send keys' }
-	];
+	const menuItems = $derived([
+		{ id: 'accounts', label: $_('settings.accounts'), icon: User, href: '/settings', note: $_('settings.accountsNote') },
+		{ id: 'appearance', label: $_('settings.appearance'), icon: Palette, href: '/settings/appearance', note: $_('settings.appearanceNote') },
+		{ id: 'notifications', label: $_('settings.notifications'), icon: Bell, href: '/settings/notifications', note: $_('settings.notificationsNote') },
+		{ id: 'language', label: $_('settings.language'), icon: Globe, href: '/settings/language', note: $_('settings.languageNote') },
+		{ id: 'privacy', label: $_('settings.privacy'), icon: Shield, href: '/settings/privacy', note: $_('settings.privacyNote') },
+		{ id: 'keyboard', label: $_('settings.keyboard'), icon: Keyboard, href: '/settings/keyboard', note: $_('settings.keyboardNote') }
+	]);
 
 	let activeSection = $derived($page.url.pathname.split('/').pop() || 'accounts');
 
@@ -29,18 +32,18 @@
 	<aside class="settings-sidebar">
 		<button onclick={goBack} class="back-button">
 			<ArrowLeft class="size-[15px]" strokeWidth={1.6} />
-			<span>Back to inbox</span>
+			<span>{$_('settings.backToInbox')}</span>
 		</button>
 
 		<div class="sidebar-header">
-			<p class="eyebrow">Workspace Preferences</p>
-			<h1 class="settings-title">Settings</h1>
+			<p class="eyebrow">{$_('settings.workspacePreferences')}</p>
+			<h1 class="settings-title">{$_('settings.title')}</h1>
 			<p class="settings-subtitle">
-				Tune Mailx for focus, noise level, and input speed.
+				{$_('settings.subtitle')}
 			</p>
 		</div>
 
-		<nav class="settings-nav" aria-label="Settings sections">
+		<nav class="settings-nav" aria-label={$_('settings.title')}>
 			{#each menuItems as item}
 				<button
 					onclick={() => goto(item.href)}
@@ -63,12 +66,12 @@
 		<div class="main-grid">
 			<div class="settings-hero">
 				<div>
-					<p class="hero-kicker">Mailx Control Center</p>
-					<h2>Less friction, fewer interruptions.</h2>
+					<p class="hero-kicker">{$_('settings.controlCenter')}</p>
+					<h2>{$_('settings.lessFriction')}</h2>
 				</div>
 				<div class="hero-chip">
 					<span class="hero-dot"></span>
-					Persisted locally
+					{$_('settings.persistedLocally')}
 				</div>
 			</div>
 

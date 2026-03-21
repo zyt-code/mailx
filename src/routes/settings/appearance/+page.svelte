@@ -1,28 +1,40 @@
 <script lang="ts">
 	import { Palette, Sun, Moon, Monitor, Check } from 'lucide-svelte';
+	import { _ } from 'svelte-i18n';
 	import { themeStore, type Theme } from '$lib/stores/themeStore.js';
 	import { preferences, ACCENT_PRESETS, type AccentTone, type MailDensity, type AppearancePreferences } from '$lib/stores/preferencesStore.js';
 
 	import { getIsTransitioning } from '$lib/stores/themeStore.js';
 
-	const themes: { id: Theme; label: string; description: string; icon: typeof Sun; previewClass: string }[] = [
-		{ id: 'light', label: 'Light', description: 'Bright canvas, sharp contrast', icon: Sun, previewClass: 'bg-white border border-[var(--border-primary)]' },
-		{ id: 'dark', label: 'Dark', description: 'Low-glare reading environment', icon: Moon, previewClass: 'bg-[var(--bg-primary)] border border-[var(--border-primary)]' },
-		{ id: 'system', label: 'System', description: 'Automatically match your system light/dark mode', icon: Monitor, previewClass: 'system-preview' }
-	];
+	const themeKeys: Record<Theme, { labelKey: string; descKey: string; icon: typeof Sun }> = {
+		light: { labelKey: 'theme.light', descKey: 'theme.lightDescription', icon: Sun },
+		dark: { labelKey: 'theme.dark', descKey: 'theme.darkDescription', icon: Moon },
+		system: { labelKey: 'theme.system', descKey: 'theme.systemDescription', icon: Monitor }
+	};
+
+	const themes: Theme[] = ['light', 'dark', 'system'];
 
 	let isTransitioning = $derived(getIsTransitioning());
+
+	const accentKeys: Record<AccentTone, { nameKey: string; descKey: string }> = {
+		blue: { nameKey: 'appearance.accentBlue', descKey: 'appearance.accentBlueDesc' },
+		sunset: { nameKey: 'appearance.accentSunset', descKey: 'appearance.accentSunsetDesc' },
+		forest: { nameKey: 'appearance.accentForest', descKey: 'appearance.accentForestDesc' },
+		graphite: { nameKey: 'appearance.accentGraphite', descKey: 'appearance.accentGraphiteDesc' }
+	};
 
 	const accentOptions = Object.entries(ACCENT_PRESETS).map(([id, palette]) => ({
 		id: id as AccentTone,
 		...palette
 	}));
 
-	const densityOptions: { id: MailDensity; label: string; description: string }[] = [
-		{ id: 'compact', label: 'Compact', description: 'More threads in view, tighter rhythm' },
-		{ id: 'comfortable', label: 'Comfortable', description: 'Balanced spacing for daily use' },
-		{ id: 'airy', label: 'Airy', description: 'More whitespace for scanning and focus' }
-	];
+	const densityKeys: Record<MailDensity, { labelKey: string; descKey: string }> = {
+		compact: { labelKey: 'theme.compact', descKey: 'theme.compactDescription' },
+		comfortable: { labelKey: 'theme.comfortable', descKey: 'theme.comfortableDescription' },
+		airy: { labelKey: 'theme.airy', descKey: 'theme.airyDescription' }
+	};
+
+	const densityOptions: MailDensity[] = ['compact', 'comfortable', 'airy'];
 
 	let activeTheme = $derived(themeStore.current);
 	let appearance = $derived($preferences.appearance);
@@ -38,10 +50,10 @@
 			<Palette class="size-6" strokeWidth={1.55} />
 		</div>
 		<div>
-			<p class="page-kicker">Appearance</p>
-			<h2 class="page-title">Shape the reading environment.</h2>
+			<p class="page-kicker">{$_('appearance.kicker')}</p>
+			<h2 class="page-title">{$_('appearance.title')}</h2>
 			<p class="page-subtitle">
-				Theme, accent tone, and message density apply across Mailx immediately.
+				{$_('appearance.subtitle')}
 			</p>
 		</div>
 	</header>
@@ -49,43 +61,44 @@
 	<section class="section-card">
 		<div class="section-copy">
 			<div>
-				<h3 class="section-title">Theme</h3>
-				<p class="section-description">Choose how Mailx responds to ambient light.</p>
+				<h3 class="section-title">{$_('appearance.themeTitle')}</h3>
+				<p class="section-description">{$_('appearance.themeDescription')}</p>
 			</div>
 		</div>
 
 		<div class="theme-grid">
-			{#each themes as theme}
+			{#each themes as themeId}
+				{@const meta = themeKeys[themeId]}
 				<button
 					class="theme-option"
-					class:active={activeTheme === theme.id}
-					class:transitioning={isTransitioning && activeTheme === theme.id}
-					onclick={() => themeStore.set(theme.id)}
+					class:active={activeTheme === themeId}
+					class:transitioning={isTransitioning && activeTheme === themeId}
+					onclick={() => themeStore.set(themeId)}
 					disabled={isTransitioning}
-					aria-label={`Switch to ${theme.label} theme`}
-					aria-pressed={activeTheme === theme.id}
+					aria-label={$_('appearance.switchTo', { values: { name: $_( meta.labelKey) } })}
+					aria-pressed={activeTheme === themeId}
 				>
 					<div class="theme-preview">
-						{#if theme.id === 'system'}
+						{#if themeId === 'system'}
 							<div class="system-preview">
 								<div class="system-preview-light"></div>
 								<div class="system-preview-dark"></div>
 							</div>
 						{:else}
-							<div class={`simple-preview ${theme.previewClass}`}></div>
+							<div class="simple-preview {themeId === 'light' ? 'bg-white border border-[var(--border-primary)]' : 'bg-[var(--bg-primary)] border border-[var(--border-primary)]'}"></div>
 						{/if}
 					</div>
 
 					<div class="theme-icon">
-						<theme.icon class="size-4" strokeWidth={1.7} />
+						<meta.icon class="size-4" strokeWidth={1.7} />
 					</div>
 
 					<div class="theme-info">
-						<p class="option-label">{theme.label}</p>
-						<p class="option-description">{theme.description}</p>
+						<p class="option-label">{$_(meta.labelKey)}</p>
+						<p class="option-description">{$_(meta.descKey)}</p>
 					</div>
 
-					{#if activeTheme === theme.id}
+					{#if activeTheme === themeId}
 						<div class="selection-indicator">
 							<Check class="check-icon" strokeWidth={2.2} />
 						</div>
@@ -98,13 +111,14 @@
 	<section class="section-card">
 		<div class="section-copy">
 			<div>
-				<h3 class="section-title">Accent Tone</h3>
-				<p class="section-description">Drive focus with a stronger or quieter signal color.</p>
+				<h3 class="section-title">{$_('appearance.accentTitle')}</h3>
+				<p class="section-description">{$_('appearance.accentDescription')}</p>
 			</div>
 		</div>
 
 		<div class="accent-grid">
 			{#each accentOptions as accent}
+				{@const keys = accentKeys[accent.id]}
 				<button
 					class="accent-option"
 					class:active={appearance.accentTone === accent.id}
@@ -117,8 +131,8 @@
 					</div>
 					<div class="accent-copy">
 						<div>
-							<p class="option-label">{accent.name}</p>
-							<p class="option-description">{accent.description}</p>
+							<p class="option-label">{$_(keys.nameKey)}</p>
+							<p class="option-description">{$_(keys.descKey)}</p>
 						</div>
 						{#if appearance.accentTone === accent.id}
 							<div class="check-badge">
@@ -134,21 +148,22 @@
 	<section class="section-card">
 		<div class="section-copy">
 			<div>
-				<h3 class="section-title">Mail Density</h3>
-				<p class="section-description">Control how much information each thread row carries.</p>
+				<h3 class="section-title">{$_('appearance.densityTitle')}</h3>
+				<p class="section-description">{$_('appearance.densityDescription')}</p>
 			</div>
 		</div>
 
 		<div class="density-grid">
-			{#each densityOptions as option}
+			{#each densityOptions as optionId}
+				{@const keys = densityKeys[optionId]}
 				<button
 					class="density-option"
-					class:active={appearance.mailDensity === option.id}
-					onclick={() => updateAppearance({ mailDensity: option.id })}
+					class:active={appearance.mailDensity === optionId}
+					onclick={() => updateAppearance({ mailDensity: optionId })}
 				>
 					<div>
-						<p class="option-label">{option.label}</p>
-						<p class="option-description">{option.description}</p>
+						<p class="option-label">{$_(keys.labelKey)}</p>
+						<p class="option-description">{$_(keys.descKey)}</p>
 					</div>
 				</button>
 			{/each}
@@ -158,19 +173,19 @@
 	<section class="section-card">
 		<div class="section-copy">
 			<div>
-				<h3 class="section-title">Thread Details</h3>
-				<p class="section-description">Decide how much context the list reveals at a glance.</p>
+				<h3 class="section-title">{$_('appearance.threadDetails')}</h3>
+				<p class="section-description">{$_('appearance.threadDetailsDescription')}</p>
 			</div>
 			<button class="reset-button" onclick={() => preferences.resetSection('appearance')}>
-				Reset appearance
+				{$_('appearance.resetAppearance')}
 			</button>
 		</div>
 
 		<div class="toggle-stack">
 			<button class="toggle-row" onclick={() => updateAppearance({ showPreviewSnippets: !appearance.showPreviewSnippets })}>
 				<div>
-					<p class="option-label">Preview snippets</p>
-					<p class="option-description">Show the first line of the message body in the thread list.</p>
+					<p class="option-label">{$_('appearance.previewSnippets')}</p>
+					<p class="option-description">{$_('appearance.previewSnippetsDescription')}</p>
 				</div>
 				<span class:toggle-on={appearance.showPreviewSnippets} class="toggle-pill">
 					<span class="toggle-thumb"></span>
@@ -179,8 +194,8 @@
 
 			<button class="toggle-row" onclick={() => updateAppearance({ showAccountColor: !appearance.showAccountColor })}>
 				<div>
-					<p class="option-label">Account color markers</p>
-					<p class="option-description">Keep per-account dots visible when multiple inboxes are mixed together.</p>
+					<p class="option-label">{$_('appearance.accountColorMarkers')}</p>
+					<p class="option-description">{$_('appearance.accountColorMarkersDescription')}</p>
 				</div>
 				<span class:toggle-on={appearance.showAccountColor} class="toggle-pill">
 					<span class="toggle-thumb"></span>
@@ -302,7 +317,6 @@
 	}
 
 	.theme-option {
-		/* Grid will be set by enhanced styles, default for fallback */
 		align-items: center;
 	}
 
@@ -442,6 +456,26 @@
 
 	.toggle-pill.toggle-on .toggle-thumb {
 		transform: translateX(1.2rem);
+	}
+
+	.section-copy {
+		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: 0.75rem;
+	}
+
+	.reset-button {
+		height: 2.45rem;
+		padding: 0 0.95rem;
+		border: 1px solid color-mix(in srgb, var(--border-primary) 92%, transparent);
+		border-radius: 14px;
+		background: color-mix(in srgb, var(--bg-primary) 92%, transparent);
+		color: var(--text-primary);
+		font-size: 0.82rem;
+		font-weight: 650;
+		cursor: pointer;
+		white-space: nowrap;
 	}
 
 	@keyframes fadeIn {

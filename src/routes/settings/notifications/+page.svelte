@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { Bell, BellRing, Moon, Send } from 'lucide-svelte';
+	import { _ } from 'svelte-i18n';
 	import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification';
 	import { preferences, type NotificationPreferences } from '$lib/stores/preferencesStore.js';
 
@@ -8,7 +9,7 @@
 
 	let notifications = $derived($preferences.notifications);
 	let permissionState = $state<PermissionState>('checking');
-	let permissionMessage = $state('Checking desktop notification access...');
+	let permissionMessage = $state('');
 
 	function updateNotifications(patch: Partial<NotificationPreferences>) {
 		preferences.updateSection('notifications', patch);
@@ -19,11 +20,11 @@
 			const granted = await isPermissionGranted();
 			permissionState = granted ? 'granted' : 'unknown';
 			permissionMessage = granted
-				? 'Desktop alerts are ready to use.'
-				: 'Desktop alerts are available but not yet allowed by the system.';
+				? $_('notifications.permGranted')
+				: $_('notifications.permNotGranted');
 		} catch {
 			permissionState = 'unknown';
-			permissionMessage = 'Desktop notification status is unavailable in this environment.';
+			permissionMessage = $_('notifications.permUnavailable');
 		}
 	}
 
@@ -33,27 +34,28 @@
 			permissionState = result === 'granted' ? 'granted' : 'denied';
 			permissionMessage =
 				result === 'granted'
-					? 'Desktop alerts are enabled.'
-					: 'The OS rejected the request. You can still change it in system settings.';
+					? $_('notifications.permEnabled')
+					: $_('notifications.permRejected');
 		} catch {
 			permissionState = 'denied';
-			permissionMessage = 'Permission request failed.';
+			permissionMessage = $_('notifications.permFailed');
 		}
 	}
 
 	async function sendTestAlert() {
 		try {
 			await sendNotification({
-				title: 'Mailx test alert',
-				body: 'Notification settings are wired correctly.'
+				title: $_('notifications.testTitle'),
+				body: $_('notifications.testBody')
 			});
-			permissionMessage = 'Test alert sent.';
+			permissionMessage = $_('notifications.testSent');
 		} catch {
-			permissionMessage = 'Unable to send a test alert in the current runtime.';
+			permissionMessage = $_('notifications.testFailed');
 		}
 	}
 
 	onMount(() => {
+		permissionMessage = $_('notifications.permChecking');
 		void refreshPermissionState();
 	});
 </script>
@@ -64,10 +66,10 @@
 			<Bell class="size-6" strokeWidth={1.55} />
 		</div>
 		<div>
-			<p class="page-kicker">Notifications</p>
-			<h2 class="page-title">Decide what deserves your attention.</h2>
+			<p class="page-kicker">{$_('notifications.kicker')}</p>
+			<h2 class="page-title">{$_('notifications.title')}</h2>
 			<p class="page-subtitle">
-				Mailx can show in-app sync feedback, desktop alerts, and quiet-hour suppression.
+				{$_('notifications.subtitle')}
 			</p>
 		</div>
 	</header>
@@ -75,9 +77,9 @@
 	<section class="section-card">
 		<div class="section-head">
 			<div>
-				<h3 class="section-title">Desktop Alerts</h3>
+				<h3 class="section-title">{$_('notifications.desktopAlerts')}</h3>
 				<p class="section-description">
-					System notifications only fire for new mail when the Mailx window is not focused.
+					{$_('notifications.desktopAlertsDescription')}
 				</p>
 			</div>
 			<div class="permission-pill" data-state={permissionState}>{permissionState}</div>
@@ -86,8 +88,8 @@
 		<div class="toggle-stack">
 			<button class="toggle-row" onclick={() => updateNotifications({ desktopNotifications: !notifications.desktopNotifications })}>
 				<div class="row-copy">
-					<p class="option-label">Allow desktop notifications</p>
-					<p class="option-description">Gate all OS-level new-mail alerts from one switch.</p>
+					<p class="option-label">{$_('notifications.allowDesktop')}</p>
+					<p class="option-description">{$_('notifications.allowDesktopDescription')}</p>
 				</div>
 				<span class:toggle-on={notifications.desktopNotifications} class="toggle-pill">
 					<span class="toggle-thumb"></span>
@@ -97,17 +99,17 @@
 
 		<div class="permission-panel">
 			<div>
-				<p class="option-label">System permission</p>
+				<p class="option-label">{$_('notifications.systemPermission')}</p>
 				<p class="option-description">{permissionMessage}</p>
 			</div>
 			<div class="button-row">
 				<button class="subtle-button" onclick={allowDesktopNotifications}>
 					<BellRing class="size-4" strokeWidth={1.7} />
-					Request access
+					{$_('notifications.requestAccess')}
 				</button>
 				<button class="subtle-button" onclick={sendTestAlert} disabled={!notifications.desktopNotifications}>
 					<Send class="size-4" strokeWidth={1.7} />
-					Send test
+					{$_('notifications.sendTest')}
 				</button>
 			</div>
 		</div>
@@ -116,19 +118,19 @@
 	<section class="section-card">
 		<div class="section-head">
 			<div>
-				<h3 class="section-title">In-App Sync Feedback</h3>
-				<p class="section-description">Tune how loudly Mailx reports background sync work.</p>
+				<h3 class="section-title">{$_('notifications.syncFeedback')}</h3>
+				<p class="section-description">{$_('notifications.syncFeedbackDescription')}</p>
 			</div>
 			<button class="reset-button" onclick={() => preferences.resetSection('notifications')}>
-				Reset notifications
+				{$_('notifications.resetNotifications')}
 			</button>
 		</div>
 
 		<div class="toggle-stack">
 			<button class="toggle-row" onclick={() => updateNotifications({ syncSuccessToasts: !notifications.syncSuccessToasts })}>
 				<div class="row-copy">
-					<p class="option-label">Success toasts</p>
-					<p class="option-description">Show a brief confirmation when an account finishes syncing.</p>
+					<p class="option-label">{$_('notifications.successToasts')}</p>
+					<p class="option-description">{$_('notifications.successToastsDescription')}</p>
 				</div>
 				<span class:toggle-on={notifications.syncSuccessToasts} class="toggle-pill">
 					<span class="toggle-thumb"></span>
@@ -137,8 +139,8 @@
 
 			<button class="toggle-row" onclick={() => updateNotifications({ syncFailureToasts: !notifications.syncFailureToasts })}>
 				<div class="row-copy">
-					<p class="option-label">Failure alerts</p>
-					<p class="option-description">Keep actionable errors visible when authentication or connectivity breaks.</p>
+					<p class="option-label">{$_('notifications.failureAlerts')}</p>
+					<p class="option-description">{$_('notifications.failureAlertsDescription')}</p>
 				</div>
 				<span class:toggle-on={notifications.syncFailureToasts} class="toggle-pill">
 					<span class="toggle-thumb"></span>
@@ -150,16 +152,16 @@
 	<section class="section-card">
 		<div class="section-head">
 			<div>
-				<h3 class="section-title">Quiet Hours</h3>
-				<p class="section-description">Suppress desktop alerts during a time window, including ranges that cross midnight.</p>
+				<h3 class="section-title">{$_('notifications.quietHours')}</h3>
+				<p class="section-description">{$_('notifications.quietHoursDescription')}</p>
 			</div>
 		</div>
 
 		<div class="toggle-stack">
 			<button class="toggle-row" onclick={() => updateNotifications({ quietHoursEnabled: !notifications.quietHoursEnabled })}>
 				<div class="row-copy">
-					<p class="option-label">Use quiet hours</p>
-					<p class="option-description">Pause desktop notifications between the times below.</p>
+					<p class="option-label">{$_('notifications.useQuietHours')}</p>
+					<p class="option-description">{$_('notifications.useQuietHoursDescription')}</p>
 				</div>
 				<span class:toggle-on={notifications.quietHoursEnabled} class="toggle-pill">
 					<span class="toggle-thumb"></span>
@@ -171,7 +173,7 @@
 			<label class="time-card">
 				<span class="time-label">
 					<Moon class="size-3.5" strokeWidth={1.7} />
-					Start
+					{$_('notifications.start')}
 				</span>
 				<input
 					type="time"
@@ -185,7 +187,7 @@
 			<label class="time-card">
 				<span class="time-label">
 					<Bell class="size-3.5" strokeWidth={1.7} />
-					End
+					{$_('notifications.end')}
 				</span>
 				<input
 					type="time"
@@ -407,6 +409,19 @@
 	.subtle-button:disabled {
 		opacity: 0.5;
 		cursor: not-allowed;
+	}
+
+	.reset-button {
+		height: 2.45rem;
+		padding: 0 0.95rem;
+		border: 1px solid color-mix(in srgb, var(--border-primary) 92%, transparent);
+		border-radius: 14px;
+		background: color-mix(in srgb, var(--bg-primary) 92%, transparent);
+		color: var(--text-primary);
+		font-size: 0.82rem;
+		font-weight: 650;
+		cursor: pointer;
+		white-space: nowrap;
 	}
 
 	.time-grid {

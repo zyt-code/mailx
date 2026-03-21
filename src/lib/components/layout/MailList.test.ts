@@ -48,6 +48,10 @@ vi.mock('$lib/stores/preferencesStore.js', () => ({
 					showSecurityWarnings: true,
 					warnBeforeSuspiciousLinks: true,
 					showFullUrlOnHover: true
+				},
+				language: {
+					locale: 'en',
+					autoDetect: true
 				}
 			});
 			return () => {};

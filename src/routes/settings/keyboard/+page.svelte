@@ -1,32 +1,33 @@
 <script lang="ts">
 	import { Keyboard, SendHorizontal, Sparkles, CornerDownLeft } from 'lucide-svelte';
+	import { _ } from 'svelte-i18n';
 	import { preferences, type KeyboardPreferences } from '$lib/stores/preferencesStore.js';
 
 	const liveShortcuts = [
 		{
-			action: 'Next message',
-			combo: ['J'],
-			description: 'Moves selection down the visible thread list.'
+			actionKey: 'keyboard.nextMessage',
+			descriptionKey: 'keyboard.nextMessageDescription',
+			combo: ['J']
 		},
 		{
-			action: 'Previous message',
-			combo: ['K'],
-			description: 'Moves selection upward without leaving the keyboard.'
+			actionKey: 'keyboard.previousMessage',
+			descriptionKey: 'keyboard.previousMessageDescription',
+			combo: ['K']
 		},
 		{
-			action: 'Compose',
-			combo: ['C'],
-			description: 'Opens a new message composer from anywhere in the mail shell.'
+			actionKey: 'keyboard.compose',
+			descriptionKey: 'keyboard.composeDescription',
+			combo: ['C']
 		},
 		{
-			action: 'Sync now',
-			combo: ['R'],
-			description: 'Triggers a manual refresh for connected accounts.'
+			actionKey: 'keyboard.syncNow',
+			descriptionKey: 'keyboard.syncNowDescription',
+			combo: ['R']
 		},
 		{
-			action: 'Send draft',
-			combo: ['Cmd/Ctrl', 'Enter'],
-			description: 'Works inside the compose modal when the send shortcut is enabled.'
+			actionKey: 'keyboard.sendDraft',
+			descriptionKey: 'keyboard.sendDraftDescription',
+			combo: ['Cmd/Ctrl', 'Enter']
 		}
 	];
 
@@ -43,10 +44,10 @@
 			<Keyboard class="size-6" strokeWidth={1.55} />
 		</div>
 		<div>
-			<p class="page-kicker">Keyboard</p>
-			<h2 class="page-title">Keep your hands in the flow.</h2>
+			<p class="page-kicker">{$_('keyboard.kicker')}</p>
+			<h2 class="page-title">{$_('keyboard.title')}</h2>
 			<p class="page-subtitle">
-				Single-key actions work only when focus is outside inputs, editors, and modals.
+				{$_('keyboard.subtitle')}
 			</p>
 		</div>
 	</header>
@@ -54,16 +55,16 @@
 	<section class="section-card">
 		<div class="section-copy">
 			<div>
-				<h3 class="section-title">Behavior</h3>
-				<p class="section-description">Control how aggressively Mailx exposes keyboard-driven actions.</p>
+				<h3 class="section-title">{$_('keyboard.behavior')}</h3>
+				<p class="section-description">{$_('keyboard.behaviorDescription')}</p>
 			</div>
 		</div>
 
 		<div class="toggle-stack">
 			<button class="toggle-row" onclick={() => updateKeyboard({ singleKeyShortcuts: !keyboard.singleKeyShortcuts })}>
 				<div class="row-copy">
-					<p class="option-label">Single-key shortcuts</p>
-					<p class="option-description">Enable `J/K` navigation, `C` compose, and `R` sync outside typing contexts.</p>
+					<p class="option-label">{$_('keyboard.singleKeyShortcuts')}</p>
+					<p class="option-description">{$_('keyboard.singleKeyShortcutsDescription')}</p>
 				</div>
 				<span class:toggle-on={keyboard.singleKeyShortcuts} class="toggle-pill">
 					<span class="toggle-thumb"></span>
@@ -72,8 +73,8 @@
 
 			<button class="toggle-row" onclick={() => updateKeyboard({ showShortcutHints: !keyboard.showShortcutHints })}>
 				<div class="row-copy">
-					<p class="option-label">Show shortcut hints</p>
-					<p class="option-description">Display subtle key badges on compose, refresh, and settings entry points.</p>
+					<p class="option-label">{$_('keyboard.showShortcutHints')}</p>
+					<p class="option-description">{$_('keyboard.showShortcutHintsDescription')}</p>
 				</div>
 				<span class:toggle-on={keyboard.showShortcutHints} class="toggle-pill">
 					<span class="toggle-thumb"></span>
@@ -82,8 +83,8 @@
 
 			<button class="toggle-row" onclick={() => updateKeyboard({ sendWithModEnter: !keyboard.sendWithModEnter })}>
 				<div class="row-copy">
-					<p class="option-label">Send with Cmd/Ctrl + Enter</p>
-					<p class="option-description">Adds a fast-send chord to the compose modal footer and overlay.</p>
+					<p class="option-label">{$_('keyboard.sendWithModEnter')}</p>
+					<p class="option-description">{$_('keyboard.sendWithModEnterDescription')}</p>
 				</div>
 				<span class:toggle-on={keyboard.sendWithModEnter} class="toggle-pill">
 					<span class="toggle-thumb"></span>
@@ -95,11 +96,11 @@
 	<section class="section-card">
 		<div class="section-copy">
 			<div>
-				<h3 class="section-title">Live Shortcut Map</h3>
-				<p class="section-description">These bindings are active in the current worktree build.</p>
+				<h3 class="section-title">{$_('keyboard.liveShortcutMap')}</h3>
+				<p class="section-description">{$_('keyboard.liveShortcutMapDescription')}</p>
 			</div>
 			<button class="reset-button" onclick={() => preferences.resetSection('keyboard')}>
-				Reset keyboard defaults
+				{$_('keyboard.resetKeyboard')}
 			</button>
 		</div>
 
@@ -111,14 +112,14 @@
 					class:highlight={item.combo.includes('Cmd/Ctrl')}
 				>
 					<div class="shortcut-head">
-						<p class="option-label">{item.action}</p>
+						<p class="option-label">{$_(item.actionKey)}</p>
 						<div class="keycaps">
 							{#each item.combo as key}
 								<span class="keycap">{key}</span>
 							{/each}
 						</div>
 					</div>
-					<p class="option-description">{item.description}</p>
+					<p class="option-description">{$_(item.descriptionKey)}</p>
 				</div>
 			{/each}
 		</div>
@@ -130,9 +131,9 @@
 				<Sparkles class="size-4" strokeWidth={1.8} />
 			</div>
 			<div>
-				<p class="option-label">Hint system</p>
+				<p class="option-label">{$_('keyboard.hintSystem')}</p>
 				<p class="option-description">
-					When enabled, primary controls surface their shortcut directly in the UI instead of hiding it in docs.
+					{$_('keyboard.hintSystemDescription')}
 				</p>
 			</div>
 		</div>
@@ -142,9 +143,9 @@
 				<SendHorizontal class="size-4" strokeWidth={1.8} />
 			</div>
 			<div>
-				<p class="option-label">Compose acceleration</p>
+				<p class="option-label">{$_('keyboard.composeAcceleration')}</p>
 				<p class="option-description">
-					The send chord is implemented in the compose overlay, so it remains fast without interfering with text entry.
+					{$_('keyboard.composeAccelerationDescription')}
 				</p>
 			</div>
 		</div>
@@ -154,9 +155,9 @@
 				<CornerDownLeft class="size-4" strokeWidth={1.8} />
 			</div>
 			<div>
-				<p class="option-label">Scope guard</p>
+				<p class="option-label">{$_('keyboard.scopeGuard')}</p>
 				<p class="option-description">
-					Single-key shortcuts are intentionally suspended while a modal is open or when focus is inside an input field.
+					{$_('keyboard.scopeGuardDescription')}
 				</p>
 			</div>
 		</div>

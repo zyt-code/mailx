@@ -1,61 +1,50 @@
-# Mailx - Tauri Mail Client
+# CLAUDE.md
 
-> Modern desktop email client with Notion-inspired UI
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Tech Stack
 
-```
-Tauri v2 (Rust)  ←→  Svelte 5 + Vite  ←→  Tailwind CSS + Skeleton UI
-```
-
-- **Backend:** Tauri v2 (Rust)
-- **Frontend:** Svelte 5 (with runes) + TypeScript
-- **UI Library:** Skeleton UI / shadcn-svelte
-- **Styling:** Tailwind CSS v4
+- **Backend:** Tauri v2 (Rust) — SQLite (rusqlite), async-imap, lettre (SMTP), keyring (OS keychain)
+- **Frontend:** Svelte 5 + SvelteKit + TypeScript (SPA mode, SSR disabled)
+- **Styling:** Tailwind CSS v4, class-based dark mode, shadcn-svelte CSS variable pattern
 - **Icons:** Lucide Svelte
-- **State:** Svelte 5 runes (`$state`, `$derived`, `$effect`)
+- **State:** Svelte 5 runes (`$state`, `$derived`, `$effect`) for new code; legacy stores use `writable`/`derived`
+- **i18n:** `svelte-i18n` v4 with lazy-loaded locales (10 languages), custom type-safe translation keys
+- **Rich text:** TipTap v3
+- **Virtualization:** virtua
 
-## Quick Start
+## Commands
 
 ```bash
-# Install dependencies
-npm install
+# Install dependencies (uses pnpm)
+pnpm install
 
-# Development mode
+# Development (starts both Vite + Tauri)
 npm run tauri dev
 
-# Build for production
+# Production build
 npm run tauri build
 
 # Type checking
 npm run check
+
+# Frontend tests (Vitest)
+npx vitest                         # run all
+npx vitest run src/lib/stores/     # run tests in a directory
+npx vitest run path/to/file.test.ts  # single file
+
+# Rust backend tests
+cargo test --manifest-path src-tauri/Cargo.toml
+cargo test --manifest-path src-tauri/Cargo.toml test_name  # single test
+
+# Gate check (run before committing)
+cargo test --manifest-path src-tauri/Cargo.toml && npm run check
 ```
 
-## Project Structure
+## Architecture
 
-```
-mailx/
-├── src-tauri/          # Tauri Rust backend
-│   ├── src/
-│   │   ├── main.rs     # Entry point
-│   │   ├── lib.rs      # Core modules
-│   │   └── commands/   # Tauri commands
-│   └── Cargo.toml
-├── src/                # Svelte 5 frontend
-│   ├── lib/
-│   │   └── components/ # UI components
-│   ├── routes/         # File-based routing
-│   ├── app.css         # Global styles
-│   └── app.d.ts        # Type declarations
-├── static/             # Static assets
-├── docs/               # Design documents
-├── CLAUDE.md           # This file
-└── package.json
-```
+### Layout: 3-Column Notion-Style
 
-## Layout Architecture
-
-**3-Column Notion-Style Layout:**
 ```
 ┌──────────┬──────────────────┬──────────────┐
 │ Sidebar  │    Mail List     │ Reading Pane │
@@ -64,161 +53,112 @@ mailx/
 └──────────┴──────────────────┴──────────────┘
 ```
 
-### Key Components
+Root layout (`src/routes/+layout.svelte`) conditionally renders:
+- Paths starting with `/settings` → renders slot directly (settings has its own 2-column layout)
+- Everything else → wraps content in `<AppShell>` (the 3-column mail layout)
 
-| Component | Location | Purpose |
-|-----------|----------|---------|
-| `AppShell.svelte` | `src/lib/components/layout/` | Main layout wrapper |
-| `Sidebar.svelte` | `src/lib/components/layout/` | Left navigation (collapsible) |
-| `MailList.svelte` | `src/lib/components/layout/` | Email list panel |
-| `ReadingPane.svelte` | `src/lib/components/layout/` | Content display |
-| `Resizer.svelte` | `src/lib/components/layout/` | Panel resize handle |
-| `ComposeModal.svelte` | `src/lib/components/compose/` | Mail composition modal |
-| `ComposeHeader.svelte` | `src/lib/components/compose/` | To/Cc/Bcc/Subject inputs |
-| `ComposeEditor.svelte` | `src/lib/components/compose/` | Message body editor |
-| `ComposeActions.svelte` | `src/lib/components/compose/` | Send/Discard/Close actions |
+### Frontend-Backend Communication
+
+- **Request/Response:** Tauri commands (28+ commands in `src-tauri/src/commands.rs`)
+- **Push events:** Tauri `Emitter` sends events from Rust → Svelte: `sync:*`, `mails:updated`, `account:*`, `mail:sent`, `navigate`
+- **Frontend event bus** bridges Tauri events and internal app events
+
+### Rust Backend Modules
+
+| Module | Purpose |
+|--------|---------|
+| `lib.rs` | Tauri builder, plugin registration, menu, state management |
+| `commands.rs` | All Tauri invoke handlers |
+| `database.rs` | SQLite schema, migrations, WAL mode, mail/attachment CRUD |
+| `accounts.rs` | Account CRUD, IMAP/SMTP config extraction |
+| `imap_client.rs` | IMAP connection, email fetching, provider-specific handling |
+| `smtp_client.rs` | Email sending via lettre, multipart/attachments |
+| `sync_manager.rs` | Background sync orchestration with `AtomicBool` lock |
+| `credentials.rs` | OS keychain storage via `keyring` crate |
+| `html_sanitize.rs` | XSS prevention via `ammonia` |
+| `mail_provider.rs` | Provider detection (Netease163, iCloud, Generic) with provider-specific IMAP quirks |
+
+State is managed via `app.manage()` — commands receive `Database`, `AccountManager`, `CredentialManager`, `SyncManager` as `State<'_>`.
+
+### Stores
+
+| Store | Pattern | Purpose |
+|-------|---------|---------|
+| `i18nStore.svelte.ts` | Svelte 5 `$state` runes | i18n initialization, locale management |
+| `preferencesStore.ts` | Svelte 4 `writable` | User preferences (appearance, notifications, keyboard, privacy, language), persisted to localStorage under `mailx-preferences` |
+| `themeStore.ts` | Svelte 4 `writable` | Theme management |
+| `mailStore.ts` | Svelte 4 `writable`/`derived` | Mail data, folder filtering, connects to Tauri events and DB |
+| `accountStore.ts` | Svelte 4 `writable`/`derived` | Account management, auto-loads on import |
+| `syncStore.ts` | Svelte 4 `writable`/`derived` | Sync state tracking via Tauri events |
+| `unreadStore.ts` | Svelte 4 `derived` | Derived from mailStore |
+
+**Note:** Only `i18nStore` uses Svelte 5 runes (requires `.svelte.ts` extension). Other stores still use the classic `writable`/`derived` pattern.
+
+### i18n System
+
+- Powered by `svelte-i18n` v4 with lazy-loaded locale imports
+- 10 locales: en, zh-CN, zh-TW, ja, ko, es, fr, de, pt, ru
+- Locale files in `src/lib/i18n/locales/` with namespaces: common, titlebar, sidebar, nav, mail, settings, language, theme, account, form, datetime
+- Type-safe keys derived from the `en` locale via `typeof` + recursive `TranslationKey` type
+- Components consume translations via `$_('namespace.key')` from `svelte-i18n`
+- Store wrapper at `src/lib/stores/i18nStore.svelte.ts` handles init, locale switching, loading state
+- Barrel re-export at `src/lib/i18n/index.ts`
+
+### Routing
+
+SPA mode (`ssr = false`, `adapter-static`). Settings pages live under `/settings/*` with sub-routes: `language`, `appearance`, `notifications`, `privacy`, `keyboard`, `accounts/new`, `accounts/[id]`.
 
 ## Code Style
 
-### Svelte 5 Runes (Required)
+### Svelte 5 Runes (Required for new code)
 
 ```svelte
 <script lang="ts">
-  // ✅ Use Svelte 5 runes
   let count = $state(0);
   let doubled = $derived(count * 2);
-
-  $effect(() => {
-    console.log(count);
-  });
-
-  // ❌ Don't use old stores
-  // import { writable } from 'svelte/store';
+  $effect(() => { console.log(count); });
 </script>
 ```
 
-### TypeScript (Strict)
+Do not use `writable`/`derived` from `svelte/store` in new code. Files using `$state` runes must have `.svelte.ts` extension.
 
-```typescript
-// Always type props
-interface Props {
-  mail: Mail;
-  onSelect: (id: string) => void;
-}
+### TypeScript
 
-// Use generics for reusable components
-interface ListProps<T> {
-  items: T[];
-  render: (item: T) => snipped;
-}
-```
+Strict mode. Always type component props with an interface.
 
-### Tailwind CSS Patterns
+### Styling
 
-```svelte
-<!-- ✅ Use Tailwind classes -->
-<div class="flex items-center gap-4 p-4 border-b">
+Use Tailwind classes exclusively — no inline styles or custom CSS.
 
-<!-- ❌ Don't write custom CSS -->
-<div style="display: flex; padding: 16px;">
-```
-
-## Development Guidelines
-
-1. **UI Priority:** Notion-inspired clean, minimal design
-2. **Modular Components:** Small, reusable, composable
-3. **Type Safety:** Always use TypeScript types
-4. **Accessibility:** WCAG AA compliant by default
-5. **Performance:** Lazy load routes, optimize assets
-
-## Strict TDD Process (Required)
-
-All development must follow **Test-Driven Development**. Use this exact flow for every feature and bugfix:
-
-1. **Red: write the test first**
-   - Define expected behavior in an automated test before editing production code.
-   - Backend tests go in `src-tauri/test/*_tests.rs` and are linked via existing `#[cfg(test)]` modules.
-   - For frontend behavior changes, add/extend automated tests for the affected logic (if no harness exists, add one first).
-   - Run only the targeted test and verify it fails for the correct reason.
-2. **Green: implement minimal code**
-   - Modify only the necessary production files (`src/`, `src-tauri/src/`) to satisfy the failing test.
-   - Keep changes minimal; avoid mixed refactor/feature commits in this step.
-3. **Refactor: improve safely**
-   - Refactor structure/naming after tests pass.
-   - Keep behavior unchanged; rerun tests after each meaningful refactor.
-4. **Gate: full verification before commit**
-   - `cargo test --manifest-path src-tauri/Cargo.toml`
-   - `npm run check`
-5. **PR must show TDD evidence**
-   - Include the failing test scenario (Red), passing result after implementation (Green), and final gate command results.
-
-### TDD Command Template
-
-```bash
-# 1) Red: run targeted test (expected fail)
-cargo test --manifest-path src-tauri/Cargo.toml test_name
-
-# 2) Green/Refactor: rerun targeted test until pass
-cargo test --manifest-path src-tauri/Cargo.toml test_name
-
-# 3) Gate: run full checks before commit/push
-cargo test --manifest-path src-tauri/Cargo.toml
-npm run check
-```
-
-## Key Files to Edit
-
-| Task | File |
-|------|------|
-| Add new route | `src/routes/+page.svelte` |
-| Create component | `src/lib/components/` |
-| Global styles | `src/app.css` |
-| Tauri commands | `src-tauri/src/commands.rs` |
-| Database operations | `src-tauri/src/database.rs` |
-| Database API | `src/lib/db/index.ts` |
-| Tailwind config | `tailwind.config.js` |
-| Type definitions | `src/lib/types.ts` |
-
-## Common Tasks
-
-```bash
-# Add a dependency
-npm install <package>
-
-# Add Tauri API
-npm install @tauri-apps/api
-
-# Run type checker
-npm run check
-
-# Format code
-npm run format
-```
-
-## Design Tokens
+### Design Tokens
 
 ```css
-/* Notion-inspired colors */
---bg-primary: #FFFFFF;      /* Main background */
---bg-secondary: #F7F7F5;    /* Secondary background */
---bg-hover: #EFEFEF;        /* Hover state */
---border: #E0E0E0;          /* Border color */
---text: #37352F;            /* Primary text */
---text-muted: #787774;      /* Secondary text */
---accent: #2EAADC;          /* Accent color */
+--bg-primary: #FFFFFF;    --bg-secondary: #F7F7F5;   --bg-hover: #EFEFEF;
+--border: #E0E0E0;        --text: #37352F;            --text-muted: #787774;
+--accent: #2EAADC;
 ```
 
-## Notes
+## Testing
+
+### Strict TDD Process (Required)
+
+1. **Red:** Write the test first, verify it fails for the correct reason
+2. **Green:** Implement minimal code to pass the test
+3. **Refactor:** Improve structure while keeping tests green
+4. **Gate:** `cargo test --manifest-path src-tauri/Cargo.toml && npm run check`
+
+### Test Organization
+
+- **Frontend:** Vitest v4 with jsdom, globals enabled. Tests co-located with source as `*.test.ts`. Integration tests in `tests/i18n/`. Setup file `tests/setup.ts` mocks Tauri APIs, SvelteKit modules, and polyfills `$state` for test compatibility.
+- **Rust:** Tests in `src-tauri/test/*_tests.rs`, linked via `#[cfg(test)]` + `#[path]` attributes in each module.
+- **Governance:** Tests and mock utilities live under `tests/`. Keep `src/` and `src-tauri/src/` strictly production-ready.
+
+## Key Behaviors
 
 - Panel widths persist in localStorage
 - Sidebar collapses to 64px (icons only)
-- Mobile: stacked layout with slide-in nav
-- All icons from Lucide Svelte
 - Compose modal auto-saves drafts every 30 seconds
-- Drafts are stored in SQLite with folder='drafts'
-- Sent emails move to folder='sent' after sending
-- Discarded drafts move to folder='trash'
-
-## Testing Governance
-
-- Tests, integration utilities, and mock data injectors live under `/tests`. Keep `src/` and `src-tauri/src/` strictly production-ready with no local-environment hacks.
+- Drafts stored in SQLite with `folder='drafts'`; sent mail moves to `folder='sent'`; discarded drafts move to `folder='trash'`
+- Separate SQLite connections for main DB and sync (WAL mode for concurrent reads)
+- IMAP uses `tokio::task::spawn_blocking` (the `imap` crate is blocking)
+- `SyncManager` uses `AtomicBool` to prevent concurrent syncs
