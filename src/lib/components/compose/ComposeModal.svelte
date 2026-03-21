@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { _ } from 'svelte-i18n';
 	import * as db from '$lib/db/index.js';
 	import * as accounts from '$lib/accounts/index.js';
 	import { ChevronDown, X } from 'lucide-svelte';
@@ -85,14 +86,14 @@
 			draft.to = replyTo.to?.[0] ? [replyTo.to[0]] : [];
 			draft.cc = [];
 			draft.bcc = [];
-			draft.subject = replyTo.subject.startsWith('Re:') ? replyTo.subject : `Re: ${replyTo.subject}`;
-			draft.body = `\n\n--- Original Message ---\nFrom: ${replyTo.from_name} <${replyTo.from_email}>\nDate: ${new Date(replyTo.timestamp).toLocaleString()}\nSubject: ${replyTo.subject}\n\n${replyTo.body}`;
+			draft.subject = replyTo.subject.startsWith('Re:') ? replyTo.subject : `${$_('compose.rePrefix')}${replyTo.subject}`;
+			draft.body = `\n\n${$_('compose.originalMessage')}\n${$_('compose.fromField')}${replyTo.from_name} <${replyTo.from_email}>\n${$_('compose.dateField')}${new Date(replyTo.timestamp).toLocaleString()}\n${$_('compose.subjectField')}${replyTo.subject}\n\n${replyTo.body}`;
 		} else if (forward) {
 			draft.to = [];
 			draft.cc = [];
 			draft.bcc = [];
-			draft.subject = forward.subject.startsWith('Fwd:') ? forward.subject : `Fwd: ${forward.subject}`;
-			draft.body = `\n\n--- Forwarded Message ---\nFrom: ${forward.from_name} <${forward.from_email}>\nDate: ${new Date(forward.timestamp).toLocaleString()}\nSubject: ${forward.subject}\n\n${forward.body}`;
+			draft.subject = forward.subject.startsWith('Fwd:') ? forward.subject : `${$_('compose.fwdPrefix')}${forward.subject}`;
+			draft.body = `\n\n${$_('compose.forwardedMessage')}\n${$_('compose.fromField')}${forward.from_name} <${forward.from_email}>\n${$_('compose.dateField')}${new Date(forward.timestamp).toLocaleString()}\n${$_('compose.subjectField')}${forward.subject}\n\n${forward.body}`;
 		} else {
 			draft.to = [];
 			draft.cc = [];
@@ -132,7 +133,7 @@
 			account_id: selectedAccount.id,
 			from_name: selectedAccount.name,
 			from_email: selectedAccount.email,
-			subject: draft.subject || '(No subject)',
+			subject: draft.subject || $_('mail.noSubject'),
 			preview: draft.body.slice(0, 100),
 			body: draft.body,
 			timestamp: Date.now(),
@@ -274,12 +275,12 @@
 
 	async function sendMail(): Promise<void> {
 		if (!selectedAccountId) {
-			alert('Please select an account to send from');
+			alert($_('compose.selectAccountAlert'));
 			return;
 		}
 
 		if (draft.to.length === 0 && draft.cc.length === 0 && draft.bcc.length === 0) {
-			alert('Please add at least one recipient');
+			alert($_('compose.addRecipientAlert'));
 			return;
 		}
 
@@ -291,7 +292,7 @@
 				await accounts.sendMail(draftId, selectedAccountId);
 			} catch (error) {
 				console.error('Failed to send mail:', error);
-				alert(`Failed to send email: ${error instanceof Error ? error.message : 'Unknown error'}`);
+				alert($_('compose.sendFailedAlert', { values: { error: error instanceof Error ? error.message : 'Unknown error' } }));
 				isSending = false;
 				return;
 			}
@@ -347,7 +348,7 @@
 			>
 				<header class="flex items-center justify-between gap-3 px-6 py-3 border-b border-[var(--border-primary)] bg-[var(--bg-secondary)]">
 					<div class="flex items-center gap-3 min-w-0">
-						<h2 id="compose-title" class="text-[15px] font-semibold text-[var(--text-primary)] shrink-0">New Message</h2>
+						<h2 id="compose-title" class="text-[15px] font-semibold text-[var(--text-primary)] shrink-0">{$_('compose.newMessage')}</h2>
 
 						{#if availableAccounts.length > 0}
 							<div class="relative" bind:this={accountMenuRef}>
@@ -359,7 +360,7 @@
 									aria-haspopup="listbox"
 									aria-expanded={showAccountDropdown}
 								>
-									<span class="truncate">From: {getSelectedAccount()?.email}</span>
+									<span class="truncate">{$_('compose.fromLabel', { values: { email: getSelectedAccount()?.email || '' } })}</span>
 									<ChevronDown class="size-3.5" strokeWidth={1.8} />
 								</button>
 
@@ -385,7 +386,7 @@
 								{/if}
 							</div>
 						{:else}
-							<span class="text-[12px] text-[var(--text-tertiary)]">No accounts configured</span>
+							<span class="text-[12px] text-[var(--text-tertiary)]">{$_('compose.noAccountsConfigured')}</span>
 						{/if}
 					</div>
 
@@ -393,7 +394,7 @@
 						type="button"
 						onclick={closeModal}
 						class="flex size-8 items-center justify-center rounded-md text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
-						aria-label="Close compose"
+						aria-label={$_('compose.closeCompose')}
 					>
 						<X class="size-4" strokeWidth={1.8} />
 					</button>

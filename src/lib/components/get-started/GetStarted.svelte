@@ -2,6 +2,7 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { ArrowRight, Mail, Lock, Send, Archive } from 'lucide-svelte';
 	import { goto } from '$app/navigation';
+	import { _ } from 'svelte-i18n';
 
 	interface Props {
 		onOpenSettings?: () => void;
@@ -25,9 +26,9 @@
 
 		<!-- Content -->
 		<div class="flex flex-col gap-3">
-			<h1 class="text-2xl font-semibold text-zinc-900">Welcome to Mailx</h1>
+			<h1 class="text-2xl font-semibold text-zinc-900">{$_('getStarted.welcome')}</h1>
 			<p class="text-[15px] text-zinc-500 leading-relaxed max-w-sm">
-				A modern email client with a clean, minimal design. Add your first account to get started.
+				{$_('getStarted.description')}
 			</p>
 		</div>
 
@@ -36,7 +37,7 @@
 			onclick={onOpenSettings}
 			class="gap-2 bg-zinc-900 text-white hover:bg-zinc-800 shadow-lg shadow-zinc-900/10"
 		>
-			Add your first account
+			{$_('getStarted.addFirstAccount')}
 			<ArrowRight class="size-4" strokeWidth={2} />
 		</Button>
 
@@ -44,15 +45,15 @@
 		<div class="flex items-center gap-6 pt-4 border-t border-zinc-100">
 			<div class="flex items-center gap-2 text-zinc-400">
 				<Lock class="size-4" strokeWidth={1.5} />
-				<span class="text-xs">Secure</span>
+				<span class="text-xs">{$_('getStarted.secure')}</span>
 			</div>
 			<div class="flex items-center gap-2 text-zinc-400">
 				<Send class="size-4" strokeWidth={1.5} />
-				<span class="text-xs">Fast</span>
+				<span class="text-xs">{$_('getStarted.fast')}</span>
 			</div>
 			<div class="flex items-center gap-2 text-zinc-400">
 				<Archive class="size-4" strokeWidth={1.5} />
-				<span class="text-xs">Organized</span>
+				<span class="text-xs">{$_('getStarted.organized')}</span>
 			</div>
 		</div>
 	</div>

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { _ } from 'svelte-i18n';
 	import { VList } from 'virtua/svelte';
 	import { cn } from '$lib/utils.js';
 	import * as ContextMenu from '$lib/components/ui/context-menu/index.js';
@@ -122,13 +123,13 @@
 	});
 
 	// Logic
-	const folderLabels: Record<Folder, string> = {
-		inbox: 'Inbox',
-		sent: 'Sent',
-		drafts: 'Drafts',
-		trash: 'Trash',
-		archive: 'Archive'
-	};
+	const folderLabels = $derived<Record<Folder, string>>({
+		inbox: $_('nav.inbox'),
+		sent: $_('nav.sent'),
+		drafts: $_('nav.drafts'),
+		trash: $_('nav.trash'),
+		archive: $_('nav.archive')
+	});
 
 	function formatMailTime(timestamp: number): string {
 		const now = new Date();
@@ -138,13 +139,13 @@
 		const diffDays = Math.floor((today.getTime() - mailDay.getTime()) / 86400000);
 
 		if (diffDays === 0) {
-			return mailDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+			return mailDate.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', hour12: true });
 		} else if (diffDays === 1) {
-			return 'Yesterday';
+			return $_('mail.yesterday');
 		} else if (diffDays < 7) {
-			return mailDate.toLocaleDateString('en-US', { weekday: 'short' });
+			return mailDate.toLocaleDateString(undefined, { weekday: 'short' });
 		}
-		return mailDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+		return mailDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 	}
 
 	function getAccountColor(mail: Mail): string {
@@ -199,7 +200,7 @@
 		)} strokeWidth={1.8} />
 		<input
 			type="text"
-			placeholder="Search {folderLabels[activeFolder].toLowerCase()}..."
+			placeholder={$_('mail.searchFolder', { values: { folder: folderLabels[activeFolder] } })}
 			disabled={!isAccountConfigured}
 			class={cn(
 				"flex-1 bg-transparent text-[13px] outline-none placeholder:text-[var(--text-tertiary)] transition-colors duration-150 rounded-md px-2 -mx-2",
@@ -220,7 +221,7 @@
 	<div class="flex-1 min-h-0">
 		{#if filteredMails.length === 0}
 			<div class="flex flex-col items-center justify-center px-6 py-16">
-				<p class="text-[13px] text-[var(--text-tertiary)]">No emails found</p>
+				<p class="text-[13px] text-[var(--text-tertiary)]">{$_('mail.noEmails')}</p>
 			</div>
 		{:else}
 			<VList
@@ -262,7 +263,7 @@
 														getAccountColor(mail),
 														isSelected && 'opacity-70'
 													)}
-													title={getAccountForMail(mail)?.email || 'Unknown account'}
+													title={getAccountForMail(mail)?.email || $_('mail.unknownAccount')}
 												></div>
 											{/if}
 										</div>
@@ -308,7 +309,7 @@
 													'text-[12px] leading-5',
 													isSelected ? 'text-[var(--text-secondary)]' : 'text-[var(--text-tertiary)]'
 												)}>
-													{mail.preview || 'No preview available'}
+													{mail.preview || $_('mail.noPreview')}
 												</p>
 											{/if}
 										</div>
@@ -329,12 +330,12 @@
 								{#if !(mail.is_read ?? false)}
 									<ContextMenu.Item onclick={() => onMarkRead?.(mail, true)}>
 										<MailOpen class="size-4 text-zinc-500" strokeWidth={1.5} />
-										Mark as Read
+										{$_('mail.markRead')}
 									</ContextMenu.Item>
 								{:else}
 									<ContextMenu.Item onclick={() => onMarkRead?.(mail, false)}>
 										<MailIcon class="size-4 text-zinc-500" strokeWidth={1.5} />
-										Mark as Unread
+										{$_('mail.markUnread')}
 									</ContextMenu.Item>
 								{/if}
 
@@ -342,43 +343,43 @@
 
 								<ContextMenu.Item onclick={() => onArchive?.(mail)}>
 									<Archive class="size-4 text-zinc-500" strokeWidth={1.5} />
-									{mail.folder === 'archive' ? 'Move to Inbox' : 'Archive'}
+									{mail.folder === 'archive' ? $_('mail.unarchive') : $_('mail.archive')}
 								</ContextMenu.Item>
 
 								<ContextMenu.Sub>
 									<ContextMenu.SubTrigger>
 										<FolderInput class="size-4 text-zinc-500" strokeWidth={1.5} />
-										Move to...
+										{$_('mail.moveTo')}...
 									</ContextMenu.SubTrigger>
 									<ContextMenu.SubContent>
 										{#if mail.folder !== 'inbox'}
 											<ContextMenu.Item onclick={() => onMoveTo?.(mail, 'inbox')}>
 												<Inbox class="size-4 text-zinc-500" strokeWidth={1.5} />
-												Inbox
+												{$_('nav.inbox')}
 											</ContextMenu.Item>
 										{/if}
 										{#if mail.folder !== 'sent'}
 											<ContextMenu.Item onclick={() => onMoveTo?.(mail, 'sent')}>
 												<Send class="size-4 text-zinc-500" strokeWidth={1.5} />
-												Sent
+												{$_('nav.sent')}
 											</ContextMenu.Item>
 										{/if}
 										{#if mail.folder !== 'drafts'}
 											<ContextMenu.Item onclick={() => onMoveTo?.(mail, 'drafts')}>
 												<FileText class="size-4 text-zinc-500" strokeWidth={1.5} />
-												Drafts
+												{$_('nav.drafts')}
 											</ContextMenu.Item>
 										{/if}
 										{#if mail.folder !== 'archive'}
 											<ContextMenu.Item onclick={() => onMoveTo?.(mail, 'archive')}>
 												<Archive class="size-4 text-zinc-500" strokeWidth={1.5} />
-												Archive
+												{$_('nav.archive')}
 											</ContextMenu.Item>
 										{/if}
 										{#if mail.folder !== 'trash'}
 											<ContextMenu.Item onclick={() => onMoveTo?.(mail, 'trash')}>
 												<Trash2 class="size-4 text-zinc-500" strokeWidth={1.5} />
-												Trash
+												{$_('nav.trash')}
 											</ContextMenu.Item>
 										{/if}
 									</ContextMenu.SubContent>
@@ -388,7 +389,7 @@
 
 								<ContextMenu.Item class="text-red-500 data-[highlighted]:text-red-600" onclick={() => onDelete?.(mail)}>
 									<Trash2 class="size-4" strokeWidth={1.5} />
-									Delete
+									{$_('mail.delete')}
 								</ContextMenu.Item>
 							</ContextMenu.Content>
 						</ContextMenu.Root>

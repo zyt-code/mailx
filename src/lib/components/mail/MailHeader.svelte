@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { _ } from 'svelte-i18n';
 	import type { Mail } from '$lib/types.js';
 	import { ChevronDown, ChevronRight, Star } from 'lucide-svelte';
 	import { cn } from '$lib/utils.js';
@@ -20,14 +21,14 @@
 			date.getFullYear() === now.getFullYear();
 
 		if (isToday) {
-			return date.toLocaleTimeString('en-US', {
+			return date.toLocaleTimeString(undefined, {
 				hour: 'numeric',
 				minute: '2-digit',
 				hour12: true
 			});
 		}
 
-		return date.toLocaleDateString('en-US', {
+		return date.toLocaleDateString(undefined, {
 			month: 'short',
 			day: 'numeric',
 			year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
@@ -76,7 +77,7 @@
 	<div class="px-6 pt-5 pb-2">
 		<div class="flex items-start gap-2">
 			<h1 class="flex-1 text-[20px] font-semibold text-[var(--text-primary)] leading-snug tracking-tight">
-				{mail.subject || '(No subject)'}
+				{mail.subject || $_('mail.noSubject')}
 			</h1>
 			{#if mail.starred}
 				<Star class="size-5 text-[var(--accent-primary)] fill-[var(--accent-primary)] shrink-0" strokeWidth={1.8} />
@@ -103,12 +104,12 @@
 				<span class="truncate text-xs text-[var(--text-tertiary)]">&lt;{mail.from_email}&gt;</span>
 			</div>
 			<div class="flex items-center gap-2 text-xs text-[var(--text-tertiary)]">
-				<span>to {hasRecipients ? mail.to![0].email : 'me'}</span>
+				<span>{hasRecipients ? $_('mail.toRecipient', { values: { email: mail.to![0].email } }) : $_('mail.toMe')}</span>
 				<span class="text-[var(--border-primary)]">·</span>
 				<span class="tabular-nums">{formatFullDate(mail.timestamp)}</span>
 				{#if mail.attachments && mail.attachments.length > 0}
 					<span class="text-[var(--border-primary)]">·</span>
-					<span>{mail.attachments.length} attachment{mail.attachments.length > 1 ? 's' : ''}</span>
+					<span>{mail.attachments.length > 1 ? $_('mail.attachmentsCount', { values: { n: mail.attachments.length } }) : $_('mail.attachmentCount', { values: { n: mail.attachments.length } })}</span>
 				{/if}
 			</div>
 		</div>
@@ -118,10 +119,10 @@
 			<button
 				onclick={() => (showDetails = !showDetails)}
 				class="flex shrink-0 items-center gap-1 rounded-md px-2.5 py-1 text-xs text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)]"
-				aria-label={showDetails ? 'Hide details' : 'Show details'}
+				aria-label={showDetails ? $_('mail.hideDetails') : $_('mail.showDetails')}
 				aria-expanded={showDetails}
 			>
-				<span>Details</span>
+				<span>{$_('mail.details')}</span>
 				{#if showDetails}
 					<ChevronDown strokeWidth={1.8} class="size-3" />
 				{:else}
@@ -137,14 +138,14 @@
 			<div class="space-y-1.5">
 				<!-- From -->
 				<div class="flex gap-3">
-					<span class="w-14 shrink-0 text-xs text-[var(--text-tertiary)] font-medium">From</span>
+					<span class="w-14 shrink-0 text-xs text-[var(--text-tertiary)] font-medium">{$_('mail.from')}</span>
 					<span class="truncate text-[var(--text-primary)] text-xs">{formatEmailAddress({ name: mail.from_name, email: mail.from_email })}</span>
 				</div>
 
 				<!-- To -->
 				{#if hasRecipients}
 					<div class="flex gap-3">
-						<span class="w-14 shrink-0 text-xs text-[var(--text-tertiary)] font-medium">To</span>
+						<span class="w-14 shrink-0 text-xs text-[var(--text-tertiary)] font-medium">{$_('mail.to')}</span>
 						<span class="flex-1 text-[var(--text-primary)] text-xs">
 							{#each mail.to as addr, i}
 								<span class="inline-block">{formatEmailAddress(addr)}</span>
@@ -157,7 +158,7 @@
 				<!-- Cc -->
 				{#if hasCc}
 					<div class="flex gap-3">
-						<span class="w-14 shrink-0 text-xs text-[var(--text-tertiary)] font-medium">Cc</span>
+						<span class="w-14 shrink-0 text-xs text-[var(--text-tertiary)] font-medium">{$_('mail.cc')}</span>
 						<span class="flex-1 text-[var(--text-primary)] text-xs">
 							{#each mail.cc as addr, i}
 								<span class="inline-block">{formatEmailAddress(addr)}</span>
@@ -170,7 +171,7 @@
 				<!-- Reply-To -->
 				{#if hasReplyTo}
 					<div class="flex gap-3">
-						<span class="w-14 shrink-0 text-xs text-[var(--text-tertiary)] font-medium">Reply-To</span>
+						<span class="w-14 shrink-0 text-xs text-[var(--text-tertiary)] font-medium">{$_('mail.replyTo')}</span>
 						<span class="flex-1 text-[var(--text-primary)] text-xs">
 							{#each mail.reply_to as addr, i}
 								<span class="inline-block">{formatEmailAddress(addr)}</span>
@@ -182,7 +183,7 @@
 
 				<!-- Date -->
 				<div class="flex gap-3">
-					<span class="w-14 shrink-0 text-xs text-[var(--text-tertiary)] font-medium">Date</span>
+					<span class="w-14 shrink-0 text-xs text-[var(--text-tertiary)] font-medium">{$_('mail.date')}</span>
 					<span class="text-[var(--text-primary)] tabular-nums text-xs">{new Date(mail.timestamp).toLocaleString()}</span>
 				</div>
 			</div>

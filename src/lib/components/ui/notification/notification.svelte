@@ -14,6 +14,7 @@
   import { fly } from 'svelte/transition';
   import { X, CheckCircle, AlertCircle, Info } from 'lucide-svelte';
   import { cn } from '$lib/utils.js';
+  import { _ } from 'svelte-i18n';
 
   let notifications = $state<NotificationItem[]>([]);
 
@@ -73,7 +74,7 @@
       <button
         onclick={() => dismiss(notification.id)}
         class="shrink-0 text-zinc-400 hover:text-zinc-600 transition-colors"
-        aria-label="Dismiss"
+        aria-label={$_('notification.dismiss')}
       >
         <X class="size-4" strokeWidth={1.5} />
       </button>

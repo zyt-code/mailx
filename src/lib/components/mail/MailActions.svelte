@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { _ } from 'svelte-i18n';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import {
 		Reply,
@@ -73,36 +74,36 @@
 		variant="ghost"
 		size="sm"
 		onclick={handleReply}
-		aria-label="Reply"
-		title="Reply (R)"
+		aria-label={$_('mail.reply')}
+		title={$_('mail.replyHint')}
 		class="text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
 	>
 		<Reply strokeWidth={1.8} class="size-4" />
-		<span class="ml-1.5 hidden sm:inline">Reply</span>
+		<span class="ml-1.5 hidden sm:inline">{$_('mail.reply')}</span>
 	</Button>
 
 	<Button
 		variant="ghost"
 		size="sm"
 		onclick={handleReplyAll}
-		aria-label="Reply all"
-		title="Reply All (A)"
+		aria-label={$_('mail.replyAll')}
+		title={$_('mail.replyAllHint')}
 		class="text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
 	>
 		<ReplyAll strokeWidth={1.8} class="size-4" />
-		<span class="ml-1.5 hidden sm:inline">Reply All</span>
+		<span class="ml-1.5 hidden sm:inline">{$_('mail.replyAll')}</span>
 	</Button>
 
 	<Button
 		variant="ghost"
 		size="sm"
 		onclick={handleForward}
-		aria-label="Forward"
-		title="Forward (F)"
+		aria-label={$_('mail.forward')}
+		title={$_('mail.forwardHint')}
 		class="text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
 	>
 		<Forward strokeWidth={1.8} class="size-4" />
-		<span class="ml-1.5 hidden sm:inline">Forward</span>
+		<span class="ml-1.5 hidden sm:inline">{$_('mail.forward')}</span>
 	</Button>
 
 	<!-- Divider -->
@@ -113,16 +114,16 @@
 		variant="ghost"
 		size="sm"
 		onclick={handleArchive}
-		aria-label={isArchive ? 'Unarchive' : 'Archive'}
-		title={isArchive ? 'Unarchive (E)' : 'Archive (E)'}
+		aria-label={isArchive ? $_('mail.unarchive') : $_('mail.archive')}
+		title={isArchive ? $_('mail.unarchiveHint') : $_('mail.archiveHint')}
 		class="text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
 	>
 		{#if isArchive}
 			<ArchiveRestore strokeWidth={1.8} class="size-4" />
-			<span class="ml-1.5 hidden sm:inline">Unarchive</span>
+			<span class="ml-1.5 hidden sm:inline">{$_('mail.unarchive')}</span>
 		{:else}
 			<Archive strokeWidth={1.8} class="size-4" />
-			<span class="ml-1.5 hidden sm:inline">Archive</span>
+			<span class="ml-1.5 hidden sm:inline">{$_('mail.archive')}</span>
 		{/if}
 	</Button>
 
@@ -131,16 +132,16 @@
 		variant="ghost"
 		size="sm"
 		onclick={handleToggleStar}
-		aria-label={mail.starred ? 'Unstar' : 'Star'}
-		title={mail.starred ? 'Unstar (S)' : 'Star (S)'}
+		aria-label={mail.starred ? $_('mail.unstar') : $_('mail.star')}
+		title={mail.starred ? $_('mail.unstarHint') : $_('mail.starHint')}
 		class={mail.starred ? 'text-[var(--accent-primary)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'}
 	>
 		{#if mail.starred}
 			<Star strokeWidth={1.8} class="size-4 fill-[var(--accent-primary)]" />
-			<span class="ml-1.5 hidden sm:inline">Starred</span>
+			<span class="ml-1.5 hidden sm:inline">{$_('mail.starred')}</span>
 		{:else}
 			<Star strokeWidth={1.8} class="size-4" />
-			<span class="ml-1.5 hidden sm:inline">Star</span>
+			<span class="ml-1.5 hidden sm:inline">{$_('mail.star')}</span>
 		{/if}
 	</Button>
 
@@ -149,17 +150,17 @@
 		variant="ghost"
 		size="sm"
 		onclick={handleDelete}
-		aria-label="Delete"
-		title="Delete"
+		aria-label={$_('mail.delete')}
+		title={$_('mail.delete')}
 		class="text-[var(--text-secondary)] hover:text-[var(--error)] hover:bg-[var(--error-light)]"
 	>
 		<Trash2 strokeWidth={1.8} class="size-4" />
-		<span class="ml-1.5 hidden sm:inline">Delete</span>
+		<span class="ml-1.5 hidden sm:inline">{$_('mail.delete')}</span>
 	</Button>
 
 	<!-- More dropdown (for mobile) -->
 	<div class="relative sm:hidden">
-		<Button variant="ghost" size="icon-sm" onclick={() => (showDropdown = !showDropdown)} aria-label="More actions">
+		<Button variant="ghost" size="icon-sm" onclick={() => (showDropdown = !showDropdown)} aria-label={$_('mail.moreActions')}>
 			<MoreHorizontal strokeWidth={1.5} class="size-4" />
 		</Button>
 
@@ -175,7 +176,7 @@
 					role="menuitem"
 				>
 					<Reply strokeWidth={1.5} class="size-4" />
-					Reply
+					{$_('mail.reply')}
 				</button>
 				<button
 					onclick={handleReplyAll}
@@ -183,7 +184,7 @@
 					role="menuitem"
 				>
 					<ReplyAll strokeWidth={1.5} class="size-4" />
-					Reply All
+					{$_('mail.replyAll')}
 				</button>
 				<button
 					onclick={handleForward}
@@ -191,7 +192,7 @@
 					role="menuitem"
 				>
 					<Forward strokeWidth={1.5} class="size-4" />
-					Forward
+					{$_('mail.forward')}
 				</button>
 				<div class="border-t border-[var(--border-primary)]"></div>
 				<button
@@ -201,10 +202,10 @@
 				>
 					{#if isArchive}
 						<ArchiveRestore strokeWidth={1.5} class="size-4" />
-						Unarchive
+						{$_('mail.unarchive')}
 					{:else}
 						<Archive strokeWidth={1.5} class="size-4" />
-						Archive
+						{$_('mail.archive')}
 					{/if}
 				</button>
 				<button
@@ -214,10 +215,10 @@
 				>
 					{#if mail.starred}
 						<StarOff strokeWidth={1.5} class="size-4" />
-						Unstar
+						{$_('mail.unstar')}
 					{:else}
 						<Star strokeWidth={1.5} class="size-4" />
-						Star
+						{$_('mail.star')}
 					{/if}
 				</button>
 				<button
@@ -226,7 +227,7 @@
 					role="menuitem"
 				>
 					<Trash2 strokeWidth={1.5} class="size-4" />
-					Delete
+					{$_('mail.delete')}
 				</button>
 			</div>
 		{/if}

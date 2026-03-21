@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { _ } from 'svelte-i18n';
 	import { ArrowLeft, Mail as MailIcon } from 'lucide-svelte';
 	import type { Mail } from '$lib/types.js';
 	import { MailHeader, MailActions, EmailRenderer } from '$lib/components/mail/index.js';
@@ -87,7 +88,7 @@
 		<div class="flex flex-1 flex-col min-h-0 overflow-hidden">
 			{#if isMobile}
 				<div class="flex items-center border-b border-[var(--border-primary)] px-3 py-2">
-					<button onclick={onBack} class="flex size-7 items-center justify-center rounded-md text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]" aria-label="Back to list">
+					<button onclick={onBack} class="flex size-7 items-center justify-center rounded-md text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]" aria-label={$_('mail.backToList')}>
 						<ArrowLeft class="size-[17px]" strokeWidth={1.8} />
 					</button>
 				</div>
@@ -125,7 +126,7 @@
 			<div class="flex flex-col items-center gap-3 text-center">
 				<MailIcon class="size-7 text-[var(--text-tertiary)] opacity-40" strokeWidth={1.8} />
 				<div>
-					<p class="text-[13px] text-[var(--text-tertiary)]">Select an email to read</p>
+					<p class="text-[13px] text-[var(--text-tertiary)]">{$_('mail.selectEmail')}</p>
 				</div>
 			</div>
 		</div>

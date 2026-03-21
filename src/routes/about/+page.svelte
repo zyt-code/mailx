@@ -2,6 +2,7 @@
 	import { version } from '$app/environment';
 	import { Mail, Github, Heart } from 'lucide-svelte';
 	import { onMount } from 'svelte';
+	import { _ } from 'svelte-i18n';
 
 	let appVersion = $state('0.1.0');
 
@@ -14,10 +15,12 @@
 	function openGitHub() {
 		window.open('https://github.com/yourusername/mailx', '_blank');
 	}
+
+	const year = new Date().getFullYear();
 </script>
 
 <svelte:head>
-	<title>About Mailx</title>
+	<title>{$_('about.title')}</title>
 </svelte:head>
 
 <div class="about-page">
@@ -31,17 +34,17 @@
 		<h1 class="app-name">Mailx</h1>
 
 		<!-- Version -->
-		<p class="app-version">Version {appVersion}</p>
+		<p class="app-version">{$_('about.version', { values: { version: appVersion } })}</p>
 
 		<!-- Description -->
 		<p class="app-description">
-			A modern email client with a clean, minimal design inspired by Notion.
+			{$_('about.description')}
 		</p>
 
 		<!-- Credits -->
 		<div class="credits">
 			<p class="credits-text">
-				Made with <Heart class="inline size-4 text-red-500 fill-red-500" /> using Tauri + Svelte 5
+				{$_('about.madeWith')} <Heart class="inline size-4 text-red-500 fill-red-500" /> {$_('about.usingStack')}
 			</p>
 		</div>
 
@@ -49,13 +52,13 @@
 		<div class="actions">
 			<button onclick={openGitHub} class="action-button">
 				<Github class="size-5" strokeWidth={1.5} />
-				<span>View on GitHub</span>
+				<span>{$_('about.viewOnGithub')}</span>
 			</button>
 		</div>
 
 		<!-- Copyright -->
 		<p class="copyright">
-			© {new Date().getFullYear()} Mailx. All rights reserved.
+			{$_('about.copyright', { values: { year: year } })}
 		</p>
 	</div>
 </div>

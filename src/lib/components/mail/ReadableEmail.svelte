@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { _ } from 'svelte-i18n';
 	import DOMPurify from 'dompurify';
 
 	interface Props {
@@ -233,7 +234,7 @@
 
 <iframe
 	bind:this={iframeEl}
-	title="Email content"
+	title={$_('mail.emailContent')}
 	{srcdoc}
 	sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin"
 	class="w-full border-none pointer-events-auto"

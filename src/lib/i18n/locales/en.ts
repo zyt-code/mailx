@@ -49,7 +49,90 @@ export default {
     markUnread: 'Mark as Unread',
     star: 'Star',
     unstar: 'Unstar',
-    moveTo: 'Move to'
+    starred: 'Starred',
+    moveTo: 'Move to',
+    moreActions: 'More actions',
+    // Keyboard hint titles
+    replyHint: 'Reply (R)',
+    replyAllHint: 'Reply All (A)',
+    forwardHint: 'Forward (F)',
+    archiveHint: 'Archive (E)',
+    unarchiveHint: 'Unarchive (E)',
+    starHint: 'Star (S)',
+    unstarHint: 'Unstar (S)',
+    // Mail header
+    noSubject: '(No subject)',
+    toRecipient: 'to {email}',
+    toMe: 'to me',
+    attachmentCount: '{n} attachment',
+    attachmentsCount: '{n} attachments',
+    showDetails: 'Show details',
+    hideDetails: 'Hide details',
+    details: 'Details',
+    from: 'From',
+    to: 'To',
+    cc: 'Cc',
+    bcc: 'Bcc',
+    replyTo: 'Reply-To',
+    date: 'Date',
+    emailContent: 'Email content',
+    // Mail list
+    searchFolder: 'Search {folder}...',
+    noEmails: 'No emails found',
+    unknownAccount: 'Unknown account',
+    noPreview: 'No preview available',
+    backToList: 'Back to list',
+    selectEmail: 'Select an email to read',
+    yesterday: 'Yesterday'
+  },
+  compose: {
+    newMessage: 'New Message',
+    fromLabel: 'From: {email}',
+    noAccountsConfigured: 'No accounts configured',
+    closeCompose: 'Close compose',
+    // Header fields
+    toLabel: 'To',
+    ccLabel: 'Cc',
+    bccLabel: 'Bcc',
+    subjectLabel: 'Subject',
+    removeRecipient: 'Remove recipient',
+    removeCcRecipient: 'Remove cc recipient',
+    removeBccRecipient: 'Remove bcc recipient',
+    toPlaceholder: 'test@example.com',
+    subjectPlaceholder: 'Write a useful subject...',
+    // Editor
+    formattingToolbar: 'Formatting toolbar',
+    bold: 'Bold',
+    italic: 'Italic',
+    underline: 'Underline',
+    list: 'List',
+    link: 'Link',
+    attachFiles: 'Attach files',
+    attach: 'Attach',
+    attachments: 'Attachments',
+    removeFile: 'Remove {filename}',
+    placeholder: 'Hi team,\n\nWrite your message...',
+    // Actions
+    draftSavedJustNow: 'Draft saved just now',
+    draftSavedMinutes: 'Draft saved {n}m ago',
+    draftSavedAt: 'Draft saved at {time}',
+    draftSavedDate: 'Draft saved {date}',
+    autosaveEnabled: 'Autosave enabled',
+    discard: 'Discard',
+    sending: 'Sending...',
+    send: 'Send',
+    // Alerts
+    selectAccountAlert: 'Please select an account to send from',
+    addRecipientAlert: 'Please add at least one recipient',
+    sendFailedAlert: 'Failed to send email: {error}',
+    // Reply/Forward
+    rePrefix: 'Re: ',
+    fwdPrefix: 'Fwd: ',
+    originalMessage: '--- Original Message ---',
+    forwardedMessage: '--- Forwarded Message ---',
+    fromField: 'From: ',
+    dateField: 'Date: ',
+    subjectField: 'Subject: '
   },
   settings: {
     title: 'Settings',
@@ -333,5 +416,25 @@ export default {
     minutesAgo: '{n} minutes ago',
     hoursAgo: '{n} hours ago',
     daysAgo: '{n} days ago'
+  },
+  getStarted: {
+    welcome: 'Welcome to Mailx',
+    description: 'A modern email client with a clean, minimal design. Add your first account to get started.',
+    addFirstAccount: 'Add your first account',
+    secure: 'Secure',
+    fast: 'Fast',
+    organized: 'Organized'
+  },
+  about: {
+    title: 'About Mailx',
+    version: 'Version {version}',
+    description: 'A modern email client with a clean, minimal design inspired by Notion.',
+    madeWith: 'Made with',
+    usingStack: 'using Tauri + Svelte 5',
+    viewOnGithub: 'View on GitHub',
+    copyright: '(c) {year} Mailx. All rights reserved.'
+  },
+  notification: {
+    dismiss: 'Dismiss'
   }
 } as const;

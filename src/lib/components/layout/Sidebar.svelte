@@ -138,7 +138,7 @@
 					const date = new Date(lastSync);
 					const hours = date.getHours().toString().padStart(2, '0');
 					const minutes = date.getMinutes().toString().padStart(2, '0');
-					return `Updated ${hours}:${minutes}`;
+					return $_('account.synced', { values: { time: `${hours}:${minutes}` } });
 				})()
 			: null
 	);
@@ -403,7 +403,7 @@
 				)}>
 					<Avatar
 						src={undefined}
-						alt={currentAccount?.name || 'User'}
+						alt={currentAccount?.name || $_('account.noAccounts')}
 						fallback={currentAccount?.name}
 						size="sm"
 					/>
@@ -413,10 +413,10 @@
 						"text-sm truncate",
 						isAccountConfigured ? "font-medium text-zinc-900" : "font-medium text-zinc-400"
 					)}>
-						{currentAccount?.name || 'No account'}
+						{currentAccount?.name || $_('account.noAccounts')}
 					</p>
 					<p class="text-xs text-zinc-500 truncate">
-						{currentAccount?.email || 'Add an account to get started'}
+						{currentAccount?.email || $_('account.addFirst')}
 					</p>
 					{#if isAccountConfigured && formattedLastSync}
 						<p class="text-[10px] text-zinc-400">
@@ -430,7 +430,7 @@
 		<!-- Disabled feedback tooltip -->
 		{#if showDisabledTooltip}
 			<div class="absolute top-16 left-1/2 -translate-x-1/2 z-50 px-3 py-1.5 bg-[var(--text-primary)] text-[var(--bg-primary)] text-xs rounded-md shadow-lg pointer-events-none animate-scale-in">
-				Please add an account in Settings
+				{$_('account.addFirst')}
 			</div>
 		{/if}
 

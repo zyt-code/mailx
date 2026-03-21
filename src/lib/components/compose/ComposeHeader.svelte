@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { _ } from 'svelte-i18n';
 	import { X } from 'lucide-svelte';
 	import type { EmailAddress } from '$lib/types.js';
 
@@ -68,7 +69,7 @@
 
 <div class="compose-lines border-b border-[var(--border-primary)] bg-[var(--bg-primary)]">
 	<div class="compose-line">
-		<label for="compose-to" class="line-label">To</label>
+		<label for="compose-to" class="line-label">{$_('compose.toLabel')}</label>
 		<div class="line-input-wrap">
 			{#each values.to as addr, index}
 				<span class="recipient-chip">
@@ -76,7 +77,7 @@
 					<button
 						type="button"
 						onclick={() => removeRecipient(values.to, index)}
-						aria-label="Remove recipient"
+						aria-label={$_('compose.removeRecipient')}
 					>
 						<X class="size-3" strokeWidth={1.8} />
 					</button>
@@ -88,23 +89,23 @@
 				bind:value={toInput}
 				onkeydown={(event) => handleRecipientKeydown(event, values.to, toInput)}
 				onblur={() => addRecipient(values.to, toInput)}
-				placeholder={values.to.length === 0 ? 'test@example.com' : ''}
+				placeholder={values.to.length === 0 ? $_('compose.toPlaceholder') : ''}
 				class="line-input"
 			/>
 		</div>
 		<div class="line-actions">
 			{#if !showCc}
-				<button type="button" onclick={() => (showCc = true)}>Cc</button>
+				<button type="button" onclick={() => (showCc = true)}>{$_('compose.ccLabel')}</button>
 			{/if}
 			{#if !showBcc}
-				<button type="button" onclick={() => (showBcc = true)}>Bcc</button>
+				<button type="button" onclick={() => (showBcc = true)}>{$_('compose.bccLabel')}</button>
 			{/if}
 		</div>
 	</div>
 
 	{#if showCc}
 		<div class="compose-line">
-			<label for="compose-cc" class="line-label">Cc</label>
+			<label for="compose-cc" class="line-label">{$_('compose.ccLabel')}</label>
 			<div class="line-input-wrap">
 				{#each values.cc as addr, index}
 					<span class="recipient-chip">
@@ -112,7 +113,7 @@
 						<button
 							type="button"
 							onclick={() => removeRecipient(values.cc, index)}
-							aria-label="Remove cc recipient"
+							aria-label={$_('compose.removeCcRecipient')}
 						>
 							<X class="size-3" strokeWidth={1.8} />
 						</button>
@@ -133,7 +134,7 @@
 
 	{#if showBcc}
 		<div class="compose-line">
-			<label for="compose-bcc" class="line-label">Bcc</label>
+			<label for="compose-bcc" class="line-label">{$_('compose.bccLabel')}</label>
 			<div class="line-input-wrap">
 				{#each values.bcc as addr, index}
 					<span class="recipient-chip">
@@ -141,7 +142,7 @@
 						<button
 							type="button"
 							onclick={() => removeRecipient(values.bcc, index)}
-							aria-label="Remove bcc recipient"
+							aria-label={$_('compose.removeBccRecipient')}
 						>
 							<X class="size-3" strokeWidth={1.8} />
 						</button>
@@ -161,13 +162,13 @@
 	{/if}
 
 	<div class="compose-line no-bottom-border">
-		<label for="compose-subject" class="sr-only">Subject</label>
+		<label for="compose-subject" class="sr-only">{$_('compose.subjectLabel')}</label>
 		<div class="line-input-wrap subject-wrap">
 			<input
 				id="compose-subject"
 				type="text"
 				bind:value={values.subject}
-				placeholder="Write a useful subject..."
+				placeholder={$_('compose.subjectPlaceholder')}
 				class="line-input subject-input"
 			/>
 		</div>

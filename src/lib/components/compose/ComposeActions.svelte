@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { _ } from 'svelte-i18n';
 	import { LoaderCircle, Send, Trash2 } from 'lucide-svelte';
 
 	interface Props {
@@ -15,14 +16,14 @@
 		const now = new Date();
 		const diff = now.getTime() - date.getTime();
 
-		if (diff < 60000) return 'Draft saved just now';
-		if (diff < 3600000) return `Draft saved ${Math.floor(diff / 60000)}m ago`;
+		if (diff < 60000) return $_('compose.draftSavedJustNow');
+		if (diff < 3600000) return $_('compose.draftSavedMinutes', { values: { n: Math.floor(diff / 60000) } });
 
 		if (date.toDateString() === now.toDateString()) {
-			return `Draft saved at ${date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
+			return $_('compose.draftSavedAt', { values: { time: date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) } });
 		}
 
-		return `Draft saved ${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+		return $_('compose.draftSavedDate', { values: { date: date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) } });
 	}
 </script>
 
@@ -31,7 +32,7 @@
 		{#if lastSaved}
 			<span>{formatLastSaved(lastSaved)}</span>
 		{:else}
-			<span>Autosave enabled</span>
+			<span>{$_('compose.autosaveEnabled')}</span>
 		{/if}
 	</div>
 
@@ -43,7 +44,7 @@
 			class="discard-btn"
 		>
 			<Trash2 class="size-3.5" strokeWidth={1.8} />
-			<span>Discard</span>
+			<span>{$_('compose.discard')}</span>
 		</button>
 
 		<button
@@ -54,10 +55,10 @@
 		>
 			{#if isSending}
 				<LoaderCircle class="size-3.5 animate-spin" strokeWidth={1.8} />
-				<span>Sending...</span>
+				<span>{$_('compose.sending')}</span>
 			{:else}
 				<Send class="size-3.5" strokeWidth={1.8} />
-				<span>Send</span>
+				<span>{$_('compose.send')}</span>
 				{#if sendWithModEnter}
 					<span class="send-hint">Cmd/Ctrl+Enter</span>
 				{/if}

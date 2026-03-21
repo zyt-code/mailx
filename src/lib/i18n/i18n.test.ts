@@ -137,6 +137,197 @@ describe('Translation Files', () => {
       expect(datetime).toHaveProperty('hoursAgo');
       expect(datetime).toHaveProperty('daysAgo');
     });
+
+    it('should have all appearance translation keys', () => {
+      const { appearance } = en;
+      // Page header
+      expect(appearance).toHaveProperty('kicker');
+      expect(appearance).toHaveProperty('title');
+      expect(appearance).toHaveProperty('subtitle');
+      // Theme section
+      expect(appearance).toHaveProperty('themeTitle');
+      expect(appearance).toHaveProperty('themeDescription');
+      expect(appearance).toHaveProperty('switchTo');
+      // Accent section
+      expect(appearance).toHaveProperty('accentTitle');
+      expect(appearance).toHaveProperty('accentDescription');
+      // Density section
+      expect(appearance).toHaveProperty('densityTitle');
+      expect(appearance).toHaveProperty('densityDescription');
+      // Thread details
+      expect(appearance).toHaveProperty('threadDetails');
+      expect(appearance).toHaveProperty('threadDetailsDescription');
+      expect(appearance).toHaveProperty('resetAppearance');
+      // Toggle options
+      expect(appearance).toHaveProperty('previewSnippets');
+      expect(appearance).toHaveProperty('previewSnippetsDescription');
+      expect(appearance).toHaveProperty('accountColorMarkers');
+      expect(appearance).toHaveProperty('accountColorMarkersDescription');
+      // Accent presets
+      expect(appearance).toHaveProperty('accentBlue');
+      expect(appearance).toHaveProperty('accentBlueDesc');
+      expect(appearance).toHaveProperty('accentSunset');
+      expect(appearance).toHaveProperty('accentSunsetDesc');
+      expect(appearance).toHaveProperty('accentForest');
+      expect(appearance).toHaveProperty('accentForestDesc');
+      expect(appearance).toHaveProperty('accentGraphite');
+      expect(appearance).toHaveProperty('accentGraphiteDesc');
+    });
+
+    it('should have all notifications translation keys', () => {
+      const { notifications } = en;
+      // Page header
+      expect(notifications).toHaveProperty('kicker');
+      expect(notifications).toHaveProperty('title');
+      expect(notifications).toHaveProperty('subtitle');
+      // Desktop alerts
+      expect(notifications).toHaveProperty('desktopAlerts');
+      expect(notifications).toHaveProperty('desktopAlertsDescription');
+      expect(notifications).toHaveProperty('allowDesktop');
+      expect(notifications).toHaveProperty('allowDesktopDescription');
+      expect(notifications).toHaveProperty('systemPermission');
+      expect(notifications).toHaveProperty('requestAccess');
+      expect(notifications).toHaveProperty('sendTest');
+      // Permission messages
+      expect(notifications).toHaveProperty('permChecking');
+      expect(notifications).toHaveProperty('permGranted');
+      expect(notifications).toHaveProperty('permNotGranted');
+      expect(notifications).toHaveProperty('permUnavailable');
+      expect(notifications).toHaveProperty('permEnabled');
+      expect(notifications).toHaveProperty('permRejected');
+      expect(notifications).toHaveProperty('permFailed');
+      expect(notifications).toHaveProperty('testSent');
+      expect(notifications).toHaveProperty('testFailed');
+      expect(notifications).toHaveProperty('testTitle');
+      expect(notifications).toHaveProperty('testBody');
+      // Sync feedback
+      expect(notifications).toHaveProperty('syncFeedback');
+      expect(notifications).toHaveProperty('syncFeedbackDescription');
+      expect(notifications).toHaveProperty('resetNotifications');
+      expect(notifications).toHaveProperty('successToasts');
+      expect(notifications).toHaveProperty('successToastsDescription');
+      expect(notifications).toHaveProperty('failureAlerts');
+      expect(notifications).toHaveProperty('failureAlertsDescription');
+      // Quiet hours
+      expect(notifications).toHaveProperty('quietHours');
+      expect(notifications).toHaveProperty('quietHoursDescription');
+      expect(notifications).toHaveProperty('useQuietHours');
+      expect(notifications).toHaveProperty('useQuietHoursDescription');
+      expect(notifications).toHaveProperty('start');
+      expect(notifications).toHaveProperty('end');
+    });
+
+    it('should have all privacy translation keys', () => {
+      const { privacy } = en;
+      // Page header
+      expect(privacy).toHaveProperty('kicker');
+      expect(privacy).toHaveProperty('title');
+      expect(privacy).toHaveProperty('subtitle');
+      // Remote content
+      expect(privacy).toHaveProperty('remoteContent');
+      expect(privacy).toHaveProperty('remoteContentDescription');
+      expect(privacy).toHaveProperty('alwaysAsk');
+      expect(privacy).toHaveProperty('alwaysAskDescription');
+      expect(privacy).toHaveProperty('neverLoad');
+      expect(privacy).toHaveProperty('neverLoadDescription');
+      expect(privacy).toHaveProperty('alwaysLoad');
+      expect(privacy).toHaveProperty('alwaysLoadDescription');
+      expect(privacy).toHaveProperty('blockExternalImages');
+      expect(privacy).toHaveProperty('blockExternalImagesDescription');
+      expect(privacy).toHaveProperty('blockRemoteFonts');
+      expect(privacy).toHaveProperty('blockRemoteFontsDescription');
+      // Read receipts
+      expect(privacy).toHaveProperty('readReceipts');
+      expect(privacy).toHaveProperty('readReceiptsDescription');
+      expect(privacy).toHaveProperty('neverSend');
+      expect(privacy).toHaveProperty('neverSendDescription');
+      expect(privacy).toHaveProperty('askMe');
+      expect(privacy).toHaveProperty('askMeDescription');
+      expect(privacy).toHaveProperty('alwaysSend');
+      expect(privacy).toHaveProperty('alwaysSendDescription');
+      // HTML security
+      expect(privacy).toHaveProperty('htmlSecurity');
+      expect(privacy).toHaveProperty('htmlSecurityDescription');
+      expect(privacy).toHaveProperty('plainText');
+      expect(privacy).toHaveProperty('plainTextDescription');
+      expect(privacy).toHaveProperty('sanitizedHtml');
+      expect(privacy).toHaveProperty('sanitizedHtmlDescription');
+      expect(privacy).toHaveProperty('fullHtml');
+      expect(privacy).toHaveProperty('fullHtmlDescription');
+      expect(privacy).toHaveProperty('blockForms');
+      expect(privacy).toHaveProperty('blockFormsDescription');
+      expect(privacy).toHaveProperty('showSecurityWarnings');
+      expect(privacy).toHaveProperty('showSecurityWarningsDescription');
+      // Link safety
+      expect(privacy).toHaveProperty('linkSafety');
+      expect(privacy).toHaveProperty('linkSafetyDescription');
+      expect(privacy).toHaveProperty('warnSuspiciousLinks');
+      expect(privacy).toHaveProperty('warnSuspiciousLinksDescription');
+      expect(privacy).toHaveProperty('showFullUrl');
+      expect(privacy).toHaveProperty('showFullUrlDescription');
+      // Local data
+      expect(privacy).toHaveProperty('localData');
+      expect(privacy).toHaveProperty('localDataDescription');
+      expect(privacy).toHaveProperty('databaseSize');
+      expect(privacy).toHaveProperty('compactDatabase');
+      expect(privacy).toHaveProperty('compacting');
+      expect(privacy).toHaveProperty('clearLocalData');
+      expect(privacy).toHaveProperty('clearing');
+      expect(privacy).toHaveProperty('clearConfirm');
+      expect(privacy).toHaveProperty('clearSuccess');
+    });
+
+    it('should have all keyboard translation keys', () => {
+      const { keyboard } = en;
+      // Page header
+      expect(keyboard).toHaveProperty('kicker');
+      expect(keyboard).toHaveProperty('title');
+      expect(keyboard).toHaveProperty('subtitle');
+      // Behavior section
+      expect(keyboard).toHaveProperty('behavior');
+      expect(keyboard).toHaveProperty('behaviorDescription');
+      expect(keyboard).toHaveProperty('singleKeyShortcuts');
+      expect(keyboard).toHaveProperty('singleKeyShortcutsDescription');
+      expect(keyboard).toHaveProperty('showShortcutHints');
+      expect(keyboard).toHaveProperty('showShortcutHintsDescription');
+      expect(keyboard).toHaveProperty('sendWithModEnter');
+      expect(keyboard).toHaveProperty('sendWithModEnterDescription');
+      // Live shortcut map
+      expect(keyboard).toHaveProperty('liveShortcutMap');
+      expect(keyboard).toHaveProperty('liveShortcutMapDescription');
+      expect(keyboard).toHaveProperty('resetKeyboard');
+      // Shortcut actions
+      expect(keyboard).toHaveProperty('nextMessage');
+      expect(keyboard).toHaveProperty('nextMessageDescription');
+      expect(keyboard).toHaveProperty('previousMessage');
+      expect(keyboard).toHaveProperty('previousMessageDescription');
+      expect(keyboard).toHaveProperty('compose');
+      expect(keyboard).toHaveProperty('composeDescription');
+      expect(keyboard).toHaveProperty('syncNow');
+      expect(keyboard).toHaveProperty('syncNowDescription');
+      expect(keyboard).toHaveProperty('sendDraft');
+      expect(keyboard).toHaveProperty('sendDraftDescription');
+      // Insight cards
+      expect(keyboard).toHaveProperty('hintSystem');
+      expect(keyboard).toHaveProperty('hintSystemDescription');
+      expect(keyboard).toHaveProperty('composeAcceleration');
+      expect(keyboard).toHaveProperty('composeAccelerationDescription');
+      expect(keyboard).toHaveProperty('scopeGuard');
+      expect(keyboard).toHaveProperty('scopeGuardDescription');
+    });
+
+    it('should have all titlebar translation keys', () => {
+      const { titlebar } = en;
+      expect(titlebar).toHaveProperty('minimize');
+      expect(titlebar).toHaveProperty('maximize');
+      expect(titlebar).toHaveProperty('close');
+    });
+
+    it('should have all sidebar translation keys', () => {
+      const { sidebar } = en;
+      expect(sidebar).toHaveProperty('expand');
+      expect(sidebar).toHaveProperty('collapse');
+    });
   });
 
   describe('Chinese translations (zh-CN)', () => {

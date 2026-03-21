@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { _ } from 'svelte-i18n';
 	import { Bold, Italic, Underline, Link2, List, Paperclip, X } from 'lucide-svelte';
 	import type { Attachment } from '$lib/types.js';
 
@@ -74,39 +75,39 @@
 </script>
 
 <div class="compose-editor-shell">
-	<div class="editor-toolbar" role="toolbar" aria-label="Formatting toolbar">
-		<button type="button" onclick={() => wrapSelection('**')} aria-label="Bold">
+	<div class="editor-toolbar" role="toolbar" aria-label={$_('compose.formattingToolbar')}>
+		<button type="button" onclick={() => wrapSelection('**')} aria-label={$_('compose.bold')}>
 			<Bold class="size-3.5" strokeWidth={1.8} />
 		</button>
-		<button type="button" onclick={() => wrapSelection('*')} aria-label="Italic">
+		<button type="button" onclick={() => wrapSelection('*')} aria-label={$_('compose.italic')}>
 			<Italic class="size-3.5" strokeWidth={1.8} />
 		</button>
-		<button type="button" onclick={() => wrapSelection('__')} aria-label="Underline">
+		<button type="button" onclick={() => wrapSelection('__')} aria-label={$_('compose.underline')}>
 			<Underline class="size-3.5" strokeWidth={1.8} />
 		</button>
 		<div class="toolbar-divider"></div>
-		<button type="button" onclick={addBulletList} aria-label="List">
+		<button type="button" onclick={addBulletList} aria-label={$_('compose.list')}>
 			<List class="size-3.5" strokeWidth={1.8} />
 		</button>
-		<button type="button" onclick={insertLink} aria-label="Link">
+		<button type="button" onclick={insertLink} aria-label={$_('compose.link')}>
 			<Link2 class="size-3.5" strokeWidth={1.8} />
 		</button>
 		<div class="toolbar-divider"></div>
-		<button type="button" onclick={() => onAttach?.()} aria-label="Attach files">
+		<button type="button" onclick={() => onAttach?.()} aria-label={$_('compose.attachFiles')}>
 			<Paperclip class="size-3.5" strokeWidth={1.8} />
-			<span>Attach</span>
+			<span>{$_('compose.attach')}</span>
 		</button>
 	</div>
 
 	<textarea
 		bind:value
 		bind:this={editorRef}
-		placeholder="Hi team,\n\nWrite your message..."
+		placeholder={$_('compose.placeholder')}
 		class="compose-editor"
 	></textarea>
 
 	{#if attachments.length > 0}
-		<div class="attachment-zone" aria-label="Attachments">
+		<div class="attachment-zone" aria-label={$_('compose.attachments')}>
 			{#each attachments as attachment}
 				<div class="attachment-chip">
 						<div class="attachment-meta">
@@ -116,7 +117,7 @@
 						<button
 							type="button"
 							onclick={() => onRemoveAttachment?.(attachment.id)}
-							aria-label={`Remove ${attachment.file_name}`}
+							aria-label={$_('compose.removeFile', { values: { filename: attachment.file_name } })}
 						>
 						<X class="size-3.5" strokeWidth={1.8} />
 					</button>
