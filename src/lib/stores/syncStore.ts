@@ -23,8 +23,10 @@ const _state = writable<SyncStoreState>({
 
 export const isSyncing = derived(_state, $state => $state.isSyncing);
 export const lastSyncTime = derived(_state, $state => $state.lastSyncTime);
+export const syncingAccountId = derived(_state, $state => $state.currentAccount);
 
 let _initialized = false;
+let _syncSafetyTimer: ReturnType<typeof setTimeout> | null = null;
 
 /**
  * Initialize SyncStore with Tauri event listeners.
@@ -41,6 +43,18 @@ export function initSyncStore(): void {
       currentAccountEmail: email,
       error: null
     }));
+    // Safety timeout: force-clear syncing state after 120s
+    if (_syncSafetyTimer) clearTimeout(_syncSafetyTimer);
+    _syncSafetyTimer = setTimeout(() => {
+      _state.update(s => ({
+        ...s,
+        isSyncing: false,
+        currentAccount: null,
+        currentAccountEmail: null,
+        progress: null,
+        error: 'Sync timed out'
+      }));
+    }, 120_000);
   });
 
   eventBus.onTauri<{ account_id: string; current: number; total: number }>('sync:progress', ({ current, total }) => {
@@ -51,6 +65,7 @@ export function initSyncStore(): void {
   });
 
   eventBus.onTauri<SyncStatus>('sync:completed', () => {
+    if (_syncSafetyTimer) { clearTimeout(_syncSafetyTimer); _syncSafetyTimer = null; }
     _state.update(s => ({
       ...s,
       isSyncing: false,
@@ -63,6 +78,7 @@ export function initSyncStore(): void {
   });
 
   eventBus.onTauri<{ account_id: string; error: string }>('sync:failed', ({ error }) => {
+    if (_syncSafetyTimer) { clearTimeout(_syncSafetyTimer); _syncSafetyTimer = null; }
     _state.update(s => ({
       ...s,
       isSyncing: false,

@@ -97,18 +97,13 @@ impl MailProvider {
     /// Multiple IMAP names may map to the same local folder (tried in order, first success wins).
     pub fn get_sync_folders(&self) -> Vec<(&'static str, &'static str)> {
         match self {
-            // Netease 163 (Coremail) uses specific folder names
-            // Try English names first, then UTF-7 encoded Chinese names
+            // Netease 163 (Coremail) — try UTF-7 encoded names first (canonical),
+            // then English fallback. Fewer attempts = fewer connections.
             MailProvider::Netease163 => vec![
                 ("INBOX", "inbox"),
-                ("Sent Messages", "sent"),
                 ("&XfJT0ZAB-", "sent"),          // 已发送 (UTF-7)
-                ("Drafts", "drafts"),
                 ("&g0l6P3ux-", "drafts"),         // 草稿箱 (UTF-7)
-                ("Deleted Messages", "trash"),
                 ("&XfJSIJZk-", "trash"),          // 已删除 (UTF-7)
-                ("Junk", "trash"),
-                ("&V4NXPpCu-", "trash"),          // 垃圾邮件 (UTF-7)
             ],
             // iCloud uses standard names
             MailProvider::ICloud => vec![

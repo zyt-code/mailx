@@ -385,18 +385,28 @@ impl ImapClient {
         Ok(session)
     }
 
-    /// Fetch emails from a folder
+    /// Fetch emails from a folder (with 30s timeout)
     pub async fn fetch_emails(&self, folder: &str, limit: usize) -> Result<Vec<Mail>> {
         let config = self.config.clone();
         let email = self.email.clone();
         let password = self.password.clone();
         let folder = folder.to_string();
 
-        tokio::task::spawn_blocking(move || {
-            Self::fetch_emails_blocking(config, email, password, &folder, limit)
-        })
-        .await
-        .map_err(|e| ImapError::FetchFailed(format!("Fetch task panicked: {}", e)))?
+        let result = tokio::time::timeout(
+            std::time::Duration::from_secs(30),
+            tokio::task::spawn_blocking(move || {
+                Self::fetch_emails_blocking(config, email, password, &folder, limit)
+            }),
+        )
+        .await;
+
+        match result {
+            Ok(join_result) => join_result
+                .map_err(|e| ImapError::FetchFailed(format!("Fetch task panicked: {}", e)))?,
+            Err(_) => Err(ImapError::FetchFailed(
+                "IMAP fetch timed out after 30s".to_string(),
+            )),
+        }
     }
 
     /// Fetch emails using blocking IMAP

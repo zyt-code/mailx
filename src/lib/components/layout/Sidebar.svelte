@@ -3,7 +3,7 @@
 	import { Avatar } from '$lib/components/ui/avatar/index.js';
 	import type { Folder, Account } from '$lib/types.js';
 	import { hasAccounts, activeAccount, accounts } from '$lib/stores/accountStore.js';
-	import { isSyncing, lastSyncTime } from '$lib/stores/syncStore.js';
+	import { isSyncing, lastSyncTime, syncingAccountId } from '$lib/stores/syncStore.js';
 	import { inboxUnread } from '$lib/stores/unreadStore.js';
 	import { selectedAccountId as storeSelectedAccountId } from '$lib/stores/mailStore.js';
 	import { syncAllAccounts, syncAccount } from '$lib/sync/index.js';
@@ -65,6 +65,7 @@
 	let unreadCount = $state(0);
 	let allAccounts = $state<Account[]>([]);
 	let selectedAccountId = $state<string | null>(null); // null = All Inboxes
+	let currentSyncAccountId = $state<string | null>(null); // which account is currently syncing
 	let accountsCollapsed = $state(
 		typeof window !== 'undefined' && localStorage.getItem('sidebar-accounts-collapsed') === 'true'
 	);
@@ -97,6 +98,9 @@
 		const unsubSelectedAccount = storeSelectedAccountId.subscribe((value) => {
 			selectedAccountId = value;
 		});
+		const unsubSyncAccount = syncingAccountId.subscribe((value) => {
+			currentSyncAccountId = value;
+		});
 		const unsubPreferences = preferences.subscribe((value) => {
 			showShortcutHints = value.keyboard.showShortcutHints;
 		});
@@ -109,6 +113,7 @@
 			unsubUnread();
 			unsubAccounts();
 			unsubSelectedAccount();
+			unsubSyncAccount();
 			unsubPreferences();
 		};
 	});
@@ -383,7 +388,7 @@
 									<p class="text-[13px] font-medium truncate">{account.name}</p>
 									<p class="text-[11px] text-[var(--text-tertiary)] truncate">{account.email}</p>
 								</div>
-								{#if isRefreshing && (selectedAccountId === account.id || selectedAccountId === null)}
+								{#if isRefreshing && (currentSyncAccountId === account.id || currentSyncAccountId === null)}
 									<RefreshCw class="size-3 text-[var(--accent-primary)] animate-spin shrink-0" strokeWidth={1.8} />
 								{/if}
 							</button>
