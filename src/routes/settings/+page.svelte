@@ -315,23 +315,23 @@
 		justify-content: center;
 		width: 48px;
 		height: 48px;
-		background: linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%);
+		background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
 		border-radius: 14px;
 		color: white;
-		box-shadow: 0 4px 12px -2px rgba(139, 92, 246, 0.3);
+		box-shadow: 0 4px 12px -2px color-mix(in srgb, var(--accent-primary) 30%, transparent);
 	}
 
 	.page-title {
 		font-size: 2rem;
 		font-weight: 680;
 		letter-spacing: -0.03em;
-		color: #1d1d1f;
+		color: var(--text-primary);
 		margin-bottom: 0.25rem;
 	}
 
 	.page-subtitle {
 		font-size: 0.9375rem;
-		color: #6b6b6b;
+		color: var(--text-secondary);
 		font-weight: 400;
 	}
 
@@ -344,17 +344,17 @@
 		font-size: 0.875rem;
 		font-weight: 540;
 		color: white;
-		background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+		background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
 		border: none;
 		border-radius: 12px;
 		cursor: pointer;
-		box-shadow: 0 4px 14px -2px rgba(139, 92, 246, 0.35);
+		box-shadow: 0 4px 14px -2px color-mix(in srgb, var(--accent-primary) 35%, transparent);
 		transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 	}
 
 	.add-account-button:hover {
 		transform: translateY(-1px);
-		box-shadow: 0 6px 20px -2px rgba(139, 92, 246, 0.45);
+		box-shadow: 0 6px 20px -2px color-mix(in srgb, var(--accent-primary) 45%, transparent);
 	}
 
 	.add-account-button:active {
@@ -367,8 +367,8 @@
 		align-items: flex-start;
 		gap: 1rem;
 		padding: 1rem 1.25rem;
-		background: linear-gradient(135deg, #fef2f2 0%, #fef0f0 100%);
-		border: 1px solid #fecaca;
+		background: color-mix(in srgb, var(--error) 8%, var(--bg-primary));
+		border: 1px solid color-mix(in srgb, var(--error) 20%, transparent);
 		border-radius: 14px;
 		margin-bottom: 1.5rem;
 		animation: slideIn 0.3s ease-out;
@@ -382,13 +382,13 @@
 	.error-title {
 		font-size: 0.875rem;
 		font-weight: 560;
-		color: #991b1b;
+		color: var(--error);
 		margin-bottom: 0.125rem;
 	}
 
 	.error-message {
 		font-size: 0.8125rem;
-		color: #b91c1c;
+		color: var(--text-secondary);
 	}
 
 	/* Loading State */
@@ -404,7 +404,7 @@
 	.loading-text {
 		margin-top: 1rem;
 		font-size: 0.9375rem;
-		color: #6b6b6b;
+		color: var(--text-secondary);
 		font-weight: 500;
 	}
 
@@ -428,11 +428,11 @@
 		justify-content: center;
 		width: 96px;
 		height: 96px;
-		background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+		background: linear-gradient(135deg, var(--accent-light) 0%, color-mix(in srgb, var(--accent-light) 80%, var(--bg-secondary)) 100%);
 		border-radius: 28px;
 		box-shadow:
-			0 4px 24px -4px rgba(139, 92, 246, 0.15),
-			inset 0 1px 0 0 rgba(255, 255, 255, 0.5);
+			0 4px 24px -4px color-mix(in srgb, var(--accent-primary) 15%, transparent),
+			inset 0 1px 0 0 color-mix(in srgb, var(--bg-primary) 50%, transparent);
 		animation: float 3s ease-in-out infinite;
 	}
 
@@ -449,13 +449,13 @@
 		font-size: 1.5rem;
 		font-weight: 620;
 		letter-spacing: -0.02em;
-		color: #1d1d1f;
+		color: var(--text-primary);
 		margin-bottom: 0.75rem;
 	}
 
 	.empty-description {
 		font-size: 0.9375rem;
-		color: #6b6b6b;
+		color: var(--text-secondary);
 		max-width: 400px;
 		line-height: 1.6;
 		margin-bottom: 2rem;
@@ -469,17 +469,17 @@
 		font-size: 0.9375rem;
 		font-weight: 540;
 		color: white;
-		background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+		background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
 		border: none;
 		border-radius: 14px;
 		cursor: pointer;
-		box-shadow: 0 6px 24px -4px rgba(139, 92, 246, 0.4);
+		box-shadow: 0 6px 24px -4px color-mix(in srgb, var(--accent-primary) 40%, transparent);
 		transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 	}
 
 	.empty-cta:hover {
 		transform: translateY(-2px);
-		box-shadow: 0 8px 32px -4px rgba(139, 92, 246, 0.5);
+		box-shadow: 0 8px 32px -4px color-mix(in srgb, var(--accent-primary) 50%, transparent);
 	}
 
 	.empty-cta:active {
@@ -489,7 +489,7 @@
 	.empty-hint-text {
 		margin-top: 1.5rem;
 		font-size: 11px;
-		color: #a1a1aa;
+		color: var(--text-tertiary);
 	}
 
 	/* Accounts Grid */
@@ -504,11 +504,10 @@
 		align-items: center;
 		gap: 1rem;
 		padding: 1.25rem 1.5rem;
-		background: rgba(255, 255, 255, 0.7);
+		background: color-mix(in srgb, var(--bg-primary) 70%, transparent);
 		backdrop-filter: blur(10px);
-		border: 1px solid rgba(0, 0, 0, 0.06);
+		border: 1px solid var(--border-primary);
 		border-radius: 16px;
-		cursor: pointer;
 		transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 		text-align: left;
 		position: relative;
@@ -522,15 +521,15 @@
 		left: 0;
 		right: 0;
 		height: 100%;
-		background: linear-gradient(135deg, rgba(139, 92, 246, 0.05) 0%, rgba(124, 58, 237, 0.03) 100%);
+		background: linear-gradient(135deg, color-mix(in srgb, var(--accent-primary) 5%, transparent) 0%, color-mix(in srgb, var(--accent-secondary) 3%, transparent) 100%);
 		opacity: 0;
 		transition: opacity 0.3s ease;
 	}
 
 	.account-card:hover {
-		border-color: rgba(139, 92, 246, 0.2);
+		border-color: color-mix(in srgb, var(--accent-primary) 20%, transparent);
 		transform: translateX(4px);
-		box-shadow: 0 8px 32px -8px rgba(0, 0, 0, 0.08);
+		box-shadow: 0 8px 32px -8px color-mix(in srgb, var(--text-primary) 8%, transparent);
 	}
 
 	.account-card:hover::before {
@@ -543,12 +542,12 @@
 		justify-content: center;
 		width: 48px;
 		height: 48px;
-		background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+		background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
 		border-radius: 14px;
 		color: white;
 		font-size: 1.125rem;
 		font-weight: 600;
-		box-shadow: 0 4px 12px -2px rgba(139, 92, 246, 0.3);
+		box-shadow: 0 4px 12px -2px color-mix(in srgb, var(--accent-primary) 30%, transparent);
 		flex-shrink: 0;
 		position: relative;
 		z-index: 1;
@@ -565,7 +564,7 @@
 		font-size: 0.9375rem;
 		font-weight: 560;
 		letter-spacing: -0.01em;
-		color: #1d1d1f;
+		color: var(--text-primary);
 		margin-bottom: 0.125rem;
 		white-space: nowrap;
 		overflow: hidden;
@@ -574,7 +573,7 @@
 
 	.account-email {
 		font-size: 0.8125rem;
-		color: #6b6b6b;
+		color: var(--text-secondary);
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
@@ -585,7 +584,7 @@
 		align-items: center;
 		gap: 0.375rem;
 		padding: 0.375rem 0.75rem;
-		background: rgba(34, 197, 94, 0.1);
+		background: color-mix(in srgb, var(--success) 10%, transparent);
 		border-radius: 8px;
 		position: relative;
 		z-index: 1;
@@ -593,7 +592,7 @@
 	}
 
 	.account-status.syncing {
-		background: rgba(59, 130, 246, 0.1);
+		background: color-mix(in srgb, var(--info, #3b82f6) 10%, transparent);
 	}
 
 	.status-icon {
@@ -604,11 +603,11 @@
 	}
 
 	.account-status:not(.syncing) .status-icon {
-		color: #16a34a;
+		color: var(--success);
 	}
 
 	.account-status.syncing .status-icon {
-		color: #3b82f6;
+		color: var(--info, #3b82f6);
 		animation: spin 1s linear infinite;
 	}
 
@@ -624,11 +623,11 @@
 	.status-text {
 		font-size: 0.75rem;
 		font-weight: 540;
-		color: #16a34a;
+		color: var(--success);
 	}
 
 	.account-status.syncing .status-text {
-		color: #3b82f6;
+		color: var(--info, #3b82f6);
 	}
 
 	.account-actions {
@@ -647,7 +646,7 @@
 		height: 32px;
 		padding: 0;
 		font-size: 0.8125rem;
-		color: #6b6b6b;
+		color: var(--text-secondary);
 		background: transparent;
 		border: none;
 		border-radius: 8px;
@@ -663,23 +662,23 @@
 	}
 
 	.action-button:hover {
-		background: rgba(0, 0, 0, 0.06);
+		background: color-mix(in srgb, var(--text-primary) 6%, transparent);
 		transform: scale(1.05);
 	}
 
 	.action-button.sync-button:hover {
-		color: #8b5cf6;
-		background: rgba(139, 92, 246, 0.1);
+		color: var(--accent-primary);
+		background: color-mix(in srgb, var(--accent-primary) 10%, transparent);
 	}
 
 	.action-button.edit-button:hover {
-		color: #0ea5e9;
-		background: rgba(14, 165, 233, 0.1);
+		color: var(--info, #0ea5e9);
+		background: color-mix(in srgb, var(--info, #0ea5e9) 10%, transparent);
 	}
 
 	.action-button.delete-button:hover {
-		color: #ef4444;
-		background: rgba(239, 68, 68, 0.1);
+		color: var(--error);
+		background: color-mix(in srgb, var(--error) 10%, transparent);
 	}
 
 	.action-button:disabled {
@@ -714,9 +713,9 @@
 	.devtools-section {
 		padding: 1.5rem;
 		margin-bottom: 1.5rem;
-		background: rgba(255, 255, 255, 0.7);
+		background: color-mix(in srgb, var(--bg-primary) 70%, transparent);
 		backdrop-filter: blur(10px);
-		border: 1px solid rgba(0, 0, 0, 0.06);
+		border: 1px solid var(--border-primary);
 		border-radius: 16px;
 		animation: fadeIn 0.4s ease-out;
 	}
@@ -725,13 +724,13 @@
 		font-size: 1rem;
 		font-weight: 560;
 		letter-spacing: -0.01em;
-		color: #1d1d1f;
+		color: var(--text-primary);
 		margin-bottom: 0.25rem;
 	}
 
 	.devtools-description {
 		font-size: 0.8125rem;
-		color: #6b6b6b;
+		color: var(--text-secondary);
 		margin-bottom: 1rem;
 	}
 
@@ -742,17 +741,17 @@
 		padding: 0.625rem 1rem;
 		font-size: 0.8125rem;
 		font-weight: 500;
-		color: #dc2626;
-		background: rgba(220, 38, 38, 0.08);
-		border: 1px solid rgba(220, 38, 38, 0.2);
+		color: var(--error);
+		background: color-mix(in srgb, var(--error) 8%, transparent);
+		border: 1px solid color-mix(in srgb, var(--error) 20%, transparent);
 		border-radius: 10px;
 		cursor: pointer;
 		transition: all 0.2s ease;
 	}
 
 	.clear-db-button:hover:not(:disabled) {
-		background: rgba(220, 38, 38, 0.12);
-		border-color: rgba(220, 38, 38, 0.3);
+		background: color-mix(in srgb, var(--error) 12%, transparent);
+		border-color: color-mix(in srgb, var(--error) 30%, transparent);
 	}
 
 	.clear-db-button:disabled {
@@ -763,7 +762,7 @@
 	.devtools-hint {
 		margin-top: 0.75rem;
 		font-size: 11px;
-		color: #a1a1aa;
+		color: var(--text-tertiary);
 		line-height: 1.4;
 	}
 </style>

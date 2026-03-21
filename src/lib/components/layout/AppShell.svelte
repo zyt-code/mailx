@@ -10,11 +10,10 @@
 	import * as db from '$lib/db/index.js';
 	import { hasAccounts, activeAccount } from '$lib/stores/accountStore.js';
 	import { initSyncStore, isSyncing } from '$lib/stores/syncStore.js';
-	import { initMailStore, switchFolder, setSelectedAccount, markMailReadLocally, markMailUnreadLocally, displayedEmails } from '$lib/stores/mailStore.js';
+	import { initMailStore, switchFolder, setSelectedAccount, markMailReadLocally, markMailUnreadLocally, displayedEmails, loadMails } from '$lib/stores/mailStore.js';
 	import { initSyncHandlers, eventBus } from '$lib/events/index.js';
 	import { initUnreadStore } from '$lib/stores/unreadStore.js';
 	import { syncAccount, syncAllAccounts } from '$lib/sync/index.js';
-	import { listen } from '@tauri-apps/api/event';
 	import { goto } from '$app/navigation';
 	import { browser } from '$app/environment';
 	import { get } from 'svelte/store';
@@ -52,11 +51,14 @@ const DEFAULTS = { sidebarCollapsed: false, mailListWidth: DEFAULT_MAIL_LIST_WID
 	let selectedMailId: string | null = $state(null);
 	let mobileView: 'list' | 'reading' = $state('list');
 
-	// Data state
-	let mails: Mail[] = $state([]);
-	let isLoading = $state(true);
-	let error = $state<string | null>(null);
-	let lastLoadedFolder: Folder | null = $state(null);
+	// Data state - subscribe to mailStore's displayedEmails for selectedMail lookup
+	let storeMails: Mail[] = $state([]);
+	$effect(() => {
+		const unsub = displayedEmails.subscribe((emails) => {
+			storeMails = emails;
+		});
+		return unsub;
+	});
 
 	// Account state - subscribe to store
 	let isAccountConfigured = $state(false);
@@ -74,13 +76,6 @@ const DEFAULTS = { sidebarCollapsed: false, mailListWidth: DEFAULT_MAIL_LIST_WID
 	initMailStore();
 	initSyncHandlers();
 	initUnreadStore();
-
-	// Reload local mails when backend signals new data (e.g. after sync)
-	$effect(() => {
-		let unlisten: (() => void) | null = null;
-		listen('mails:updated', () => { loadMails(); }).then(fn => { unlisten = fn; });
-		return () => { unlisten?.(); };
-	});
 
 	// Sync state
 	let syncing = $state(false);
@@ -132,56 +127,7 @@ const DEFAULTS = { sidebarCollapsed: false, mailListWidth: DEFAULT_MAIL_LIST_WID
 	});
 
 	let sidebarWidth = $derived(sidebarCollapsed ? SIDEBAR_COLLAPSED : SIDEBAR_EXPANDED);
-	let selectedMail = $derived(mails.find((m) => m.id === selectedMailId) ?? null);
-
-	async function loadMails() {
-		if (!isAccountConfigured) {
-			mails = [];
-			isLoading = false;
-			error = null;
-			lastLoadedFolder = null;
-			return;
-		}
-
-		// Skip if already loading the same folder
-		if (isLoading && lastLoadedFolder === activeFolder) {
-			return;
-		}
-
-		isLoading = true;
-		error = null;
-		try {
-			mails = await db.getMails(activeFolder);
-			lastLoadedFolder = activeFolder;
-			// console.log('[AppShell] Loaded mails:', mails.length, 'for folder:', activeFolder);
-		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to load mails';
-			console.error('Failed to load mails:', e);
-			lastLoadedFolder = null;
-		} finally {
-			isLoading = false;
-		}
-	}
-
-	// Load mails when component mounts
-	$effect(() => {
-		// console.log('[AppShell] Effect triggered: mounting/loading mails');
-		loadMails();
-	});
-
-	// Reload when account configuration changes
-	$effect(() => {
-		// console.log('[AppShell] isAccountConfigured changed:', isAccountConfigured);
-		if (isAccountConfigured) {
-			loadMails();
-		}
-	});
-
-	// Reload when folder changes
-	$effect(() => {
-		// console.log('[AppShell] activeFolder changed:', activeFolder);
-		loadMails();
-	});
+	let selectedMail = $derived(storeMails.find((m) => m.id === selectedMailId) ?? null);
 
 	$effect(() => {
 		try {

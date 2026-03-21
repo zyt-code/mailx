@@ -389,7 +389,7 @@
 		animation: check-pop 0.3s cubic-bezier(0.2, 0, 0, 1);
 	}
 
-	.check-icon {
+	.selection-indicator :global(.check-icon) {
 		width: 0.9rem;
 		height: 0.9rem;
 	}

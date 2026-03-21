@@ -4,8 +4,6 @@ import providerDefaults from '../config/provider-defaults.json';
 import type {
 	Account,
 	AccountFormData,
-	ConnectionTestResult,
-	Mail,
 	SyncStatus,
 } from '$lib/types';
 
@@ -155,34 +153,6 @@ export function onAccountUpdated(callback: (event: { id: string }) => void): Pro
  */
 export function onAccountDeleted(callback: (event: { id: string }) => void): Promise<UnlistenFn> {
 	return listen('account:deleted', (event) => callback(event.payload as unknown as { id: string }));
-}
-
-/**
- * Listen for sync started events
- */
-export function onSyncStarted(callback: (event: { account_id: string; email: string }) => void): Promise<UnlistenFn> {
-	return listen('sync:started', (event) => callback(event.payload as unknown as { account_id: string; email: string }));
-}
-
-/**
- * Listen for sync completed events
- */
-export function onSyncCompleted(callback: (status: SyncStatus) => void): Promise<UnlistenFn> {
-	return listen('sync:completed', (event) => callback(event.payload as unknown as SyncStatus));
-}
-
-/**
- * Listen for mail sent events
- */
-export function onMailSent(callback: (event: { id: string; account_id: string }) => void): Promise<UnlistenFn> {
-	return listen('mail:sent', (event) => callback(event.payload as unknown as { id: string; account_id: string }));
-}
-
-/**
- * Listen for mails updated events
- */
-export function onMailsUpdated(callback: () => void): Promise<UnlistenFn> {
-	return listen('mails:updated', callback);
 }
 
 // ============================================================================

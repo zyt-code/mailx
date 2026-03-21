@@ -15,9 +15,9 @@ const _error = writable<string | null>(null);
 
 // Computed values using derived stores
 export const hasAccounts: Readable<boolean> = derived(_accounts, ($accounts) => $accounts.length > 0);
-export const accounts: Readable<Account[]> = derived(_accounts, ($accounts) => $accounts);
-export const isLoading: Readable<boolean> = derived(_isLoading, ($loading) => $loading);
-export const error: Readable<string | null> = derived(_error, ($error) => $error);
+export const accounts: Readable<Account[]> = { subscribe: _accounts.subscribe };
+export const isLoading: Readable<boolean> = { subscribe: _isLoading.subscribe };
+export const error: Readable<string | null> = { subscribe: _error.subscribe };
 
 // Get the active account
 export const activeAccount: Readable<Account | null> = derived(_accounts, ($accounts) =>

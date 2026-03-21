@@ -1,4 +1,4 @@
-import { derived, writable, get } from 'svelte/store';
+import { derived, writable, get, type Readable } from 'svelte/store';
 import * as db from '$lib/db/index.js';
 import { eventBus } from '$lib/events/index.js';
 import type { Mail, Folder } from '$lib/types.js';
@@ -41,16 +41,11 @@ function updateMailInStore(mailId: string, updater: (mail: Mail) => Mail): Mail 
 	return updated;
 }
 
-export const mails = derived(_mails, $mails => $mails);
-export const isLoading = derived(_isLoading, $loading => $loading);
-export const activeFolder = derived(_activeFolder, $f => $f);
-export const selectedAccountId = derived(_selectedAccountId, $id => $id);
-export const mailError = derived(_error, $e => $e);
-
-export const folderMails = derived(
-  [_mails, _activeFolder],
-  ([$mails, $activeFolder]) => $mails.filter(m => m.folder === $activeFolder)
-);
+export const mails: Readable<Mail[]> = { subscribe: _mails.subscribe };
+export const isLoading: Readable<boolean> = { subscribe: _isLoading.subscribe };
+export const activeFolder: Readable<Folder> = { subscribe: _activeFolder.subscribe };
+export const selectedAccountId: Readable<string | null> = { subscribe: _selectedAccountId.subscribe };
+export const mailError: Readable<string | null> = { subscribe: _error.subscribe };
 
 // Account-filtered emails: if selectedAccountId is null, show all; otherwise filter by account
 export const displayedEmails = derived(
@@ -115,10 +110,6 @@ export async function loadMails(folder?: Folder): Promise<void> {
   } finally {
     _isLoading.set(false);
   }
-}
-
-export function refreshMails(): void {
-  eventBus.emit('sync:trigger');
 }
 
 export function switchFolder(folder: Folder): void {

@@ -106,6 +106,12 @@
   style[data-allow-style] {
     display: block !important;
   }
+  /* Dark mode adaptation */
+  @media (prefers-color-scheme: dark) {
+    body { color: #e8e6e3; }
+    a { color: #60a5fa; }
+    pre { background: #2a2a2c; }
+  }
 </style>
 </head>
 <body>${processed}</body>
@@ -136,6 +142,9 @@
     color: #37352f;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+  @media (prefers-color-scheme: dark) {
+    body { color: #e8e6e3; }
   }
 </style>
 </head>

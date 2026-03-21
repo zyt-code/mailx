@@ -373,8 +373,8 @@
 	}
 
 	.status-indicator.success {
-		background: color-mix(in srgb, #22c55e 12%, transparent);
-		color: #16a34a;
+		background: color-mix(in srgb, var(--success) 12%, transparent);
+		color: var(--success);
 	}
 
 	.system-info {
@@ -453,7 +453,7 @@
 		line-height: 1.6;
 	}
 
-	.info-banner svg {
+	.info-banner :global(svg) {
 		flex-shrink: 0;
 		color: var(--accent-primary);
 		margin-top: 0.125rem;

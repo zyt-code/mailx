@@ -41,18 +41,6 @@ export interface EmailAddress {
 	email: string;
 }
 
-// Legacy compatibility - remove once all components use from_name/from_email
-export interface MailLegacy {
-	id: string;
-	from: string;
-	subject: string;
-	preview: string;
-	body: string;
-	time: string;
-	unread: boolean;
-	folder: Folder;
-}
-
 // ============================================================================
 // Account Management Types
 // ============================================================================
@@ -129,31 +117,3 @@ export interface ConnectionTestResult {
 	smtp: boolean;
 	error?: string;
 }
-
-// ============================================================================
-// Event Types
-// ============================================================================
-
-export interface AccountCreatedEvent {
-	id: string;
-}
-
-export interface AccountUpdatedEvent {
-	id: string;
-}
-
-export interface AccountDeletedEvent {
-	id: string;
-}
-
-export interface MailSentEvent {
-	id: string;
-	account_id: string;
-}
-
-export interface SyncStartedEvent {
-	account_id: string;
-	email: string;
-}
-
-export interface SyncCompletedEvent extends SyncStatus {}

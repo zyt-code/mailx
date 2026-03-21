@@ -151,7 +151,7 @@
 	.rich-editor-content :global(.ProseMirror p.is-empty:first-child::before) {
 		content: attr(data-placeholder);
 		float: left;
-		color: #9CA3AF;
+		color: var(--text-tertiary);
 		font-weight: 400;
 		pointer-events: none;
 		height: 0;
@@ -170,7 +170,7 @@
 		margin-bottom: 0.75em;
 		line-height: 1.6;
 		font-size: 14px;
-		color: #1A1A1A;
+		color: var(--text-primary);
 	}
 
 	.rich-editor-content :global(p:first-child) {
@@ -192,7 +192,7 @@
 		margin-bottom: 0.625em;
 		font-weight: 600;
 		line-height: 1.3;
-		color: #1A1A1A;
+		color: var(--text-primary);
 	}
 
 	.rich-editor-content :global(h1) {
@@ -221,13 +221,13 @@
 
 	/* Links */
 	.rich-editor-content :global(a) {
-		color: #6366F1;
+		color: var(--accent-primary);
 		text-decoration: underline;
 		text-underline-offset: 2px;
 	}
 
 	.rich-editor-content :global(a:hover) {
-		color: #4F46E5;
+		color: var(--accent-secondary);
 	}
 
 	/* Text formatting */
@@ -249,27 +249,27 @@
 	}
 
 	.rich-editor-content :global(code) {
-		background: #F3F4F6;
+		background: var(--bg-secondary);
 		padding: 0.125em 0.375em;
 		border-radius: 4px;
 		font-family: 'SF Mono', 'Menlo', monospace;
 		font-size: 0.875em;
-		color: #DC2626;
+		color: var(--error);
 	}
 
 	/* Blockquote */
 	.rich-editor-content :global(blockquote) {
-		border-left: 3px solid #E0E0DE;
+		border-left: 3px solid var(--border-primary);
 		padding-left: 1em;
 		margin-left: 0;
 		margin-bottom: 1em;
-		color: #6B7280;
+		color: var(--text-secondary);
 		font-style: italic;
 	}
 
 	/* Selection */
 	.rich-editor-content :global(::selection) {
-		background: rgba(99, 102, 241, 0.2);
+		background: color-mix(in srgb, var(--accent-primary) 20%, transparent);
 	}
 
 	/* Read-only mode */

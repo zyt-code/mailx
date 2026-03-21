@@ -21,10 +21,7 @@ const _state = writable<SyncStoreState>({
   lastSyncTime: null
 });
 
-export const syncState = derived(_state, $state => $state);
 export const isSyncing = derived(_state, $state => $state.isSyncing);
-export const syncProgress = derived(_state, $state => $state.progress);
-export const syncError = derived(_state, $state => $state.error);
 export const lastSyncTime = derived(_state, $state => $state.lastSyncTime);
 
 let _initialized = false;
@@ -75,8 +72,4 @@ export function initSyncStore(): void {
       error
     }));
   });
-}
-
-export function triggerSync(accountId: string): void {
-  eventBus.emit('sync:trigger', { accountId });
 }
