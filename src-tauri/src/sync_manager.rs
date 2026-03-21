@@ -181,54 +181,87 @@ impl SyncManager {
             imap_config.server, imap_config.port, imap_config.use_ssl
         );
 
-        // Create IMAP client and fetch
-        let imap_client = ImapClient::new(imap_config, account.email.clone(), password);
-
-        let mails = imap_client.fetch_emails("INBOX", 50).await.map_err(|e| {
-            println!("[Sync] IMAP fetch error for '{}': {}", account.email, e);
-            SyncError::Imap(e.to_string())
-        })?;
+        // Detect provider for folder mappings
+        let provider = crate::mail_provider::MailProvider::detect_from_host(&imap_config.server);
+        let sync_folders = provider.get_sync_folders();
 
         println!(
-            "[Sync] Fetched {} mails for '{}'",
-            mails.len(),
-            account.email
+            "[Sync] Provider: {}, will try {} folder mappings",
+            provider,
+            sync_folders.len()
         );
 
-        // Store emails in database
-        // IMPORTANT: Use upsert_mail_preserving_read_status to preserve local read/unread status
-        // This ensures that emails marked as read locally stay read, even if the server
-        // still shows them as unread (which can happen due to sync timing)
-        let mut inserted = 0u32;
-        let mut updated = 0u32;
-        for mut mail in mails {
-            // Tag each mail with the account that owns it
-            mail.account_id = Some(account_id.to_string());
+        let mut total_inserted = 0u32;
+        let mut total_updated = 0u32;
+        let mut synced_local_folders = std::collections::HashSet::new();
 
-            // Check if this is a new mail or an existing one
-            let is_new = match self.database.get_mail(&mail.id) {
-                Ok(Some(_)) => false,
-                _ => true,
-            };
+        // Sync each folder — skip folders that fail to SELECT (don't exist on server)
+        for (imap_folder, local_folder) in &sync_folders {
+            // Skip if we already synced this local folder successfully
+            // (multiple IMAP names can map to the same local folder)
+            if synced_local_folders.contains(*local_folder) {
+                continue;
+            }
 
-            // Use upsert which preserves local read/unread status
-            self.database
-                .upsert_mail_preserving_read_status(&mail)
-                .map_err(|e| {
-                    println!("[Sync] DB upsert error: {}", e);
-                    SyncError::Database(e.to_string())
-                })?;
+            let imap_client = ImapClient::new(
+                imap_config.clone(),
+                account.email.clone(),
+                password.clone(),
+            );
 
-            if is_new {
-                inserted += 1;
-            } else {
-                updated += 1;
+            let fetch_limit = if *local_folder == "inbox" { 200 } else { 100 };
+
+            match imap_client.fetch_emails(imap_folder, fetch_limit).await {
+                Ok(mails) => {
+                    println!(
+                        "[Sync] Fetched {} mails from '{}' -> local '{}'",
+                        mails.len(),
+                        imap_folder,
+                        local_folder
+                    );
+
+                    for mut mail in mails {
+                        mail.account_id = Some(account_id.to_string());
+                        // Override folder to local name
+                        mail.folder = local_folder.to_string();
+
+                        let is_new = match self.database.get_mail(&mail.id) {
+                            Ok(Some(_)) => false,
+                            _ => true,
+                        };
+
+                        self.database
+                            .upsert_mail_preserving_read_status(&mail)
+                            .map_err(|e| {
+                                println!("[Sync] DB upsert error: {}", e);
+                                SyncError::Database(e.to_string())
+                            })?;
+
+                        if is_new {
+                            total_inserted += 1;
+                        } else {
+                            total_updated += 1;
+                        }
+                    }
+
+                    synced_local_folders.insert(*local_folder);
+                }
+                Err(e) => {
+                    // Folder doesn't exist or can't be selected — skip silently
+                    println!(
+                        "[Sync] Skipping '{}' ({}): {}",
+                        imap_folder, local_folder, e
+                    );
+                }
             }
         }
 
         println!(
-            "[Sync] DB: {} inserted (new), {} updated (existing, local read status preserved) for '{}'",
-            inserted, updated, account.email
+            "[Sync] DB: {} inserted (new), {} updated across {} folders for '{}'",
+            total_inserted,
+            total_updated,
+            synced_local_folders.len(),
+            account.email
         );
 
         let now = chrono::Utc::now().timestamp_millis();
@@ -240,17 +273,16 @@ impl SyncManager {
             last_sync: Some(now),
             error_message: None,
             retry_count: 0,
-            new_count: inserted,
+            new_count: total_inserted,
         };
 
         let _ = self.app_handle.emit("sync:completed", json!(status));
 
         // Trigger UI reload if there were any changes (new or updated emails)
-        // This ensures the UI reflects the latest data from the server
-        if inserted > 0 || updated > 0 {
+        if total_inserted > 0 || total_updated > 0 {
             println!(
                 "[Sync] Triggering mails:updated event ({} new, {} updated)",
-                inserted, updated
+                total_inserted, total_updated
             );
             let _ = self.app_handle.emit("mails:updated", ());
         }

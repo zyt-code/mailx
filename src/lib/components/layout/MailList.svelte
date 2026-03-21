@@ -165,6 +165,8 @@
 
 	let hasMultipleAccounts = $derived(allAccounts.length > 1);
 
+	let vlistRef = $state<{ getScrollOffset: () => number; getScrollSize: () => number; getViewportSize: () => number } | null>(null);
+
 	function handleSelectMail(mailId: string) {
 		onSelectMail(mailId);
 		const mail = displayedMails.find((m) => m.id === mailId);
@@ -176,6 +178,16 @@
 					console.error('[MailList] Failed to sync read status:', error);
 				});
 			}
+		}
+	}
+
+	function handleScroll(offset: number) {
+		if (!canLoadMore || isLoadingMore || searchQuery.trim() || !vlistRef) return;
+		const scrollSize = vlistRef.getScrollSize();
+		const viewportSize = vlistRef.getViewportSize();
+		// Trigger load when within 300px of the bottom
+		if (scrollSize - offset - viewportSize < 300) {
+			void loadMoreMails();
 		}
 	}
 
@@ -222,11 +234,13 @@
 			</div>
 		{:else}
 			<VList
+				bind:this={vlistRef}
 				data={filteredMails}
 				style="height: 100%;"
 				getKey={(mail: Mail) => mail.id}
 				itemSize={ESTIMATED_HEIGHTS[mailDensity]}
 				bufferSize={200}
+				onscroll={handleScroll}
 				onscrollend={maybeLoadMore}
 			>
 				{#snippet children(mail: Mail, index: number)}

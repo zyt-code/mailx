@@ -91,6 +91,48 @@ impl MailProvider {
             MailProvider::ICloud | MailProvider::Generic => false,
         }
     }
+
+    /// Get IMAP folder names to sync with their local folder mappings.
+    /// Returns Vec<(imap_folder_name, local_folder_name)>.
+    /// Multiple IMAP names may map to the same local folder (tried in order, first success wins).
+    pub fn get_sync_folders(&self) -> Vec<(&'static str, &'static str)> {
+        match self {
+            // Netease 163 (Coremail) uses specific folder names
+            // Try English names first, then UTF-7 encoded Chinese names
+            MailProvider::Netease163 => vec![
+                ("INBOX", "inbox"),
+                ("Sent Messages", "sent"),
+                ("&XfJT0ZAB-", "sent"),          // 已发送 (UTF-7)
+                ("Drafts", "drafts"),
+                ("&g0l6P3ux-", "drafts"),         // 草稿箱 (UTF-7)
+                ("Deleted Messages", "trash"),
+                ("&XfJSIJZk-", "trash"),          // 已删除 (UTF-7)
+                ("Junk", "trash"),
+                ("&V4NXPpCu-", "trash"),          // 垃圾邮件 (UTF-7)
+            ],
+            // iCloud uses standard names
+            MailProvider::ICloud => vec![
+                ("INBOX", "inbox"),
+                ("Sent Messages", "sent"),
+                ("Drafts", "drafts"),
+                ("Deleted Messages", "trash"),
+                ("Archive", "archive"),
+                ("Junk", "trash"),
+            ],
+            // Generic IMAP: try common conventions
+            MailProvider::Generic => vec![
+                ("INBOX", "inbox"),
+                ("Sent", "sent"),
+                ("Sent Messages", "sent"),
+                ("Sent Items", "sent"),
+                ("Drafts", "drafts"),
+                ("Trash", "trash"),
+                ("Deleted Messages", "trash"),
+                ("Archive", "archive"),
+                ("Junk", "trash"),
+            ],
+        }
+    }
 }
 
 impl fmt::Display for MailProvider {
