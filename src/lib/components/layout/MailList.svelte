@@ -220,21 +220,29 @@
 							<ContextMenu.Trigger>
 								<button
 									class={cn(
-										'mail-item relative flex w-full items-stretch gap-3 overflow-hidden rounded-xl border text-left select-none [-webkit-user-select:none] [user-select:none] cursor-default transition-all duration-120 shadow-[var(--shadow-xs)]',
-										mailDensity === 'compact' && 'h-[68px] px-3 py-2',
-										mailDensity === 'comfortable' && 'h-[82px] px-3.5 py-3',
-										mailDensity === 'airy' && 'h-[96px] px-4 py-3.5',
+										'mail-item relative flex w-full items-stretch overflow-hidden rounded-xl border text-left select-none [-webkit-user-select:none] [user-select:none] cursor-default transition-all duration-120 shadow-[var(--shadow-xs)]',
+										mailDensity === 'compact' && 'h-[68px] py-2',
+										mailDensity === 'comfortable' && 'h-[82px] py-3',
+										mailDensity === 'airy' && 'h-[96px] py-3.5',
 										isSelected
 											? 'border-[var(--accent-muted)] bg-[var(--bg-selected)] shadow-[var(--shadow-sm)]'
 											: 'border-transparent hover:border-[var(--border-secondary)] hover:bg-[var(--bg-hover)]'
 									)}
 									onclick={() => handleSelectMail(mail.id)}
 								>
-									{#if isUnread && !isSelected}
-										<div class="absolute left-2.5 top-5 unread-dot"></div>
-									{/if}
+									<!-- Unread accent bar — left edge, inside card border-radius -->
+									<div class={cn(
+										'shrink-0 w-[3px] rounded-r-sm self-stretch transition-colors duration-150',
+										mailDensity === 'compact' ? 'mx-2' : 'mx-2.5',
+										isUnread && !isSelected
+											? 'bg-[var(--accent-primary)]'
+											: 'bg-transparent'
+									)}></div>
 
-									<div class="flex min-w-0 flex-1 flex-col justify-between overflow-hidden">
+									<div class={cn(
+										'flex min-w-0 flex-1 flex-col justify-between overflow-hidden',
+										mailDensity === 'compact' ? 'pr-3' : mailDensity === 'comfortable' ? 'pr-3.5' : 'pr-4'
+									)}>
 											<div class="flex items-start justify-between gap-3">
 												<span
 													class={cn(
