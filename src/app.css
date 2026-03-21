@@ -109,9 +109,9 @@ code, pre, .font-mono, .tabular-nums {
 		--bg-selected: #1a2d4a;
 
 		--text-primary: #f8f8f8;
-		--text-secondary: #a0a0a5;
-		--text-tertiary: #8a8a8f; /* 增强对比度: 从 #6c6c70 改为 #8a8a8f (4.7:1) */
-		--text-quaternary: #4a4a4e;
+		--text-secondary: #b8b8bd;
+		--text-tertiary: #9a9aa0;
+		--text-quaternary: #5e5e64;
 
 		/* Enhanced accent colors for better text contrast */
 		--accent-primary: #3a8cff; /* 增强对比度: 从 #1a6cff 改为 #3a8cff (5.2:1) */

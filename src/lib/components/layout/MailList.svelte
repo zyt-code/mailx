@@ -4,8 +4,7 @@
 	import { cn } from '$lib/utils.js';
 	import * as ContextMenu from '$lib/components/ui/context-menu/index.js';
 	import { Search, Paperclip, MailOpen, Mail as MailIcon, Archive, Trash2, FolderInput, Inbox, Send, FileText } from 'lucide-svelte';
-	import type { Mail, Folder, Account } from '$lib/types.js';
-	import { accounts } from '$lib/stores/accountStore.js';
+	import type { Mail, Folder } from '$lib/types.js';
 	import {
 		displayedEmails,
 		activeFolder as storeActiveFolder,
@@ -39,7 +38,6 @@
 	let { selectedMailId, onSelectMail, onMarkRead, onDelete, onArchive, onMoveTo, width, isAccountConfigured = true, isSyncing = false }: Props = $props();
 
 	// State
-	let allAccounts = $state<Account[]>([]);
 	let displayedMails = $state<Mail[]>([]);
 	let currentSelectedAccountId = $state<string | null>(null);
 	let activeFolder: Folder = $state('inbox');
@@ -50,16 +48,8 @@
 	// Appearance preferences
 	let mailDensity = $state<'compact' | 'comfortable' | 'airy'>('comfortable');
 	let showPreviewSnippets = $state(true);
-	let showAccountColor = $state(true);
 
 	// Subscriptions
-	$effect(() => {
-		const unsub = accounts.subscribe((accs) => {
-			allAccounts = accs;
-		});
-		return unsub;
-	});
-
 	$effect(() => {
 		const unsub = displayedEmails.subscribe((mails) => {
 			displayedMails = mails;
@@ -71,7 +61,6 @@
 		const unsub = preferences.subscribe((value) => {
 			mailDensity = value.appearance.mailDensity;
 			showPreviewSnippets = value.appearance.showPreviewSnippets;
-			showAccountColor = value.appearance.showAccountColor;
 		});
 		return unsub;
 	});
@@ -144,26 +133,6 @@
 		}
 		return mailDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 	}
-
-	function getAccountColor(mail: Mail): string {
-		if (!mail.account_id) return 'bg-zinc-300';
-		const colors = [
-			'bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-orange-500',
-			'bg-pink-500', 'bg-teal-500', 'bg-cyan-500', 'bg-red-500'
-		];
-		let hash = 0;
-		for (let i = 0; i < mail.account_id.length; i++) {
-			hash = mail.account_id.charCodeAt(i) + ((hash << 5) - hash);
-		}
-		return colors[Math.abs(hash) % colors.length];
-	}
-
-	function getAccountForMail(mail: Mail): Account | undefined {
-		if (!mail.account_id) return undefined;
-		return allAccounts.find((acc) => acc.id === mail.account_id);
-	}
-
-	let hasMultipleAccounts = $derived(allAccounts.length > 1);
 
 	let vlistRef = $state<{ getScrollOffset: () => number; getScrollSize: () => number; getViewportSize: () => number } | null>(null);
 
@@ -265,21 +234,7 @@
 										<div class="absolute left-2.5 top-5 unread-dot"></div>
 									{/if}
 
-									<div class="flex min-w-0 flex-1 gap-3">
-										<div class="flex w-3 shrink-0 items-start justify-center pt-1">
-											{#if showAccountColor && hasMultipleAccounts && mail.account_id}
-												<div
-													class={cn(
-														'size-2 rounded-full',
-														getAccountColor(mail),
-														isSelected && 'opacity-70'
-													)}
-													title={getAccountForMail(mail)?.email || $_('mail.unknownAccount')}
-												></div>
-											{/if}
-										</div>
-
-										<div class="flex min-w-0 flex-1 flex-col justify-between overflow-hidden">
+									<div class="flex min-w-0 flex-1 flex-col justify-between overflow-hidden">
 											<div class="flex items-start justify-between gap-3">
 												<span
 													class={cn(
@@ -324,7 +279,6 @@
 												</p>
 											{/if}
 										</div>
-									</div>
 
 									{#if mail.has_attachments}
 										<div class="flex shrink-0 items-start pt-1">
