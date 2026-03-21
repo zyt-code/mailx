@@ -61,27 +61,7 @@ export const displayedEmails = derived(
       const beforeFilter = filtered.length;
       // Force both to String for comparison to avoid type mismatch (number vs string)
       const selectedStr = String($selectedAccountId);
-      filtered = filtered.filter(m => {
-        const mailStr = String(m.account_id ?? '');
-        const match = mailStr === selectedStr;
-        console.log('[MailStore] Filter comparison:', {
-          selectedAccountId: $selectedAccountId,
-          selectedStr,
-          mailAccountId: m.account_id,
-          mailStr,
-          match
-        });
-        return match;
-      });
-      // Debug logging for empty results
-      if (filtered.length === 0 && beforeFilter > 0) {
-        console.log('[MailStore] Account filter resulted in empty list:', {
-          selectedAccountId: $selectedAccountId,
-          availableAccountIds: [...new Set($mails.map(m => m.account_id).filter(Boolean))],
-          folder: $activeFolder,
-          totalMailsInFolder: beforeFilter
-        });
-      }
+      filtered = filtered.filter(m => String(m.account_id ?? '') === selectedStr);
     }
     return filtered;
   }
@@ -93,12 +73,7 @@ export const displayedEmails = derived(
  * then optionally triggers a background sync without blocking the UI.
  */
 export function setSelectedAccount(accountId: string | null): void {
-  const previousAccountId = get(_selectedAccountId);
   _selectedAccountId.set(accountId);
-  console.log('[MailStore] Optimistic UI: switched account', {
-    from: previousAccountId,
-    to: accountId
-  });
   // The displayedEmails derived store will immediately update the UI
   // Background sync can happen without blocking the UI
 }

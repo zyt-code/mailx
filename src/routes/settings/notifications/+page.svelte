@@ -202,85 +202,11 @@
 </div>
 
 <style>
-	.settings-page {
-		display: grid;
-		gap: 1rem;
-		animation: fadeIn 180ms ease-out;
-	}
-
-	.page-header {
-		display: flex;
-		gap: 1rem;
-		align-items: flex-start;
-		margin-bottom: 0.35rem;
-	}
-
-	.header-icon {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		width: 3.2rem;
-		height: 3.2rem;
-		border-radius: 20px;
-		background: linear-gradient(135deg, color-mix(in srgb, var(--accent-primary) 18%, white), color-mix(in srgb, var(--accent-light) 92%, white));
-		color: var(--accent-primary);
-		box-shadow: var(--shadow-sm);
-		flex-shrink: 0;
-	}
-
-	.page-kicker {
-		margin: 0 0 0.25rem;
-		font-size: 0.74rem;
-		font-weight: 700;
-		letter-spacing: 0.16em;
-		text-transform: uppercase;
-		color: var(--accent-primary);
-	}
-
-	.page-title {
-		margin: 0;
-		font-size: clamp(1.8rem, 2.2vw, 2.45rem);
-		font-weight: 720;
-		letter-spacing: -0.05em;
-	}
-
-	.page-subtitle {
-		margin: 0.45rem 0 0;
-		max-width: 42rem;
-		color: var(--text-secondary);
-		font-size: 0.96rem;
-		line-height: 1.6;
-	}
-
-	.section-card {
-		display: grid;
-		gap: 1rem;
-		padding: 1.25rem;
-		border: 1px solid color-mix(in srgb, var(--border-primary) 88%, transparent);
-		border-radius: 24px;
-		background: color-mix(in srgb, var(--bg-primary) 84%, transparent);
-		box-shadow: var(--shadow-xs);
-		backdrop-filter: blur(16px);
-	}
-
 	.section-head {
 		display: flex;
 		align-items: flex-start;
 		justify-content: space-between;
 		gap: 0.75rem;
-	}
-
-	.section-title {
-		margin: 0;
-		font-size: 1.05rem;
-		letter-spacing: -0.03em;
-	}
-
-	.section-description {
-		margin: 0.3rem 0 0;
-		color: var(--text-secondary);
-		font-size: 0.84rem;
-		line-height: 1.5;
 	}
 
 	.permission-pill {
@@ -304,12 +230,6 @@
 		color: var(--error);
 	}
 
-	.toggle-stack {
-		display: grid;
-		gap: 0.75rem;
-	}
-
-	.toggle-row,
 	.permission-panel,
 	.time-card {
 		display: flex;
@@ -323,63 +243,11 @@
 		text-align: left;
 	}
 
-	.toggle-row {
-		cursor: pointer;
-	}
-
-	.toggle-row:hover,
 	.subtle-button:hover:not(:disabled),
 	.time-card:hover {
 		border-color: color-mix(in srgb, var(--accent-primary) 22%, var(--border-primary));
 		transform: translateY(-1px);
 		box-shadow: var(--shadow-sm);
-	}
-
-	.row-copy {
-		min-width: 0;
-	}
-
-	.option-label {
-		margin: 0;
-		font-size: 0.92rem;
-		font-weight: 650;
-		letter-spacing: -0.02em;
-	}
-
-	.option-description {
-		margin: 0.18rem 0 0;
-		font-size: 0.8rem;
-		line-height: 1.5;
-		color: var(--text-secondary);
-	}
-
-	.toggle-pill {
-		position: relative;
-		width: 3rem;
-		height: 1.75rem;
-		border-radius: 999px;
-		background: color-mix(in srgb, var(--bg-active) 90%, transparent);
-		flex-shrink: 0;
-	}
-
-	.toggle-pill.toggle-on {
-		background: color-mix(in srgb, var(--accent-primary) 28%, var(--accent-light));
-	}
-
-	.toggle-thumb {
-		position: absolute;
-		top: 0.16rem;
-		left: 0.18rem;
-		width: 1.4rem;
-		height: 1.4rem;
-		border-radius: 999px;
-		background: white;
-		box-shadow: var(--shadow-sm);
-		transition: transform 140ms ease;
-	}
-
-	.toggle-pill.toggle-on .toggle-thumb {
-		transform: translateX(1.2rem);
 	}
 
 	.permission-panel {
@@ -411,19 +279,6 @@
 		cursor: not-allowed;
 	}
 
-	.reset-button {
-		height: 2.45rem;
-		padding: 0 0.95rem;
-		border: 1px solid color-mix(in srgb, var(--border-primary) 92%, transparent);
-		border-radius: 14px;
-		background: color-mix(in srgb, var(--bg-primary) 92%, transparent);
-		color: var(--text-primary);
-		font-size: 0.82rem;
-		font-weight: 650;
-		cursor: pointer;
-		white-space: nowrap;
-	}
-
 	.time-grid {
 		display: grid;
 		grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -453,23 +308,11 @@
 		margin-top: 0.3rem;
 	}
 
-	@keyframes fadeIn {
-		from {
-			opacity: 0;
-			transform: translateY(6px);
-		}
-		to {
-			opacity: 1;
-			transform: translateY(0);
-		}
-	}
-
 	@media (max-width: 720px) {
 		.section-head,
 		.permission-panel,
 		.button-row,
-		.time-grid,
-		.page-header {
+		.time-grid {
 			flex-direction: column;
 		}
 

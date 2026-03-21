@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { invoke } from '@tauri-apps/api/core';
-	import { Plus, Loader2, AtSign, Trash2, RefreshCw, Edit, MoreVertical, CheckCircle, XCircle, Clock } from 'lucide-svelte';
+	import { Plus, Loader2, AtSign, Trash2, RefreshCw, Edit, CheckCircle, XCircle, Clock } from 'lucide-svelte';
 	import * as db from '$lib/db/index.js';
 	import { syncAccount } from '$lib/sync/index.js';
 	import type { SyncStatus } from '$lib/types.js';

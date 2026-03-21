@@ -5,7 +5,7 @@ import { svelteTesting } from '@testing-library/svelte/vite';
 export default defineConfig({
 	plugins: [sveltekit(), svelteTesting()],
 	test: {
-		include: ['src/**/*.{test,spec}.{js,ts}'],
+		include: ['src/**/*.{test,spec}.{js,ts}', 'tests/**/*.{test,spec}.{js,ts}'],
 		environment: 'jsdom',
 		setupFiles: ['tests/setup.ts'],
 		globals: true

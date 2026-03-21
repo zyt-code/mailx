@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { page } from '$app/stores';
 	import { invoke } from '@tauri-apps/api/core';
 	import { ArrowLeft, Check, Loader2, Mail, Lock, Server, Eye, EyeOff, ShieldCheck } from 'lucide-svelte';
 	import * as accounts from '$lib/accounts/index.js';

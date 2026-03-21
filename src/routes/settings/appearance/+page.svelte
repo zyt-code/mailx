@@ -206,80 +206,6 @@
 </div>
 
 <style>
-	.settings-page {
-		display: grid;
-		gap: 1rem;
-		animation: fadeIn 180ms ease-out;
-	}
-
-	.page-header {
-		display: flex;
-		gap: 1rem;
-		align-items: flex-start;
-		margin-bottom: 0.35rem;
-	}
-
-	.header-icon {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		width: 3.2rem;
-		height: 3.2rem;
-		border-radius: 20px;
-		background: linear-gradient(135deg, color-mix(in srgb, var(--accent-primary) 18%, white), color-mix(in srgb, var(--accent-light) 92%, white));
-		color: var(--accent-primary);
-		box-shadow: var(--shadow-sm);
-		flex-shrink: 0;
-	}
-
-	.page-kicker {
-		margin: 0 0 0.25rem;
-		font-size: 0.74rem;
-		font-weight: 700;
-		letter-spacing: 0.16em;
-		text-transform: uppercase;
-		color: var(--accent-primary);
-	}
-
-	.page-title {
-		margin: 0;
-		font-size: clamp(1.8rem, 2.2vw, 2.45rem);
-		font-weight: 720;
-		letter-spacing: -0.05em;
-	}
-
-	.page-subtitle {
-		margin: 0.45rem 0 0;
-		max-width: 42rem;
-		color: var(--text-secondary);
-		font-size: 0.96rem;
-		line-height: 1.6;
-	}
-
-	.section-card {
-		display: grid;
-		gap: 1rem;
-		padding: 1.25rem;
-		border: 1px solid color-mix(in srgb, var(--border-primary) 88%, transparent);
-		border-radius: 24px;
-		background: color-mix(in srgb, var(--bg-primary) 84%, transparent);
-		box-shadow: var(--shadow-xs);
-		backdrop-filter: blur(16px);
-	}
-
-	.section-title {
-		margin: 0;
-		font-size: 1.05rem;
-		letter-spacing: -0.03em;
-	}
-
-	.section-description {
-		margin: 0.3rem 0 0;
-		color: var(--text-secondary);
-		font-size: 0.84rem;
-		line-height: 1.5;
-	}
-
 	.theme-grid,
 	.density-grid {
 		display: grid;
@@ -302,8 +228,7 @@
 
 	.theme-option:hover,
 	.density-option:hover,
-	.accent-option:hover,
-	.toggle-row:hover {
+	.accent-option:hover {
 		border-color: color-mix(in srgb, var(--accent-primary) 22%, var(--border-primary));
 		transform: translateY(-1px);
 		box-shadow: var(--shadow-sm);
@@ -385,20 +310,6 @@
 		gap: 0.6rem;
 	}
 
-	.option-label {
-		margin: 0;
-		font-size: 0.92rem;
-		font-weight: 650;
-		letter-spacing: -0.02em;
-	}
-
-	.option-description {
-		margin: 0.18rem 0 0;
-		font-size: 0.8rem;
-		line-height: 1.5;
-		color: var(--text-secondary);
-	}
-
 	.check-badge {
 		display: flex;
 		align-items: center;
@@ -409,84 +320,6 @@
 		background: var(--accent-primary);
 		color: white;
 		flex-shrink: 0;
-	}
-
-	.toggle-stack {
-		display: grid;
-		gap: 0.75rem;
-	}
-
-	.toggle-row {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 1rem;
-		padding: 1rem;
-		border: 1px solid color-mix(in srgb, var(--border-primary) 90%, transparent);
-		border-radius: 18px;
-		background: color-mix(in srgb, var(--bg-secondary) 65%, transparent);
-		cursor: pointer;
-		text-align: left;
-	}
-
-	.toggle-pill {
-		position: relative;
-		width: 3rem;
-		height: 1.75rem;
-		border-radius: 999px;
-		background: color-mix(in srgb, var(--bg-active) 90%, transparent);
-		flex-shrink: 0;
-	}
-
-	.toggle-pill.toggle-on {
-		background: color-mix(in srgb, var(--accent-primary) 28%, var(--accent-light));
-	}
-
-	.toggle-thumb {
-		position: absolute;
-		top: 0.16rem;
-		left: 0.18rem;
-		width: 1.4rem;
-		height: 1.4rem;
-		border-radius: 999px;
-		background: white;
-		box-shadow: var(--shadow-sm);
-		transition: transform 140ms ease;
-	}
-
-	.toggle-pill.toggle-on .toggle-thumb {
-		transform: translateX(1.2rem);
-	}
-
-	.section-copy {
-		display: flex;
-		align-items: flex-start;
-		justify-content: space-between;
-		gap: 0.75rem;
-	}
-
-	.reset-button {
-		height: 2.45rem;
-		padding: 0 0.95rem;
-		border: 1px solid color-mix(in srgb, var(--border-primary) 92%, transparent);
-		border-radius: 14px;
-		background: color-mix(in srgb, var(--bg-primary) 92%, transparent);
-		color: var(--text-primary);
-		font-size: 0.82rem;
-		font-weight: 650;
-		cursor: pointer;
-		white-space: nowrap;
-	}
-
-	@keyframes fadeIn {
-		from {
-			opacity: 0;
-			transform: translateY(6px);
-		}
-		to {
-			opacity: 1;
-			transform: translateY(0);
-		}
 	}
 
 	/* Enhanced theme option styles */
@@ -503,6 +336,7 @@
 		margin-bottom: 0.75rem;
 		overflow: hidden;
 		background: var(--bg-secondary);
+		transition: transform 0.3s cubic-bezier(0.2, 0, 0, 1);
 	}
 
 	.simple-preview {
@@ -515,6 +349,8 @@
 		display: flex;
 		width: 100%;
 		height: 100%;
+		position: relative;
+		overflow: hidden;
 	}
 
 	.system-preview-light {
@@ -550,6 +386,7 @@
 		background: var(--accent-primary);
 		color: white;
 		margin-left: 0.5rem;
+		animation: check-pop 0.3s cubic-bezier(0.2, 0, 0, 1);
 	}
 
 	.check-icon {
@@ -559,12 +396,30 @@
 
 	/* Transitioning state */
 	.theme-option.transitioning {
-		opacity: 0.8;
+		opacity: 0.9;
 		cursor: wait;
 	}
 
 	.theme-option.transitioning .theme-preview {
+		position: relative;
+		overflow: hidden;
 		animation: pulse-subtle 1.5s ease-in-out infinite;
+	}
+
+	.theme-option.transitioning .theme-preview::before {
+		content: '';
+		position: absolute;
+		top: 0;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		background: linear-gradient(90deg,
+			transparent 0%,
+			color-mix(in srgb, var(--accent-primary) 15%, transparent) 50%,
+			transparent 100%
+		);
+		z-index: 1;
+		animation: transition-shimmer 1.5s ease-in-out infinite;
 	}
 
 	@keyframes pulse-subtle {
@@ -572,30 +427,12 @@
 		50% { opacity: 0.7; }
 	}
 
-	@media (max-width: 640px) {
-		.page-header {
-			flex-direction: column;
-		}
-
-		.toggle-row {
-			align-items: flex-start;
-		}
-
-		.theme-option {
-			grid-template-columns: auto 1fr;
-		}
-
-		.theme-preview {
-			grid-column: 1 / -1;
-		}
-
-		.selection-indicator {
-			grid-column: 2;
-			justify-self: end;
-		}
+	@keyframes transition-shimmer {
+		0% { transform: translateX(-100%); }
+		100% { transform: translateX(100%); }
 	}
 
-	/* Enhanced theme switching animations and UI refinements */
+	/* Active theme enhancement */
 	.theme-option.active {
 		position: relative;
 		z-index: 1;
@@ -634,12 +471,7 @@
 		box-shadow: 0 4px 12px color-mix(in srgb, var(--border-primary) 20%, transparent);
 	}
 
-	/* System preview animation */
-	.system-preview {
-		position: relative;
-		overflow: hidden;
-	}
-
+	/* System preview shimmer */
 	.system-preview::after {
 		content: '';
 		position: absolute;
@@ -670,73 +502,33 @@
 		}
 	}
 
-	/* Enhanced transitioning state */
-	.theme-option.transitioning {
-		opacity: 0.9;
-		cursor: wait;
-	}
-
-	.theme-option.transitioning .theme-preview {
-		position: relative;
-		overflow: hidden;
-	}
-
-	.theme-option.transitioning .theme-preview::before {
-		content: '';
-		position: absolute;
-		top: 0;
-		left: 0;
-		right: 0;
-		bottom: 0;
-		background: linear-gradient(90deg,
-			transparent 0%,
-			color-mix(in srgb, var(--accent-primary) 15%, transparent) 50%,
-			transparent 100%
-		);
-		z-index: 1;
-		animation: transition-shimmer 1.5s ease-in-out infinite;
-	}
-
-	@keyframes transition-shimmer {
-		0% {
-			transform: translateX(-100%);
-		}
-		100% {
-			transform: translateX(100%);
-		}
-	}
-
-	/* Theme selection indicator refinement */
-	.selection-indicator {
-		animation: check-pop 0.3s cubic-bezier(0.2, 0, 0, 1);
-	}
-
 	@keyframes check-pop {
-		0% {
-			transform: scale(0);
-			opacity: 0;
-		}
-		80% {
-			transform: scale(1.1);
-		}
-		100% {
-			transform: scale(1);
-			opacity: 1;
-		}
-	}
-
-	/* Theme preview subtle scale animation on hover */
-	.theme-preview {
-		transition: transform 0.3s cubic-bezier(0.2, 0, 0, 1);
+		0% { transform: scale(0); opacity: 0; }
+		80% { transform: scale(1.1); }
+		100% { transform: scale(1); opacity: 1; }
 	}
 
 	.theme-option:hover .theme-preview {
 		transform: scale(1.02);
 	}
 
-	/* Active theme preview enhancement */
 	.theme-option.active .theme-preview {
 		transform: scale(1.03);
 		box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-primary) 20%, transparent);
+	}
+
+	@media (max-width: 640px) {
+		.theme-option {
+			grid-template-columns: auto 1fr;
+		}
+
+		.theme-preview {
+			grid-column: 1 / -1;
+		}
+
+		.selection-indicator {
+			grid-column: 2;
+			justify-self: end;
+		}
 	}
 </style>

@@ -66,7 +66,9 @@
 	let unreadCount = $state(0);
 	let allAccounts = $state<Account[]>([]);
 	let selectedAccountId = $state<string | null>(null); // null = All Inboxes
-	let accountsCollapsed = $state(false);
+	let accountsCollapsed = $state(
+		typeof window !== 'undefined' && localStorage.getItem('sidebar-accounts-collapsed') === 'true'
+	);
 	let showShortcutHints = $state(true);
 
 	function toggleAccountsCollapse() {
@@ -110,15 +112,6 @@
 			unsubSelectedAccount();
 			unsubPreferences();
 		};
-	});
-
-	// Persist collapse state to localStorage with safe initialization
-	$effect(() => {
-		// Load initial value from localStorage
-		const saved = localStorage.getItem('sidebar-accounts-collapsed');
-		if (saved !== null) {
-			accountsCollapsed = saved === 'true';
-		}
 	});
 
 	// Save collapse state to localStorage when it changes

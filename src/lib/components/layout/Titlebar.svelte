@@ -120,8 +120,8 @@
 	.titlebar-windows {
 		height: 32px;
 		padding: 0;
-		background: #f3f3f3;
-		border-bottom: 1px solid #e5e5e5;
+		background: var(--bg-secondary);
+		border-bottom: 1px solid var(--border-primary);
 		justify-content: space-between;
 	}
 
@@ -141,18 +141,18 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		color: #737373;
+		color: var(--text-tertiary);
 		transition: color 0.15s ease;
 	}
 
 	.titlebar-windows .titlebar-icon:hover {
-		color: #1a1a1a;
+		color: var(--text-primary);
 	}
 
 	.titlebar-windows .titlebar-text {
 		font-size: 12px;
 		font-weight: 400;
-		color: #1a1a1a;
+		color: var(--text-primary);
 		font-family: 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
 	}
 
@@ -176,12 +176,12 @@
 		cursor: pointer;
 		transition: background 0.1s ease;
 		pointer-events: auto;
-		color: #1a1a1a;
+		color: var(--text-primary);
 	}
 
 	/* Minimize and Maximize hover */
 	.titlebar-windows .caption-button:hover {
-		background: #e5e5e5;
+		background: var(--bg-hover);
 	}
 
 	/* Close button special handling */
@@ -200,8 +200,8 @@
 	.titlebar-unix {
 		height: 38px;
 		padding: 0 14px;
-		background: #ffffff;
-		border-bottom: 1px solid rgb(244 244 245);
+		background: var(--bg-primary);
+		border-bottom: 1px solid var(--border-primary);
 	}
 
 	.titlebar-unix .titlebar-drag-region {

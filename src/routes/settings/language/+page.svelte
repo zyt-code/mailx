@@ -4,7 +4,6 @@
 	import { _ } from 'svelte-i18n';
 	import { i18nStore, SUPPORTED_LOCALES, type SupportedLocale } from '$lib/stores/i18nStore.svelte.js';
 	import { preferences } from '$lib/stores/preferencesStore.js';
-	import { page } from '$app/stores';
 
 	let currentLocale = $state<SupportedLocale>('en');
 	let autoDetect = $state(true);
@@ -23,18 +22,9 @@
 		return unsubscribe;
 	});
 
-	// Update current locale when it changes
+	// Update current locale reactively when i18nStore changes
 	$effect(() => {
-		const checkLocale = () => {
-			currentLocale = i18nStore.current;
-		};
-
-		// Initial check
-		checkLocale();
-
-		// Watch for changes
-		const interval = setInterval(checkLocale, 500);
-		return () => clearInterval(interval);
+		currentLocale = i18nStore.current;
 	});
 
 	onMount(() => {
