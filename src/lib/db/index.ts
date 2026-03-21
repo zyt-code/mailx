@@ -2,10 +2,27 @@ import { invoke } from '@tauri-apps/api/core';
 import type { Attachment, Mail, Folder } from '$lib/types.js';
 
 /**
- * Get all mails, optionally filtered by folder and account
+ * Get mails with pagination, optionally filtered by folder and account
  */
-export async function getMails(folder?: Folder, accountId?: string | null): Promise<Mail[]> {
-	return invoke<Mail[]>('get_mails', { folder, account_id: accountId });
+export async function getMails(
+	folder?: Folder,
+	accountId?: string | null,
+	limit?: number,
+	offset?: number
+): Promise<Mail[]> {
+	return invoke<Mail[]>('get_mails', {
+		folder,
+		account_id: accountId,
+		limit: limit ?? 50,
+		offset: offset ?? 0
+	});
+}
+
+/**
+ * Get total count of mails for a folder/account filter
+ */
+export async function getMailsCount(folder?: Folder, accountId?: string | null): Promise<number> {
+	return invoke<number>('get_mails_count', { folder, account_id: accountId });
 }
 
 /**

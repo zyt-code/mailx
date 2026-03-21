@@ -3,11 +3,18 @@ import * as db from '$lib/db/index.js';
 import { eventBus } from '$lib/events/index.js';
 import type { Mail, Folder } from '$lib/types.js';
 
+const PAGE_SIZE = 50;
+
 const _mails = writable<Mail[]>([]);
 const _isLoading = writable(false);
+const _isLoadingMore = writable(false);
 const _activeFolder = writable<Folder>('inbox');
 const _selectedAccountId = writable<string | null>(null); // null = 'all' accounts
 const _error = writable<string | null>(null);
+const _hasMore = writable(true);
+const _totalCount = writable(0);
+
+let _currentOffset = 0;
 
 function ensureReadState(mail: Mail, read: boolean): Mail {
 	return {
@@ -43,9 +50,12 @@ function updateMailInStore(mailId: string, updater: (mail: Mail) => Mail): Mail 
 
 export const mails: Readable<Mail[]> = { subscribe: _mails.subscribe };
 export const isLoading: Readable<boolean> = { subscribe: _isLoading.subscribe };
+export const isLoadingMore: Readable<boolean> = { subscribe: _isLoadingMore.subscribe };
 export const activeFolder: Readable<Folder> = { subscribe: _activeFolder.subscribe };
 export const selectedAccountId: Readable<string | null> = { subscribe: _selectedAccountId.subscribe };
 export const mailError: Readable<string | null> = { subscribe: _error.subscribe };
+export const hasMore: Readable<boolean> = { subscribe: _hasMore.subscribe };
+export const totalCount: Readable<number> = { subscribe: _totalCount.subscribe };
 
 // Account-filtered emails: if selectedAccountId is null, show all; otherwise filter by account
 export const displayedEmails = derived(
@@ -98,17 +108,49 @@ export function initMailStore(): void {
 export async function loadMails(folder?: Folder): Promise<void> {
   _isLoading.set(true);
   _error.set(null);
+  _currentOffset = 0;
   try {
     const targetFolder = folder || 'inbox';
     const accountId = get(_selectedAccountId);
-    const data = await db.getMails(targetFolder, accountId);
+    const [data, count] = await Promise.all([
+      db.getMails(targetFolder, accountId, PAGE_SIZE, 0),
+      db.getMailsCount(targetFolder, accountId)
+    ]);
     _mails.set(data.map(normalizeMail));
+    _totalCount.set(count);
+    _currentOffset = data.length;
+    _hasMore.set(data.length < count);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error('Failed to load mails:', msg);
     _error.set(msg);
   } finally {
     _isLoading.set(false);
+  }
+}
+
+export async function loadMoreMails(): Promise<void> {
+  if (get(_isLoadingMore) || !get(_hasMore)) return;
+  _isLoadingMore.set(true);
+  try {
+    const targetFolder = get(_activeFolder);
+    const accountId = get(_selectedAccountId);
+    const data = await db.getMails(targetFolder, accountId, PAGE_SIZE, _currentOffset);
+    if (data.length > 0) {
+      const normalized = data.map(normalizeMail);
+      // Deduplicate by id (in case mails arrived during pagination)
+      _mails.update((current) => {
+        const existingIds = new Set(current.map((m) => m.id));
+        const newMails = normalized.filter((m) => !existingIds.has(m.id));
+        return [...current, ...newMails];
+      });
+      _currentOffset += data.length;
+    }
+    _hasMore.set(data.length >= PAGE_SIZE);
+  } catch (e) {
+    console.error('Failed to load more mails:', e);
+  } finally {
+    _isLoadingMore.set(false);
   }
 }
 

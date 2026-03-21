@@ -25,17 +25,31 @@ fn sanitize_mail_html(mut mail: Mail) -> Mail {
     mail
 }
 
-/// Get all mails, optionally filtered by folder and account
+/// Get mails with pagination, optionally filtered by folder and account
 #[tauri::command]
 pub fn get_mails(
     folder: Option<String>,
     account_id: Option<String>,
+    limit: Option<i64>,
+    offset: Option<i64>,
     db: State<'_, Database>,
 ) -> Result<Vec<Mail>, String> {
     db.inner()
-        .get_mails(folder, account_id)
+        .get_mails(folder, account_id, limit, offset)
         .map(|mails| mails.into_iter().map(sanitize_mail_html).collect())
         .map_err(|e| format!("Failed to get mails: {}", e))
+}
+
+/// Get total count of mails for a folder/account filter
+#[tauri::command]
+pub fn get_mails_count(
+    folder: Option<String>,
+    account_id: Option<String>,
+    db: State<'_, Database>,
+) -> Result<i64, String> {
+    db.inner()
+        .get_mails_count(folder, account_id)
+        .map_err(|e| format!("Failed to get mail count: {}", e))
 }
 
 /// Get a single mail by ID

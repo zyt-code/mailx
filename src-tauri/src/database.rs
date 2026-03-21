@@ -290,26 +290,28 @@ impl Database {
         Ok(())
     }
 
-    /// Get all mails, optionally filtered by folder and account
+    /// Get mails with pagination, optionally filtered by folder and account
     pub fn get_mails(
         &self,
         folder: Option<String>,
         account_id: Option<String>,
+        limit: Option<i64>,
+        offset: Option<i64>,
     ) -> SqliteResult<Vec<Mail>> {
         let conn = self.conn.lock().unwrap();
 
         let mut query = "SELECT id, uid, from_name, from_email, subject, preview, body, timestamp, folder, unread, account_id, to_json, cc_json, bcc_json, html_body, reply_to_json, starred, has_attachments FROM mails".to_string();
-        let mut params: Vec<&dyn rusqlite::ToSql> = Vec::new();
+        let mut params: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
         let mut conditions = Vec::new();
 
         // Build WHERE clause based on provided filters
         if let Some(folder) = &folder {
             conditions.push("folder = ?");
-            params.push(folder);
+            params.push(Box::new(folder.clone()));
         }
         if let Some(account_id) = &account_id {
             conditions.push("account_id = ?");
-            params.push(account_id);
+            params.push(Box::new(account_id.clone()));
         }
 
         if !conditions.is_empty() {
@@ -317,6 +319,13 @@ impl Database {
             query.push_str(&conditions.join(" AND "));
         }
         query.push_str(" ORDER BY timestamp DESC");
+
+        // Apply pagination
+        let effective_limit = limit.unwrap_or(50);
+        let effective_offset = offset.unwrap_or(0);
+        query.push_str(" LIMIT ? OFFSET ?");
+        params.push(Box::new(effective_limit));
+        params.push(Box::new(effective_offset));
 
         let mut stmt = conn.prepare(&query)?;
         let mail_iter = stmt.query_map(rusqlite::params_from_iter(params), |row| {
@@ -351,6 +360,37 @@ impl Database {
         }
 
         Ok(mails)
+    }
+
+    /// Get total count of mails matching folder/account filters
+    pub fn get_mails_count(
+        &self,
+        folder: Option<String>,
+        account_id: Option<String>,
+    ) -> SqliteResult<i64> {
+        let conn = self.conn.lock().unwrap();
+
+        let mut query = "SELECT COUNT(*) FROM mails".to_string();
+        let mut params: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
+        let mut conditions = Vec::new();
+
+        if let Some(folder) = &folder {
+            conditions.push("folder = ?");
+            params.push(Box::new(folder.clone()));
+        }
+        if let Some(account_id) = &account_id {
+            conditions.push("account_id = ?");
+            params.push(Box::new(account_id.clone()));
+        }
+
+        if !conditions.is_empty() {
+            query.push_str(" WHERE ");
+            query.push_str(&conditions.join(" AND "));
+        }
+
+        let mut stmt = conn.prepare(&query)?;
+        let count: i64 = stmt.query_row(rusqlite::params_from_iter(params), |row| row.get(0))?;
+        Ok(count)
     }
 
     /// Get a single mail by ID

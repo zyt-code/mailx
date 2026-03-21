@@ -152,6 +152,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             // Mail commands
             commands::get_mails,
+            commands::get_mails_count,
             commands::get_mail,
             commands::create_mail,
             commands::add_mail_attachment,

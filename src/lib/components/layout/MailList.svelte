@@ -10,7 +10,10 @@
 		displayedEmails,
 		activeFolder as storeActiveFolder,
 		markMailReadLocally,
-		selectedAccountId as selectedAccountFilterId
+		selectedAccountId as selectedAccountFilterId,
+		isLoadingMore as storeIsLoadingMore,
+		hasMore as storeHasMore,
+		loadMoreMails
 	} from '$lib/stores/mailStore.js';
 	import { markMailAsRead } from '$lib/db/index.js';
 	import { preferences } from '$lib/stores/preferencesStore.js';
@@ -27,8 +30,6 @@
 		isSyncing?: boolean;
 	}
 
-	const PAGE_SIZE = 30;
-
 	const ESTIMATED_HEIGHTS = {
 		compact: 68,
 		comfortable: 82,
@@ -43,8 +44,8 @@
 	let currentSelectedAccountId = $state<string | null>(null);
 	let activeFolder: Folder = $state('inbox');
 	let searchQuery = $state('');
-	let visibleMailCount = $state(PAGE_SIZE);
 	let isLoadingMore = $state(false);
+	let canLoadMore = $state(true);
 
 	// Appearance preferences
 	let mailDensity = $state<'compact' | 'comfortable' | 'airy'>('comfortable');
@@ -89,6 +90,20 @@
 		return unsub;
 	});
 
+	$effect(() => {
+		const unsub = storeIsLoadingMore.subscribe((v) => {
+			isLoadingMore = v;
+		});
+		return unsub;
+	});
+
+	$effect(() => {
+		const unsub = storeHasMore.subscribe((v) => {
+			canLoadMore = v;
+		});
+		return unsub;
+	});
+
 	// Derived
 	let filteredMails = $derived(
 		searchQuery.trim()
@@ -103,24 +118,6 @@
 				})
 			: displayedMails
 	);
-
-	let visibleMails = $derived(
-		searchQuery.trim() ? filteredMails : filteredMails.slice(0, visibleMailCount)
-	);
-
-	let canLoadMore = $derived(
-		!searchQuery.trim() && visibleMailCount < filteredMails.length
-	);
-
-	// Virtualization - using svelte-virtua
-
-	// Reset visible count when search or folder changes
-	$effect(() => {
-		activeFolder;
-		currentSelectedAccountId;
-		searchQuery;
-		visibleMailCount = PAGE_SIZE;
-	});
 
 	// Logic
 	const folderLabels = $derived<Record<Folder, string>>({
@@ -183,8 +180,8 @@
 	}
 
 	function maybeLoadMore() {
-		if (!canLoadMore || isLoadingMore) return;
-		visibleMailCount = Math.min(filteredMails.length, visibleMailCount + PAGE_SIZE);
+		if (!canLoadMore || isLoadingMore || searchQuery.trim()) return;
+		void loadMoreMails();
 	}
 </script>
 
@@ -225,7 +222,7 @@
 			</div>
 		{:else}
 			<VList
-				data={visibleMails}
+				data={filteredMails}
 				style="height: 100%;"
 				getKey={(mail: Mail) => mail.id}
 				itemSize={ESTIMATED_HEIGHTS[mailDensity]}
@@ -396,6 +393,11 @@
 					</div>
 				{/snippet}
 			</VList>
+			{#if isLoadingMore}
+				<div class="flex items-center justify-center py-4 shrink-0">
+					<div class="size-4 border-2 border-[var(--accent-primary)] border-t-transparent rounded-full animate-spin"></div>
+				</div>
+			{/if}
 		{/if}
 	</div>
 </div>
