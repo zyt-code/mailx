@@ -23,7 +23,8 @@ vi.mock('$lib/stores/preferencesStore.js', () => ({
 					accentTone: 'blue',
 					mailDensity: 'comfortable',
 					showPreviewSnippets: true,
-					showAccountColor: true
+					showAccountColor: true,
+					theme: 'system'
 				},
 				notifications: {
 					desktopNotifications: true,

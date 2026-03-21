@@ -60,6 +60,18 @@ class ResizeObserver {
 }
 
 window.ResizeObserver = ResizeObserver;
+// Mock matchMedia (not implemented in jsdom)
+window.matchMedia = window.matchMedia || vi.fn().mockImplementation((query: string) => ({
+	matches: false,
+	media: query,
+	onchange: null,
+	addListener: vi.fn(),
+	removeListener: vi.fn(),
+	addEventListener: vi.fn(),
+	removeEventListener: vi.fn(),
+	dispatchEvent: vi.fn(),
+}));
+
 
 // Mock Svelte 5 runes for tests
 if (typeof globalThis !== 'undefined') {

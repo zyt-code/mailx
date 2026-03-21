@@ -2,6 +2,7 @@ import { writable, get } from 'svelte/store';
 import type { SupportedLocale } from './i18nStore.svelte';
 
 export type AccentTone = 'blue' | 'sunset' | 'forest' | 'graphite';
+export type Theme = 'light' | 'dark' | 'system';
 export type MailDensity = 'compact' | 'comfortable' | 'airy';
 
 export interface AppearancePreferences {
@@ -9,6 +10,7 @@ export interface AppearancePreferences {
 	mailDensity: MailDensity;
 	showPreviewSnippets: boolean;
 	showAccountColor: boolean;
+	theme: Theme;
 }
 
 export interface NotificationPreferences {
@@ -52,6 +54,7 @@ export interface UserPreferences {
 }
 
 const STORAGE_KEY = 'mailx-preferences';
+const LEGACY_THEME_KEY = 'mailx-theme';
 
 export const ACCENT_PRESETS: Record<
 	AccentTone,
@@ -108,7 +111,8 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
 		accentTone: 'blue',
 		mailDensity: 'comfortable',
 		showPreviewSnippets: true,
-		showAccountColor: true
+		showAccountColor: true,
+		theme: 'system'
 	},
 	notifications: {
 		desktopNotifications: true,
@@ -179,6 +183,21 @@ function mergePreferences(raw: unknown): UserPreferences {
 	};
 }
 
+function migrateLegacyTheme(): Theme | null {
+	if (typeof window === 'undefined') return null;
+
+	try {
+		const legacyTheme = localStorage.getItem(LEGACY_THEME_KEY);
+		if (legacyTheme === 'light' || legacyTheme === 'dark' || legacyTheme === 'system') {
+			localStorage.removeItem(LEGACY_THEME_KEY);
+			return legacyTheme;
+		}
+	} catch {
+		// Ignore localStorage errors
+	}
+	return null;
+}
+
 function loadPreferences(): UserPreferences {
 	if (typeof window === 'undefined') {
 		return DEFAULT_PREFERENCES;
@@ -186,9 +205,35 @@ function loadPreferences(): UserPreferences {
 
 	try {
 		const stored = localStorage.getItem(STORAGE_KEY);
-		return stored ? mergePreferences(JSON.parse(stored)) : DEFAULT_PREFERENCES;
+		const prefs = stored ? mergePreferences(JSON.parse(stored)) : DEFAULT_PREFERENCES;
+
+		// Migrate legacy theme from old themeStore
+		const legacyTheme = migrateLegacyTheme();
+		if (legacyTheme !== null) {
+			prefs.appearance.theme = legacyTheme;
+		}
+
+		return prefs;
 	} catch {
 		return DEFAULT_PREFERENCES;
+	}
+}
+
+function getSystemPrefersDark(): boolean {
+	if (typeof window === 'undefined') return false;
+	return window.matchMedia('(prefers-color-scheme: dark)').matches;
+}
+
+function applyThemeToDOM(theme: Theme): void {
+	if (typeof document === 'undefined') return;
+
+	const root = document.documentElement;
+	const isDark = theme === 'dark' || (theme === 'system' && getSystemPrefersDark());
+
+	if (isDark) {
+		root.classList.add('dark');
+	} else {
+		root.classList.remove('dark');
 	}
 }
 
@@ -205,6 +250,8 @@ function applyAppearance(preferences: UserPreferences): void {
 	root.style.setProperty('--accent-light', accent.light);
 	root.style.setProperty('--accent-muted', accent.muted);
 	root.dataset.mailDensity = preferences.appearance.mailDensity;
+
+	applyThemeToDOM(preferences.appearance.theme);
 }
 
 function createPreferencesStore() {
@@ -212,10 +259,26 @@ function createPreferencesStore() {
 	const store = writable<UserPreferences>(initial);
 
 	if (typeof window !== 'undefined') {
+		// Prevent transition flash on initial load
+		document.documentElement.classList.add('no-transition');
 		applyAppearance(initial);
+
+		// Remove no-transition class after a tick
+		setTimeout(() => {
+			document.documentElement.classList.remove('no-transition');
+		}, 0);
+
 		store.subscribe((value) => {
 			localStorage.setItem(STORAGE_KEY, JSON.stringify(value));
 			applyAppearance(value);
+		});
+
+		// Listen for system theme changes
+		window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+			const current = get(store);
+			if (current.appearance.theme === 'system') {
+				applyThemeToDOM('system');
+			}
 		});
 	}
 

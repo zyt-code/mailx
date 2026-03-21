@@ -1,10 +1,8 @@
 <script lang="ts">
 	import { Palette, Sun, Moon, Monitor, Check } from 'lucide-svelte';
 	import { _ } from 'svelte-i18n';
-	import { themeStore, type Theme } from '$lib/stores/themeStore.js';
-	import { preferences, ACCENT_PRESETS, type AccentTone, type MailDensity, type AppearancePreferences } from '$lib/stores/preferencesStore.js';
+	import { preferences, ACCENT_PRESETS, type AccentTone, type MailDensity, type AppearancePreferences, type Theme } from '$lib/stores/preferencesStore.js';
 
-	import { getIsTransitioning } from '$lib/stores/themeStore.js';
 
 	const themeKeys: Record<Theme, { labelKey: string; descKey: string; icon: typeof Sun }> = {
 		light: { labelKey: 'theme.light', descKey: 'theme.lightDescription', icon: Sun },
@@ -14,7 +12,6 @@
 
 	const themes: Theme[] = ['light', 'dark', 'system'];
 
-	let isTransitioning = $derived(getIsTransitioning());
 
 	const accentKeys: Record<AccentTone, { nameKey: string; descKey: string }> = {
 		blue: { nameKey: 'appearance.accentBlue', descKey: 'appearance.accentBlueDesc' },
@@ -36,7 +33,7 @@
 
 	const densityOptions: MailDensity[] = ['compact', 'comfortable', 'airy'];
 
-	let activeTheme = $derived(themeStore.current);
+	let activeTheme = $derived($preferences.appearance.theme);
 	let appearance = $derived($preferences.appearance);
 
 	function updateAppearance(patch: Partial<AppearancePreferences>) {
@@ -72,9 +69,7 @@
 				<button
 					class="theme-option"
 					class:active={activeTheme === themeId}
-					class:transitioning={isTransitioning && activeTheme === themeId}
-					onclick={() => themeStore.set(themeId)}
-					disabled={isTransitioning}
+					onclick={() => updateAppearance({ theme: themeId })}
 					aria-label={$_('appearance.switchTo', { values: { name: $_( meta.labelKey) } })}
 					aria-pressed={activeTheme === themeId}
 				>
@@ -394,43 +389,7 @@
 		height: 0.9rem;
 	}
 
-	/* Transitioning state */
-	.theme-option.transitioning {
-		opacity: 0.9;
-		cursor: wait;
-	}
-
-	.theme-option.transitioning .theme-preview {
-		position: relative;
-		overflow: hidden;
-		animation: pulse-subtle 1.5s ease-in-out infinite;
-	}
-
-	.theme-option.transitioning .theme-preview::before {
-		content: '';
-		position: absolute;
-		top: 0;
-		left: 0;
-		right: 0;
-		bottom: 0;
-		background: linear-gradient(90deg,
-			transparent 0%,
-			color-mix(in srgb, var(--accent-primary) 15%, transparent) 50%,
-			transparent 100%
-		);
-		z-index: 1;
-		animation: transition-shimmer 1.5s ease-in-out infinite;
-	}
-
-	@keyframes pulse-subtle {
-		0%, 100% { opacity: 1; }
-		50% { opacity: 0.7; }
-	}
-
-	@keyframes transition-shimmer {
-		0% { transform: translateX(-100%); }
-		100% { transform: translateX(100%); }
-	}
+	
 
 	/* Active theme enhancement */
 	.theme-option.active {
