@@ -5,6 +5,7 @@
 	import AccountItem from './AccountItem.svelte';
 	import SyncStatus from './SyncStatus.svelte';
 	import { onMount, onDestroy } from 'svelte';
+	import { _ } from 'svelte-i18n';
 
 	interface Props {
 		onNavigate?: (route: string) => void;
@@ -118,9 +119,9 @@
 <div class="p-6">
 	<div class="flex items-center justify-between mb-6">
 		<div>
-			<h1 class="text-2xl font-semibold text-gray-900">Accounts</h1>
+			<h1 class="text-2xl font-semibold text-gray-900">{$_('settings.accounts')}</h1>
 			<p class="text-sm text-gray-500 mt-1">
-				Manage your email accounts and sync settings
+				{$_('account.manageSubtitle')}
 			</p>
 		</div>
 		<div class="flex gap-2">
@@ -129,14 +130,14 @@
 					onclick={handleSyncAll}
 					class="px-4 py-2 text-blue-600 border border-blue-600 rounded hover:bg-blue-50"
 				>
-					Sync All
+					{$_('account.syncAll')}
 				</button>
 			{/if}
 			<button
 				onclick={handleAddAccount}
 				class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
 			>
-				Add Account
+				{$_('account.add')}
 			</button>
 		</div>
 	</div>
@@ -161,15 +162,15 @@
 							/>
 						</svg>
 					</div>
-					<h3 class="text-lg font-medium text-gray-900 mb-2">No accounts yet</h3>
+					<h3 class="text-lg font-medium text-gray-900 mb-2">{$_('account.noAccountsYet')}</h3>
 					<p class="text-gray-500 mb-4">
-						Add your first email account to start sending and receiving emails.
+						{$_('account.noAccountsDescription')}
 					</p>
 					<button
 						onclick={handleAddAccount}
 						class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
 					>
-						Add Account
+						{$_('account.add')}
 					</button>
 				</div>
 			{:else}

@@ -2,6 +2,7 @@
 	import type { Account, SyncState } from '$lib/types';
 	import * as accounts from '$lib/accounts/index.js';
 	import { onMount } from 'svelte';
+	import { _ } from 'svelte-i18n';
 
 	interface Props {
 		account: Account;
@@ -54,14 +55,14 @@
 	}
 
 	function formatTimeAgo(timestamp: number | undefined): string {
-		if (!timestamp) return 'Never';
+		if (!timestamp) return $_('common.never');
 
-		const seconds = Math.floor((Date.now() - timestamp) / 1000);
+		const diff = Date.now() - timestamp;
 
-		if (seconds < 60) return 'Just now';
-		if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-		if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-		return `${Math.floor(seconds / 86400)}d ago`;
+		if (diff < 60000) return $_('account.justNow');
+		if (diff < 3600000) return $_('account.minutesAgo', { values: { n: Math.floor(diff / 60000) } });
+		if (diff < 86400000) return $_('account.hoursAgo', { values: { n: Math.floor(diff / 3600000) } });
+		return $_('account.daysAgo', { values: { n: Math.floor(diff / 86400000) } });
 	}
 
 	function getStatusColor(): string {
@@ -71,8 +72,8 @@
 	}
 
 	function getStatusText(): string {
-		if (syncing) return 'Syncing...';
-		if (syncStatus === 'failed') return 'Failed';
+		if (syncing) return $_('account.syncing');
+		if (syncStatus === 'failed') return $_('account.failed');
 		return formatTimeAgo(lastSync);
 	}
 </script>
@@ -113,7 +114,7 @@
 				onclick={handleSync}
 				disabled={syncing}
 				class="p-2 hover:bg-gray-200 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-				title="Sync now"
+				title={$_('account.syncAccount')}
 			>
 				<svg
 					class="w-4 h-4 {syncing ? 'animate-spin' : ''}"
@@ -133,7 +134,7 @@
 			<button
 				onclick={() => onEdit?.(account)}
 				class="p-2 hover:bg-gray-200 rounded"
-				title="Edit account"
+				title={$_('account.editAccount')}
 			>
 				<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 					<path
@@ -148,7 +149,7 @@
 			<button
 				onclick={handleDelete}
 				class="p-2 hover:bg-red-100 text-red-600 rounded"
-				title="Delete account"
+				title={$_('account.deleteAccount')}
 			>
 				<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 					<path
@@ -165,21 +166,20 @@
 	{#if showDeleteConfirm}
 		<div class="mt-4 p-3 bg-red-50 border border-red-200 rounded">
 			<p class="text-sm text-red-800 mb-2">
-				Are you sure you want to delete this account? This will remove all locally stored emails
-				for this account.
+				{$_('account.deleteConfirm')}
 			</p>
 			<div class="flex gap-2">
 				<button
 					onclick={confirmDelete}
 					class="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700"
 				>
-					Delete
+					{$_('common.delete')}
 				</button>
 				<button
 					onclick={() => (showDeleteConfirm = false)}
 					class="px-3 py-1 bg-white border border-gray-300 text-sm rounded hover:bg-gray-50"
 				>
-					Cancel
+					{$_('common.cancel')}
 				</button>
 			</div>
 		</div>

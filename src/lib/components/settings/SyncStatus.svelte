@@ -2,6 +2,7 @@
 	import * as accounts from '$lib/accounts/index.js';
 	import type { SyncStatus } from '$lib/types';
 	import { onMount, onDestroy } from 'svelte';
+	import { _ } from 'svelte-i18n';
 
 	let syncStatuses = $state<SyncStatus[]>([]);
 	let refreshing = $state(false);
@@ -46,14 +47,14 @@
 	}
 
 	function formatTimeAgo(timestamp: number | undefined): string {
-		if (!timestamp) return 'Never';
+		if (!timestamp) return $_('common.never');
 
 		const seconds = Math.floor((Date.now() - timestamp) / 1000);
 
-		if (seconds < 60) return 'Just now';
-		if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-		if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-		return `${Math.floor(seconds / 86400)}d ago`;
+		if (seconds < 60) return $_('account.justNow');
+		if (seconds < 3600) return $_('account.minutesAgo', { values: { n: Math.floor(seconds / 60) } });
+		if (seconds < 86400) return $_('account.hoursAgo', { values: { n: Math.floor(seconds / 3600) } });
+		return $_('account.daysAgo', { values: { n: Math.floor(seconds / 86400) } });
 	}
 
 	function getStatusIcon(status: string) {
@@ -77,18 +78,18 @@
 
 <div class="mt-6 p-4 bg-white rounded-lg border">
 	<div class="flex items-center justify-between mb-3">
-		<h3 class="text-sm font-medium text-gray-700">Sync Status</h3>
+		<h3 class="text-sm font-medium text-gray-700">{$_('account.syncStatus')}</h3>
 		<button
 			onclick={handleRefresh}
 			disabled={refreshing}
 			class="text-sm text-blue-600 hover:text-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
 		>
-			{refreshing ? 'Refreshing...' : 'Refresh'}
+			{refreshing ? $_('account.refreshing') : $_('account.refresh')}
 		</button>
 	</div>
 
 	{#if syncStatuses.length === 0}
-		<p class="text-sm text-gray-500">No accounts configured</p>
+		<p class="text-sm text-gray-500">{$_('account.noAccounts')}</p>
 	{:else}
 		<div class="space-y-2">
 			{#each syncStatuses as status (status.account_id)}
@@ -99,11 +100,11 @@
 					</div>
 					<div class="text-gray-500">
 						{#if status.status === 'syncing'}
-							Syncing...
+							{$_('account.syncing')}
 						{:else if status.error_message}
 							<span class="text-red-600">{status.error_message}</span>
 						{:else}
-							Last sync: {formatTimeAgo(status.last_sync)}
+							{$_('account.lastSync')} {formatTimeAgo(status.last_sync)}
 						{/if}
 					</div>
 				</div>

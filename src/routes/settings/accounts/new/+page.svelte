@@ -5,6 +5,7 @@
 	import { ArrowLeft, Check, Loader2, Mail, Lock, Server, Eye, EyeOff, ShieldCheck } from 'lucide-svelte';
 	import * as accounts from '$lib/accounts/index.js';
 	import { syncAccount } from '$lib/sync/index.js';
+	import { _ } from 'svelte-i18n';
 
 	let email = $state('');
 	let password = $state('');
@@ -39,12 +40,12 @@
 
 	async function testConnection() {
 		if (!email || !password) {
-			error = 'Please enter email and password first';
+			error = $_('accountForm.enterEmailFirst');
 			return;
 		}
 
 		if (!imapServer || !smtpServer) {
-			error = 'Please enter or auto-detect server settings first';
+			error = $_('accountForm.enterServerFirst');
 			return;
 		}
 
@@ -65,7 +66,7 @@
 			});
 			testResult = result as string;
 		} catch (e) {
-			error = e instanceof Error ? e.message : 'Connection test failed';
+			error = e instanceof Error ? e.message : $_('account.connectionFailed');
 		} finally {
 			isTesting = false;
 		}
@@ -77,13 +78,13 @@
 
 	async function handleSubmit() {
 		if (!email || !password) {
-			error = 'Please fill in all required fields';
+			error = $_('accountForm.fillRequired');
 			return;
 		}
 
 		// Validate email format
 		if (!accounts.validateEmail(email)) {
-			error = 'Please enter a valid email address';
+			error = $_('accountForm.invalidEmail');
 			return;
 		}
 
@@ -113,7 +114,7 @@
 
 			goto('/');
 		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to add account';
+			error = e instanceof Error ? e.message : $_('account.failedToAdd');
 		} finally {
 			isSubmitting = false;
 		}
@@ -128,11 +129,11 @@
 			class="back-button"
 		>
 			<ArrowLeft class="size-4" />
-			<span>Back to Accounts</span>
+			<span>{$_('account.backToAccounts')}</span>
 		</button>
 		<div>
-			<h2 class="page-title">Add Account</h2>
-			<p class="page-subtitle">Connect your email to get started</p>
+			<h2 class="page-title">{$_('account.add')}</h2>
+			<p class="page-subtitle">{$_('accountForm.connectEmail')}</p>
 		</div>
 	</div>
 
@@ -153,8 +154,8 @@
 						<Mail class="size-5" />
 					</div>
 					<div>
-						<h3 class="section-title">Email Account</h3>
-						<p class="section-subtitle">Enter your email credentials</p>
+						<h3 class="section-title">{$_('accountForm.emailAccountSection')}</h3>
+						<p class="section-subtitle">{$_('accountForm.enterCredentials')}</p>
 					</div>
 				</div>
 
@@ -162,7 +163,7 @@
 					<!-- Email -->
 					<div class="field-group">
 						<label for="email" class="field-label">
-							Email Address
+							{$_('accountForm.emailAddress')}
 							<span class="required">*</span>
 						</label>
 						<div class="input-wrapper">
@@ -171,7 +172,7 @@
 								type="email"
 								bind:value={email}
 								onblur={handleEmailChange}
-								placeholder="you@example.com"
+								placeholder={$_('accountForm.emailPlaceholder')}
 								required
 								class="field-input"
 							/>
@@ -181,7 +182,7 @@
 					<!-- Password -->
 					<div class="field-group">
 						<label for="password" class="field-label">
-							Password / App Password
+							{$_('accountForm.passwordAppPassword')}
 							<span class="required">*</span>
 						</label>
 						<div class="input-wrapper input-with-action">
@@ -191,7 +192,7 @@
 								type={showPassword ? 'text' : 'password'}
 								value={password}
 								oninput={handlePasswordInput}
-								placeholder="Enter your password or app password"
+								placeholder={$_('accountForm.passwordPlaceholder')}
 								required
 								autocomplete="off"
 								class="field-input field-input-padded"
@@ -200,7 +201,7 @@
 								type="button"
 								onclick={() => showPassword = !showPassword}
 								class="toggle-password-button"
-								title={showPassword ? 'Hide password' : 'Show password'}
+								title={showPassword ? $_('accountForm.hidePassword') : $_('accountForm.showPassword')}
 							>
 								{#if showPassword}
 									<EyeOff class="size-4" strokeWidth={1.5} />
@@ -210,8 +211,7 @@
 							</button>
 						</div>
 						<p class="field-hint">
-							For Gmail, use an <a href="https://support.google.com/accounts/answer/185833" target="_blank" class="text-violet-600 hover:underline">App Password</a>.
-							For QQ/163/126, use the 16-character Authorization Code.
+							{$_('accountForm.passwordHint')}
 						</p>
 					</div>
 				</div>
@@ -219,7 +219,7 @@
 
 			<div class="form-divider">
 				<div class="divider-line"></div>
-				<span class="divider-text">Advanced</span>
+				<span class="divider-text">{$_('accountForm.advanced')}</span>
 				<div class="divider-line"></div>
 			</div>
 
@@ -229,40 +229,40 @@
 						<Server class="size-5" />
 					</div>
 					<div>
-						<h3 class="section-title">Server Settings</h3>
-						<p class="section-subtitle">Auto-configured for popular providers</p>
+						<h3 class="section-title">{$_('accountForm.serverSettings')}</h3>
+						<p class="section-subtitle">{$_('accountForm.autoConfigured')}</p>
 					</div>
 				</div>
 
 				<div class="form-fields">
 					<!-- IMAP Server -->
 					<div class="field-group">
-						<label for="imap" class="field-label">IMAP Server</label>
+						<label for="imap" class="field-label">{$_('accountForm.imapServer')}</label>
 						<div class="input-wrapper">
 							<input
 								id="imap"
 								type="text"
 								bind:value={imapServer}
-								placeholder="Auto-detected from email"
+								placeholder={$_('accountForm.autoDetected')}
 								class="field-input"
 							/>
 						</div>
-						<p class="field-hint">Leave empty to auto-detect (supports Gmail, Outlook, QQ, 163, 126, etc.)</p>
+						<p class="field-hint">{$_('accountForm.autoDetectHint')}</p>
 					</div>
 
 					<!-- SMTP Server -->
 					<div class="field-group">
-						<label for="smtp" class="field-label">SMTP Server</label>
+						<label for="smtp" class="field-label">{$_('accountForm.smtpServer')}</label>
 						<div class="input-wrapper">
 							<input
 								id="smtp"
 								type="text"
 								bind:value={smtpServer}
-								placeholder="Auto-detected from email"
+								placeholder={$_('accountForm.autoDetected')}
 								class="field-input"
 							/>
 						</div>
-						<p class="field-hint">Leave empty to auto-detect (supports Gmail, Outlook, QQ, 163, 126, etc.)</p>
+						<p class="field-hint">{$_('accountForm.autoDetectHint')}</p>
 					</div>
 
 					<!-- Test Connection -->
@@ -278,7 +278,7 @@
 							{:else}
 								<ShieldCheck class="size-4" />
 							{/if}
-							<span>{isTesting ? 'Testing...' : 'Test Connection'}</span>
+							<span>{isTesting ? $_('account.testing') : $_('account.testConnection')}</span>
 						</button>
 						{#if testResult}
 							<p class="test-success">{testResult}</p>
@@ -299,7 +299,7 @@
 					{:else}
 						<Check class="size-5" />
 					{/if}
-					<span>{isSubmitting ? 'Adding Account...' : 'Add Account'}</span>
+					<span>{isSubmitting ? $_('account.addingAccount') : $_('account.add')}</span>
 				</button>
 				<button
 					type="button"
@@ -307,14 +307,14 @@
 					disabled={isSubmitting}
 					class="cancel-button"
 				>
-					Cancel
+					{$_('common.cancel')}
 				</button>
 			</div>
 		</form>
 	</div>
 
 	<!-- Security Note -->
-	<p class="security-hint">Your credentials are encrypted and stored locally on your device</p>
+	<p class="security-hint">{$_('accountForm.credentialsEncrypted')}</p>
 </div>
 
 <style>

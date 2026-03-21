@@ -1,4 +1,5 @@
-import { init, register, locale, waitLocale } from 'svelte-i18n';
+import { init, register, locale, waitLocale, addMessages } from 'svelte-i18n';
+import enMessages from '../i18n/locales/en';
 
 export const SUPPORTED_LOCALES = [
   { code: 'en', name: 'English', nativeName: 'English' },
@@ -36,13 +37,28 @@ function detectSystemLocale(): SupportedLocale {
   return prefixMatch?.code ?? 'en';
 }
 
-function registerLocale(code: SupportedLocale) {
-  register(code, () => import(`../i18n/locales/${code}.ts`));
+// CRITICAL: Add the fallback locale dictionary synchronously BEFORE init().
+// svelte-i18n's $locale.set() is async when register() creates a loader queue.
+// By using addMessages() the 'en' dictionary is available immediately, so
+// init({ initialLocale: 'en' }) sets $locale synchronously (no flush needed).
+// Other locales are lazy-loaded via register().
+addMessages('en', enMessages);
+
+for (const { code } of SUPPORTED_LOCALES) {
+  if (code !== 'en') {
+    register(code, () => import(`../i18n/locales/${code}.ts`));
+  }
 }
 
+init({
+  fallbackLocale: 'en',
+  initialLocale: 'en'
+});
+
+// Async phase: load user preferences and switch to the preferred locale.
 async function initializeI18n(initialPreferences?: LocalePreferences): Promise<void> {
   let prefs: LocalePreferences;
-  
+
   if (initialPreferences) {
     prefs = initialPreferences;
   } else {
@@ -60,21 +76,12 @@ async function initializeI18n(initialPreferences?: LocalePreferences): Promise<v
       prefs = { locale: 'en', autoDetect: true };
     }
   }
-  
+
   const targetLocale = prefs.autoDetect ? detectSystemLocale() : prefs.locale;
-
-  for (const { code } of SUPPORTED_LOCALES) {
-    registerLocale(code);
-  }
-
-  init({
-    fallbackLocale: 'en',
-    initialLocale: targetLocale
-  });
 
   locale.set(targetLocale);
   currentLocale = targetLocale;
-  
+
   await waitLocale();
 
   if (typeof document !== 'undefined') {

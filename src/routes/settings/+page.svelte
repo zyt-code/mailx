@@ -39,7 +39,7 @@
 			// Load sync status for each account
 			await loadSyncStatus();
 		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to load accounts';
+			error = e instanceof Error ? e.message : $_('account.failedToLoadAccounts');
 		} finally {
 			isLoading = false;
 		}
@@ -120,7 +120,7 @@
 			await db.clearDatabase();
 			alert($_('account.clearDbSuccess'));
 		} catch (e) {
-			alert('Failed to clear database: ' + (e instanceof Error ? e.message : String(e)));
+			alert($_('account.failedToClearDb') + ': ' + (e instanceof Error ? e.message : String(e)));
 		} finally {
 			isClearing = false;
 		}
@@ -133,7 +133,7 @@
 			await syncAccount(accountId);
 		} catch (e) {
 			console.error('Sync failed:', e);
-			alert('Sync failed: ' + (e instanceof Error ? e.message : String(e)));
+			alert($_('account.failedToSync') + ': ' + (e instanceof Error ? e.message : String(e)));
 		} finally {
 			syncingAccountId = null;
 		}

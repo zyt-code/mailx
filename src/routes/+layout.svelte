@@ -1,5 +1,6 @@
 <script lang="ts">
 	import '../app.css';
+	import { ensureInitialized } from '$lib/stores/i18nStore.svelte.js';
 	import { page } from '$app/stores';
 	import { AppShell } from '$lib/components/layout/index.js';
 	import { invoke } from '@tauri-apps/api/core';

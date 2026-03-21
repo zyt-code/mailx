@@ -2,6 +2,7 @@
 	import type { Account, AccountFormData } from '$lib/types';
 	import * as accounts from '$lib/accounts/index.js';
 	import { cn } from '$lib/utils.js';
+	import { _ } from 'svelte-i18n';
 
 	interface Props {
 		account?: Account;
@@ -104,7 +105,7 @@
 				testResult = {
 					imap: false,
 					smtp: false,
-					error: 'Please save the account first, then test connection.',
+					error: $_('accountForm.saveFirst'),
 				};
 				testing = false;
 				return;
@@ -115,7 +116,7 @@
 			testResult = {
 				imap: false,
 				smtp: false,
-				error: error instanceof Error ? error.message : 'Connection failed',
+				error: error instanceof Error ? error.message : $_('account.connectionFailed'),
 			};
 		} finally {
 			testing = false;
@@ -142,7 +143,7 @@
 			}
 			onSave();
 		} catch (error) {
-			errors.general = error instanceof Error ? error.message : 'Failed to save account';
+			errors.general = error instanceof Error ? error.message : $_('account.failedToAdd');
 		} finally {
 			saving = false;
 		}
@@ -152,23 +153,23 @@
 		const newErrors: Record<string, string> = {};
 
 		if (!accounts.validateEmail(formData.email)) {
-			newErrors.email = 'Invalid email format';
+			newErrors.email = $_('accountForm.invalidEmailFormat');
 		}
 
 		if (!formData.name.trim()) {
-			newErrors.name = 'Name is required';
+			newErrors.name = $_('accountForm.nameRequired');
 		}
 
 		if (!account && !formData.password) {
-			newErrors.password = 'Password is required for new accounts';
+			newErrors.password = $_('accountForm.passwordRequired');
 		}
 
 		if (!accounts.validateServerSettings(formData.imap_server, formData.imap_port)) {
-			newErrors.imap_server = 'Invalid IMAP server settings';
+			newErrors.imap_server = $_('accountForm.invalidImapSettings');
 		}
 
 		if (!accounts.validateServerSettings(formData.smtp_server, formData.smtp_port)) {
-			newErrors.smtp_server = 'Invalid SMTP server settings';
+			newErrors.smtp_server = $_('accountForm.invalidSmtpSettings');
 		}
 
 		return newErrors;
@@ -184,7 +185,7 @@
 
 <div class="p-6 bg-white rounded-lg border">
 	<h2 class="text-xl font-semibold mb-4">
-		{account ? 'Edit Account' : 'Add Account'}
+		{account ? $_('account.edit') : $_('account.add')}
 	</h2>
 
 	{#if errors.general}
@@ -201,21 +202,21 @@
 
 	{#if testResult && !testResult.error}
 		<div class="mb-4 p-3 bg-green-50 border border-green-200 rounded text-green-800 text-sm">
-			Connection successful! Both IMAP and SMTP are working.
+			{$_('account.connectionSuccess')}
 		</div>
 	{/if}
 
 	<form onsubmit={(e) => e.preventDefault()} class="space-y-4">
 		<!-- Basic Info -->
 		<div class="space-y-2">
-			<label for="account-email" class="block text-sm font-medium text-gray-700">Email</label>
+			<label for="account-email" class="block text-sm font-medium text-gray-700">{$_('form.email')}</label>
 			<input
 				id="account-email"
 				type="email"
 				bind:value={formData.email}
 				onblur={handleEmailChange}
 				class={getFieldClass('email')}
-				placeholder="you@example.com"
+				placeholder={$_('accountForm.emailPlaceholder')}
 				onpaste={handlePaste}
 				onkeydown={handleKeyDown}
 			/>
@@ -225,13 +226,13 @@
 		</div>
 
 		<div class="space-y-2">
-			<label for="account-name" class="block text-sm font-medium text-gray-700">Name</label>
+			<label for="account-name" class="block text-sm font-medium text-gray-700">{$_('form.name')}</label>
 			<input
 				id="account-name"
 				type="text"
 				bind:value={formData.name}
 				class={getFieldClass('name')}
-				placeholder="Your Name"
+				placeholder={$_('accountForm.displayNamePlaceholder')}
 				onpaste={handlePaste}
 				onkeydown={handleKeyDown}
 			/>
@@ -242,7 +243,7 @@
 
 		{#if !account}
 			<div class="space-y-2" data-allow-context-menu>
-				<label for="account-password" class="block text-sm font-medium text-gray-700">Password</label>
+				<label for="account-password" class="block text-sm font-medium text-gray-700">{$_('form.password')}</label>
 				<input
 					id="account-password"
 					type="password"
@@ -260,22 +261,22 @@
 
 		<!-- IMAP Settings -->
 		<div class="border-t pt-4">
-			<h3 class="text-sm font-medium text-gray-700 mb-2">IMAP Settings</h3>
+			<h3 class="text-sm font-medium text-gray-700 mb-2">{$_('accountForm.imapSettings')}</h3>
 			<div class="grid grid-cols-2 gap-4">
 				<div class="space-y-2">
-					<label for="imap-server" class="block text-sm font-medium text-gray-700">Server</label>
+					<label for="imap-server" class="block text-sm font-medium text-gray-700">{$_('form.server')}</label>
 					<input
 						id="imap-server"
 						type="text"
 						bind:value={formData.imap_server}
 						class={getFieldClass('imap_server')}
-						placeholder="imap.example.com"
+						placeholder={$_('accountForm.imapPlaceholder')}
 						onpaste={handlePaste}
 						onkeydown={handleKeyDown}
 					/>
 				</div>
 				<div class="space-y-2">
-					<label for="imap-port" class="block text-sm font-medium text-gray-700">Port</label>
+					<label for="imap-port" class="block text-sm font-medium text-gray-700">{$_('form.port')}</label>
 					<input
 						id="imap-port"
 						type="number"
@@ -291,7 +292,7 @@
 			<div class="mt-2">
 				<label class="flex items-center gap-2">
 					<input type="checkbox" bind:checked={formData.imap_use_ssl} class="rounded" />
-					<span class="text-sm text-gray-700">Use SSL/TLS</span>
+					<span class="text-sm text-gray-700">{$_('accountForm.useSslTls')}</span>
 				</label>
 			</div>
 			{#if errors.imap_server}
@@ -301,22 +302,22 @@
 
 		<!-- SMTP Settings -->
 		<div class="border-t pt-4">
-			<h3 class="text-sm font-medium text-gray-700 mb-2">SMTP Settings</h3>
+			<h3 class="text-sm font-medium text-gray-700 mb-2">{$_('accountForm.smtpSettings')}</h3>
 			<div class="grid grid-cols-2 gap-4">
 				<div class="space-y-2">
-					<label for="smtp-server" class="block text-sm font-medium text-gray-700">Server</label>
+					<label for="smtp-server" class="block text-sm font-medium text-gray-700">{$_('form.server')}</label>
 					<input
 						id="smtp-server"
 						type="text"
 						bind:value={formData.smtp_server}
 						class={getFieldClass('smtp_server')}
-						placeholder="smtp.example.com"
+						placeholder={$_('accountForm.smtpPlaceholder')}
 						onpaste={handlePaste}
 						onkeydown={handleKeyDown}
 					/>
 				</div>
 				<div class="space-y-2">
-					<label for="smtp-port" class="block text-sm font-medium text-gray-700">Port</label>
+					<label for="smtp-port" class="block text-sm font-medium text-gray-700">{$_('form.port')}</label>
 					<input
 						id="smtp-port"
 						type="number"
@@ -332,7 +333,7 @@
 			<div class="mt-2">
 				<label class="flex items-center gap-2">
 					<input type="checkbox" bind:checked={formData.smtp_use_ssl} class="rounded" />
-					<span class="text-sm text-gray-700">Use SSL/TLS</span>
+					<span class="text-sm text-gray-700">{$_('accountForm.useSslTls')}</span>
 				</label>
 			</div>
 			{#if errors.smtp_server}
@@ -349,7 +350,7 @@
 					disabled={testing || saving}
 					class="px-4 py-2 text-blue-600 border border-blue-600 rounded hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
 				>
-					{testing ? 'Testing...' : 'Test Connection'}
+					{testing ? $_('account.testing') : $_('account.testConnection')}
 				</button>
 			</div>
 			<div class="flex gap-2">
@@ -359,7 +360,7 @@
 					disabled={saving}
 					class="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
 				>
-					Cancel
+					{$_('common.cancel')}
 				</button>
 				<button
 					type="button"
@@ -367,7 +368,7 @@
 					disabled={saving}
 					class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
 				>
-					{saving ? 'Saving...' : 'Save'}
+					{saving ? $_('account.saving') : $_('common.save')}
 				</button>
 			</div>
 		</div>

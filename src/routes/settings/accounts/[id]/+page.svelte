@@ -6,6 +6,7 @@
 	import * as accounts from '$lib/accounts/index.js';
 	import { syncAccount } from '$lib/sync/index.js';
 	import type { Account } from '$lib/types.js';
+	import { _ } from 'svelte-i18n';
 
 	let account = $state<Account | null>(null);
 	let isLoading = $state(true);
@@ -54,7 +55,7 @@
 			smtpPort = account.smtp_port || 587;
 			smtpUseSsl = account.smtp_use_ssl !== false;
 		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to load account';
+			error = e instanceof Error ? e.message : $_('account.failedToLoad');
 			console.error('Failed to load account:', e);
 		} finally {
 			isLoading = false;
@@ -69,7 +70,7 @@
 		if (!account) return;
 
 		if (!email || !name) {
-			error = 'Email and name are required';
+			error = $_('accountForm.emailAndNameRequired');
 			return;
 		}
 
@@ -91,7 +92,7 @@
 			// Reload account data
 			await loadAccount();
 		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to update account';
+			error = e instanceof Error ? e.message : $_('account.failedToUpdate');
 		} finally {
 			isSubmitting = false;
 		}
@@ -107,7 +108,7 @@
 			await accounts.deleteAccount(account.id);
 			goto('/settings');
 		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to delete account';
+			error = e instanceof Error ? e.message : $_('account.failedToDelete');
 			isDeleting = false;
 			showDeleteConfirm = false;
 		}
@@ -124,9 +125,9 @@
 			const result = await invoke('test_account_connection', {
 				id: account.id
 			});
-			testResult = 'Connection successful! Both IMAP and SMTP are working.';
+			testResult = $_('account.connectionSuccess');
 		} catch (e) {
-			error = e instanceof Error ? e.message : 'Connection test failed';
+			error = e instanceof Error ? e.message : $_('account.connectionFailed');
 		} finally {
 			isTesting = false;
 		}
@@ -140,9 +141,9 @@
 
 		try {
 			await syncAccount(account.id);
-			testResult = 'Sync completed successfully.';
+			testResult = $_('account.syncSuccess');
 		} catch (e) {
-			error = e instanceof Error ? e.message : 'Sync failed';
+			error = e instanceof Error ? e.message : $_('account.failedToSync');
 		} finally {
 			isSyncing = false;
 		}
@@ -153,7 +154,7 @@
 	<div class="add-account-page">
 		<div class="loading-state">
 			<Loader2 class="size-8 animate-spin text-violet-500" />
-			<p class="loading-text">Loading account...</p>
+			<p class="loading-text">{$_('account.loadingAccount')}</p>
 		</div>
 	</div>
 {:else if account}
@@ -165,7 +166,7 @@
 				class="back-button"
 			>
 				<ArrowLeft class="size-4" />
-				<span>Back to Accounts</span>
+				<span>{$_('account.backToAccounts')}</span>
 			</button>
 			<div class="header-actions">
 				<button
@@ -173,11 +174,11 @@
 					class="delete-button"
 				>
 					<Trash2 class="size-4" />
-					<span>Delete Account</span>
+					<span>{$_('account.delete')}</span>
 				</button>
 			</div>
 			<div>
-				<h2 class="page-title">Edit Account</h2>
+				<h2 class="page-title">{$_('account.edit')}</h2>
 				<p class="page-subtitle">{account.email}</p>
 			</div>
 		</div>
@@ -194,17 +195,16 @@
 		{#if showDeleteConfirm}
 			<div class="delete-confirm">
 				<div class="delete-confirm-content">
-					<h3 class="delete-confirm-title">Delete Account?</h3>
+					<h3 class="delete-confirm-title">{$_('accountForm.deleteTitle')}</h3>
 					<p class="delete-confirm-text">
-						This will remove {account.email} from Mailx. All locally cached emails will be deleted.
-						This action cannot be undone.
+						{$_('accountForm.deleteConfirmDetail', { values: { email: account.email } })}
 					</p>
 					<div class="delete-confirm-actions">
 						<button
 							onclick={() => showDeleteConfirm = false}
 							class="cancel-delete-button"
 						>
-							Cancel
+							{$_('common.cancel')}
 						</button>
 						<button
 							onclick={handleDelete}
@@ -214,7 +214,7 @@
 							{#if isDeleting}
 								<Loader2 class="size-4 animate-spin" />
 							{/if}
-							{isDeleting ? 'Deleting...' : 'Delete Account'}
+							{isDeleting ? $_('account.deleting') : $_('account.delete')}
 						</button>
 					</div>
 				</div>
@@ -230,8 +230,8 @@
 							<Mail class="size-5" />
 						</div>
 						<div>
-							<h3 class="section-title">Email Account</h3>
-							<p class="section-subtitle">Update your account information</p>
+							<h3 class="section-title">{$_('accountForm.emailAccountSection')}</h3>
+							<p class="section-subtitle">{$_('accountForm.updateInfo')}</p>
 						</div>
 					</div>
 
@@ -239,7 +239,7 @@
 						<!-- Email -->
 						<div class="field-group">
 							<label for="email" class="field-label">
-								Email Address
+								{$_('accountForm.emailAddress')}
 								<span class="required">*</span>
 							</label>
 							<div class="input-wrapper">
@@ -247,7 +247,7 @@
 									id="email"
 									type="email"
 									bind:value={email}
-									placeholder="you@example.com"
+									placeholder={$_('accountForm.emailPlaceholder')}
 									required
 									class="field-input"
 								/>
@@ -257,7 +257,7 @@
 						<!-- Name -->
 						<div class="field-group">
 							<label for="name" class="field-label">
-								Display Name
+								{$_('accountForm.displayName')}
 								<span class="required">*</span>
 							</label>
 							<div class="input-wrapper">
@@ -265,7 +265,7 @@
 									id="name"
 									type="text"
 									bind:value={name}
-									placeholder="Your Name"
+									placeholder={$_('accountForm.displayNamePlaceholder')}
 									required
 									class="field-input"
 								/>
@@ -275,22 +275,22 @@
 						<!-- Password (Optional - only update if provided) -->
 						<div class="field-group">
 							<label for="password" class="field-label">
-								New Password
-								<span class="optional">(optional)</span>
+								{$_('accountForm.newPassword')}
+								<span class="optional">{$_('accountForm.optional')}</span>
 							</label>
 							<div class="input-wrapper input-with-action">
 								<input
 									id="password"
 									type={showPassword ? 'text' : 'password'}
 									bind:value={password}
-									placeholder="Leave empty to keep current password"
+									placeholder={$_('accountForm.keepCurrentPassword')}
 									class="field-input field-input-padded"
 								/>
 								<button
 									type="button"
 									onclick={() => showPassword = !showPassword}
 									class="toggle-password-button"
-									title={showPassword ? 'Hide password' : 'Show password'}
+									title={showPassword ? $_('accountForm.hidePassword') : $_('accountForm.showPassword')}
 								>
 									{#if showPassword}
 										<EyeOff class="size-4" strokeWidth={1.5} />
@@ -299,14 +299,14 @@
 									{/if}
 								</button>
 							</div>
-							<p class="field-hint">Only enter if you want to change your password</p>
+							<p class="field-hint">{$_('accountForm.passwordChangeHint')}</p>
 						</div>
 					</div>
 				</div>
 
 				<div class="form-divider">
 					<div class="divider-line"></div>
-					<span class="divider-text">Advanced</span>
+					<span class="divider-text">{$_('accountForm.advanced')}</span>
 					<div class="divider-line"></div>
 				</div>
 
@@ -316,21 +316,21 @@
 							<Server class="size-5" />
 						</div>
 						<div>
-							<h3 class="section-title">Server Settings</h3>
-							<p class="section-subtitle">IMAP and SMTP configuration</p>
+							<h3 class="section-title">{$_('accountForm.serverSettings')}</h3>
+							<p class="section-subtitle">{$_('accountForm.imapSmtpConfig')}</p>
 						</div>
 					</div>
 
 					<div class="form-fields">
 						<!-- IMAP Server -->
 						<div class="field-group">
-							<label for="imap" class="field-label">IMAP Server</label>
+							<label for="imap" class="field-label">{$_('accountForm.imapServer')}</label>
 							<div class="input-wrapper">
 								<input
 									id="imap"
 									type="text"
 									bind:value={imapServer}
-									placeholder="imap.example.com"
+									placeholder={$_('accountForm.imapPlaceholder')}
 									class="field-input"
 								/>
 							</div>
@@ -339,7 +339,7 @@
 						<!-- IMAP Port & SSL -->
 						<div class="field-row">
 							<div class="field-group">
-								<label for="imap-port" class="field-label">IMAP Port</label>
+								<label for="imap-port" class="field-label">{$_('accountForm.imapPort')}</label>
 								<div class="input-wrapper">
 									<input
 										id="imap-port"
@@ -357,20 +357,20 @@
 										bind:checked={imapUseSsl}
 										class="checkbox-input"
 									/>
-									<span>Use SSL/TLS</span>
+									<span>{$_('accountForm.useSslTls')}</span>
 								</label>
 							</div>
 						</div>
 
 						<!-- SMTP Server -->
 						<div class="field-group">
-							<label for="smtp" class="field-label">SMTP Server</label>
+							<label for="smtp" class="field-label">{$_('accountForm.smtpServer')}</label>
 							<div class="input-wrapper">
 								<input
 									id="smtp"
 									type="text"
 									bind:value={smtpServer}
-									placeholder="smtp.example.com"
+									placeholder={$_('accountForm.smtpPlaceholder')}
 									class="field-input"
 								/>
 							</div>
@@ -379,7 +379,7 @@
 						<!-- SMTP Port & SSL -->
 						<div class="field-row">
 							<div class="field-group">
-								<label for="smtp-port" class="field-label">SMTP Port</label>
+								<label for="smtp-port" class="field-label">{$_('accountForm.smtpPort')}</label>
 								<div class="input-wrapper">
 									<input
 										id="smtp-port"
@@ -397,7 +397,7 @@
 										bind:checked={smtpUseSsl}
 										class="checkbox-input"
 									/>
-									<span>Use SSL/TLS</span>
+									<span>{$_('accountForm.useSslTls')}</span>
 								</label>
 							</div>
 						</div>
@@ -415,7 +415,7 @@
 								{:else}
 									<ShieldCheck class="size-4" />
 								{/if}
-								<span>{isTesting ? 'Testing...' : 'Test Connection'}</span>
+								<span>{isTesting ? $_('account.testing') : $_('account.testConnection')}</span>
 							</button>
 							<button
 								type="button"
@@ -428,7 +428,7 @@
 								{:else}
 									<RefreshCw class="size-4" />
 								{/if}
-								<span>{isSyncing ? 'Syncing...' : 'Sync Now'}</span>
+								<span>{isSyncing ? $_('account.syncing') : $_('account.syncAccount')}</span>
 							</button>
 						</div>
 
@@ -440,7 +440,7 @@
 
 				<div class="form-divider">
 					<div class="divider-line"></div>
-					<span class="divider-text">Sync Settings</span>
+					<span class="divider-text">{$_('accountForm.syncSettings')}</span>
 					<div class="divider-line"></div>
 				</div>
 
@@ -450,31 +450,31 @@
 							<RefreshCw class="size-5" />
 						</div>
 						<div>
-							<h3 class="section-title">Automatic Sync</h3>
-							<p class="section-subtitle">Configure how often Mailx checks for new messages</p>
+							<h3 class="section-title">{$_('accountForm.automaticSync')}</h3>
+							<p class="section-subtitle">{$_('accountForm.syncConfigDesc')}</p>
 						</div>
 					</div>
 
 					<div class="form-fields">
 						<div class="field-group">
-							<label for="sync-interval" class="field-label">Sync Interval</label>
+							<label for="sync-interval" class="field-label">{$_('accountForm.syncInterval')}</label>
 							<div class="input-wrapper">
 								<select
 									id="sync-interval"
 									bind:value={syncInterval}
 									class="field-input"
 								>
-									<option value={5}>Every 5 minutes</option>
-									<option value={15}>Every 15 minutes</option>
-									<option value={30}>Every 30 minutes</option>
-									<option value={60}>Every hour</option>
-									<option value={0}>Manual only</option>
+									<option value={5}>{$_('accountForm.every5Min')}</option>
+									<option value={15}>{$_('accountForm.every15Min')}</option>
+									<option value={30}>{$_('accountForm.every30Min')}</option>
+									<option value={60}>{$_('accountForm.everyHour')}</option>
+									<option value={0}>{$_('accountForm.manualOnly')}</option>
 								</select>
 							</div>
 							<p class="field-hint">
 								{syncInterval === 0
-									? 'Auto-sync is disabled. Use the Sync Now button to check for new messages.'
-									: `Mailx will automatically check for new messages every ${syncInterval} minutes.`}
+									? $_('accountForm.autoSyncDisabled')
+									: $_('accountForm.autoSyncInterval', { values: { n: syncInterval } })}
 							</p>
 						</div>
 					</div>
@@ -492,7 +492,7 @@
 						{:else}
 							<Check class="size-5" />
 						{/if}
-						<span>{isSubmitting ? 'Saving...' : 'Save Changes'}</span>
+						<span>{isSubmitting ? $_('account.saving') : $_('account.saveChanges')}</span>
 					</button>
 					<button
 						type="button"
@@ -500,20 +500,20 @@
 						disabled={isSubmitting}
 						class="cancel-button"
 					>
-						Cancel
+						{$_('common.cancel')}
 					</button>
 				</div>
 			</form>
 		</div>
 
 		<!-- Security Note -->
-		<p class="security-hint">Your credentials are encrypted and stored locally on your device</p>
+		<p class="security-hint">{$_('accountForm.credentialsEncrypted')}</p>
 	</div>
 {:else}
 	<div class="add-account-page">
 		<div class="loading-state">
-			<p class="error-message">Account not found</p>
-			<button onclick={goBack} class="back-button">Back to Accounts</button>
+			<p class="error-message">{$_('account.accountNotFound')}</p>
+			<button onclick={goBack} class="back-button">{$_('account.backToAccounts')}</button>
 		</div>
 	</div>
 {/if}

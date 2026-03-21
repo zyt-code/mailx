@@ -26,7 +26,7 @@
 				dbSize = { size: Math.round(sizeBytes / (1024 * 1024)), unit: 'MB' };
 			}
 		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to get database size';
+			error = e instanceof Error ? e.message : $_('accountForm.failedToGetDbSize');
 		}
 	}
 
@@ -37,7 +37,7 @@
 			await invoke('compact_database');
 			await getDatabaseSize();
 		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to compact database';
+			error = e instanceof Error ? e.message : $_('accountForm.failedToCompactDb');
 		} finally {
 			isCompacting = false;
 		}
@@ -53,7 +53,7 @@
 			await db.clearDatabase();
 			alert($_('privacy.clearSuccess'));
 		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to clear local data';
+			error = e instanceof Error ? e.message : $_('accountForm.failedToClearData');
 		} finally {
 			isClearing = false;
 		}
