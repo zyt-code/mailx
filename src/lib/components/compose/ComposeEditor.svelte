@@ -139,10 +139,10 @@
 	.editor-toolbar {
 		display: flex;
 		align-items: center;
-		gap: 0.35rem;
-		padding: 0.55rem 1.2rem;
+		gap: 0.25rem;
+		padding: 0.45rem 1.25rem;
 		border-bottom: 1px solid var(--border-tertiary);
-		background: color-mix(in srgb, var(--bg-secondary) 55%, white);
+		background: var(--bg-primary);
 	}
 
 	.editor-toolbar button {
@@ -150,54 +150,58 @@
 		align-items: center;
 		justify-content: center;
 		gap: 0.35rem;
-		height: 30px;
-		padding: 0 0.65rem;
-		border: 1px solid transparent;
-		border-radius: 8px;
+		height: 28px;
+		padding: 0 0.55rem;
+		border: none;
+		border-radius: 6px;
 		background: transparent;
 		font-size: 12px;
 		font-weight: 500;
-		color: var(--text-secondary);
+		color: var(--text-tertiary);
 		cursor: pointer;
 	}
 
 	.editor-toolbar button:hover {
 		background: var(--bg-hover);
 		color: var(--text-primary);
-		border-color: var(--border-secondary);
+	}
+
+	.editor-toolbar button:active {
+		background: var(--bg-active);
 	}
 
 	.toolbar-divider {
 		width: 1px;
-		height: 16px;
-		background: var(--border-primary);
-		margin: 0 0.15rem;
+		height: 14px;
+		background: var(--border-tertiary);
+		margin: 0 0.2rem;
 	}
 
 	.compose-editor {
 		flex: 1;
 		min-height: 340px;
-		padding: 1.5rem;
+		padding: 1.25rem 1.5rem;
 		border: none;
 		outline: none;
 		resize: none;
 		background: var(--bg-primary);
 		color: var(--text-primary);
-		font-size: 14px;
-		line-height: 1.75;
+		font-size: 15px;
+		line-height: 1.8;
+		letter-spacing: -0.01em;
 	}
 
 	.compose-editor::placeholder {
-		color: color-mix(in srgb, var(--text-tertiary) 70%, white);
+		color: var(--text-quaternary);
 	}
 
 	.attachment-zone {
 		display: flex;
 		flex-wrap: wrap;
 		gap: 0.5rem;
-		padding: 0.9rem 1.2rem 1rem;
+		padding: 0.75rem 1.25rem 0.85rem;
 		border-top: 1px solid var(--border-tertiary);
-		background: color-mix(in srgb, var(--bg-secondary) 50%, white);
+		background: var(--bg-secondary);
 	}
 
 	.attachment-chip {
@@ -207,10 +211,14 @@
 		gap: 0.55rem;
 		min-width: 180px;
 		max-width: 300px;
-		padding: 0.45rem 0.55rem 0.45rem 0.65rem;
-		border: 1px solid var(--border-primary);
-		border-radius: 10px;
+		padding: 0.45rem 0.55rem 0.45rem 0.75rem;
+		border: 1px solid var(--border-secondary);
+		border-radius: 8px;
 		background: var(--bg-primary);
+	}
+
+	.attachment-chip:hover {
+		border-color: var(--border-primary);
 	}
 
 	.attachment-meta {
@@ -220,7 +228,7 @@
 	}
 
 	.attachment-name {
-		font-size: 12px;
+		font-size: 13px;
 		font-weight: 500;
 		color: var(--text-primary);
 		white-space: nowrap;
@@ -239,12 +247,14 @@
 		justify-content: center;
 		border: none;
 		background: transparent;
-		color: var(--text-tertiary);
+		color: var(--text-quaternary);
 		cursor: pointer;
-		padding: 0;
+		padding: 2px;
+		border-radius: 4px;
 	}
 
 	.attachment-chip button:hover {
 		color: var(--text-primary);
+		background: var(--bg-hover);
 	}
 </style>

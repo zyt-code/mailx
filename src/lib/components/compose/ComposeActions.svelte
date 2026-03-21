@@ -72,18 +72,18 @@
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		background: color-mix(in srgb, var(--bg-secondary) 60%, white);
+		background: var(--bg-secondary);
 	}
 
 	.footer-status {
-		font-size: 11px;
+		font-size: 12px;
 		color: var(--text-tertiary);
 	}
 
 	.footer-actions {
 		display: flex;
 		align-items: center;
-		gap: 0.6rem;
+		gap: 0.5rem;
 	}
 
 	.discard-btn,
@@ -93,7 +93,7 @@
 		gap: 0.4rem;
 		height: 34px;
 		padding: 0 0.95rem;
-		border-radius: 9px;
+		border-radius: 8px;
 		font-size: 13px;
 		font-weight: 600;
 		cursor: pointer;
@@ -137,9 +137,9 @@
 	}
 
 	.send-hint {
-		padding: 0.2rem 0.45rem;
-		border-radius: 999px;
-		background: rgba(255, 255, 255, 0.18);
+		padding: 0.15rem 0.4rem;
+		border-radius: 4px;
+		background: color-mix(in srgb, white 18%, transparent);
 		font-size: 10px;
 		font-weight: 700;
 		line-height: 1;

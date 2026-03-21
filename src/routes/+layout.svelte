@@ -1,6 +1,7 @@
 <script lang="ts">
 	import '../app.css';
 	import { ensureInitialized } from '$lib/stores/i18nStore.svelte.js';
+	import { locale } from 'svelte-i18n';
 	import { page } from '$app/stores';
 	import { AppShell } from '$lib/components/layout/index.js';
 	import { invoke } from '@tauri-apps/api/core';
@@ -85,13 +86,15 @@
 	});
 </script>
 
-<!-- svelte-ignore a11y_no_static_element_interactions -->
-<div oncontextmenu={handleContextMenu} class="contents">
-	{#if $page.url.pathname.startsWith('/settings')}
-		<slot />
-	{:else}
-		<AppShell>
+{#if $locale}
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div oncontextmenu={handleContextMenu} class="contents">
+		{#if $page.url.pathname.startsWith('/settings')}
 			<slot />
-		</AppShell>
-	{/if}
-</div>
+		{:else}
+			<AppShell>
+				<slot />
+			</AppShell>
+		{/if}
+	</div>
+{/if}

@@ -341,12 +341,12 @@
 			out:fade={{ duration: 140 }}
 		>
 			<div
-				class="compose-modal-shell flex flex-col w-full h-full sm:h-auto sm:min-h-[60vh] sm:max-h-[88vh] sm:max-w-[820px] overflow-hidden rounded-none sm:rounded-2xl border border-[var(--border-primary)] bg-[var(--bg-primary)] shadow-2xl"
+				class="compose-modal-shell flex flex-col w-full h-full sm:h-auto sm:min-h-[60vh] sm:max-h-[88vh] sm:max-w-[780px] overflow-hidden rounded-none sm:rounded-xl border border-[var(--border-secondary)] bg-[var(--bg-primary)] shadow-2xl"
 				role="document"
 				in:scale={{ duration: 160, start: 0.97, opacity: 0.2 }}
 				out:scale={{ duration: 120, start: 1, opacity: 0.15 }}
 			>
-				<header class="flex items-center justify-between gap-3 px-6 py-3 border-b border-[var(--border-primary)] bg-[var(--bg-secondary)]">
+				<header class="flex items-center justify-between gap-3 px-5 py-2.5 border-b border-[var(--border-tertiary)] bg-[var(--bg-primary)]">
 					<div class="flex items-center gap-3 min-w-0">
 						<h2 id="compose-title" class="text-[15px] font-semibold text-[var(--text-primary)] shrink-0">{$_('compose.newMessage')}</h2>
 
@@ -431,12 +431,12 @@
 	.from-switcher {
 		display: inline-flex;
 		align-items: center;
-		gap: 0.45rem;
+		gap: 0.4rem;
 		max-width: min(430px, 52vw);
-		height: 32px;
-		padding: 0 0.75rem;
-		border-radius: 9px;
-		border: 1px solid var(--border-primary);
+		height: 30px;
+		padding: 0 0.65rem;
+		border-radius: 6px;
+		border: 1px solid var(--border-secondary);
 		background: var(--bg-primary);
 		color: var(--text-secondary);
 		font-size: 12px;
@@ -447,17 +447,18 @@
 	.from-switcher:hover {
 		background: var(--bg-hover);
 		color: var(--text-primary);
+		border-color: var(--border-primary);
 	}
 
 	.account-dropdown {
 		position: absolute;
-		top: calc(100% + 6px);
+		top: calc(100% + 4px);
 		left: 0;
 		z-index: 20;
-		width: min(360px, 70vw);
-		padding: 0.3rem;
-		border-radius: 12px;
-		border: 1px solid var(--border-primary);
+		width: min(340px, 70vw);
+		padding: 0.25rem;
+		border-radius: 10px;
+		border: 1px solid var(--border-secondary);
 		background: var(--bg-primary);
 		box-shadow: var(--shadow-lg);
 	}
@@ -467,9 +468,9 @@
 		align-items: center;
 		gap: 0.6rem;
 		width: 100%;
-		padding: 0.45rem 0.5rem;
+		padding: 0.4rem 0.5rem;
 		border: none;
-		border-radius: 8px;
+		border-radius: 6px;
 		background: transparent;
 		cursor: pointer;
 		text-align: left;
@@ -485,12 +486,12 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		width: 28px;
-		height: 28px;
-		border-radius: 50%;
+		width: 26px;
+		height: 26px;
+		border-radius: 6px;
 		background: var(--accent-light);
 		color: var(--accent-primary);
-		font-size: 12px;
+		font-size: 11px;
 		font-weight: 600;
 		flex-shrink: 0;
 	}

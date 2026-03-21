@@ -184,7 +184,7 @@
 		display: flex;
 		align-items: center;
 		gap: 0.75rem;
-		min-height: 46px;
+		min-height: 42px;
 		padding: 0 1.5rem;
 		border-bottom: 1px solid var(--border-tertiary);
 	}
@@ -194,10 +194,11 @@
 	}
 
 	.line-label {
-		width: 44px;
+		width: 36px;
 		flex-shrink: 0;
 		color: var(--text-tertiary);
-		font-size: 12px;
+		font-size: 13px;
+		font-weight: 500;
 	}
 
 	.line-input-wrap {
@@ -216,12 +217,12 @@
 		background: transparent;
 		outline: none;
 		padding: 0;
-		font-size: 13px;
+		font-size: 14px;
 		color: var(--text-primary);
 	}
 
 	.line-input::placeholder {
-		color: color-mix(in srgb, var(--text-tertiary) 70%, white);
+		color: var(--text-quaternary);
 	}
 
 	.subject-wrap {
@@ -229,7 +230,14 @@
 	}
 
 	.subject-input {
-		font-size: 14px;
+		font-size: 20px;
+		font-weight: 700;
+		letter-spacing: -0.03em;
+		line-height: 1.3;
+	}
+
+	.subject-input::placeholder {
+		color: var(--text-quaternary);
 		font-weight: 500;
 	}
 
@@ -243,29 +251,30 @@
 	.line-actions button {
 		border: none;
 		background: transparent;
-		font-size: 11px;
+		font-size: 12px;
 		font-weight: 600;
 		color: var(--text-tertiary);
-		padding: 0.2rem 0.45rem;
-		border-radius: 999px;
+		padding: 0.2rem 0.5rem;
+		border-radius: 6px;
 		cursor: pointer;
 	}
 
 	.line-actions button:hover {
 		background: var(--bg-hover);
-		color: var(--text-secondary);
+		color: var(--accent-primary);
 	}
 
 	.recipient-chip {
 		display: inline-flex;
 		align-items: center;
-		gap: 0.35rem;
-		background: color-mix(in srgb, var(--accent-light) 45%, white);
-		color: var(--text-secondary);
-		border: 1px solid color-mix(in srgb, var(--accent-muted) 60%, white);
-		border-radius: 999px;
-		font-size: 12px;
-		padding: 0.2rem 0.45rem;
+		gap: 0.3rem;
+		background: var(--bg-secondary);
+		color: var(--text-primary);
+		border: 1px solid var(--border-secondary);
+		border-radius: 6px;
+		font-size: 13px;
+		font-weight: 500;
+		padding: 0.2rem 0.5rem;
 	}
 
 	.recipient-chip button {
@@ -274,12 +283,14 @@
 		justify-content: center;
 		border: none;
 		background: transparent;
-		color: var(--text-tertiary);
+		color: var(--text-quaternary);
 		padding: 0;
 		cursor: pointer;
+		border-radius: 3px;
 	}
 
 	.recipient-chip button:hover {
 		color: var(--text-primary);
+		background: var(--bg-hover);
 	}
 </style>
