@@ -11,6 +11,17 @@
 
 	let iframeEl = $state<HTMLIFrameElement | null>(null);
 
+	// Detect dark mode from parent document's .dark class
+	let isDark = $state(false);
+	$effect(() => {
+		isDark = document.documentElement.classList.contains('dark');
+		const observer = new MutationObserver(() => {
+			isDark = document.documentElement.classList.contains('dark');
+		});
+		observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+		return () => observer.disconnect();
+	});
+
 	// Process HTML to ensure links open in new tab
 	function processHtmlLinks(html: string): string {
 		// Create a temporary div to parse HTML
@@ -29,6 +40,12 @@
 
 	// Build the srcdoc content for the iframe
 	let srcdoc = $derived.by(() => {
+		// Dark mode styles for plain text emails
+		const darkStyles = isDark ? `
+  body { background: #0f0f10; color: #f8f8f8; }
+  a { color: #60a5fa; }
+  pre { background: #252528; color: #f8f8f8; }` : '';
+
 		if (htmlBody) {
 			const sanitized = DOMPurify.sanitize(htmlBody, {
 				WHOLE_DOCUMENT: false,
@@ -45,7 +62,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
-  /* CSS Reset for consistent styling */
+  /* Minimal reset — preserve original email formatting */
   *, *::before, *::after {
     box-sizing: border-box;
   }
@@ -59,18 +76,16 @@
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', 'Helvetica Neue', sans-serif;
     font-size: 15px;
     line-height: 1.7;
-    color: #37352f;
+    color: #1d1d1f;
     word-wrap: break-word;
     overflow-wrap: break-word;
   }
-  /* Ensure links are styled consistently */
+  /* Default link styling (overridable by email styles) */
   a { color: #2563eb; text-decoration: none; }
   a:hover { text-decoration: underline; }
-  /* Ensure images don't overflow */
+  /* Prevent overflow without destroying layout */
   img { max-width: 100%; height: auto; }
-  /* Ensure tables don't overflow */
-  table { max-width: 100%; border-collapse: collapse; }
-  /* Ensure code blocks scroll horizontally */
+  table { max-width: 100%; }
   pre {
     overflow-x: auto;
     background: #f7f6f3;
@@ -80,37 +95,6 @@
   code {
     font-family: 'SF Mono', 'Monaco', 'Cascadia Code', 'Roboto Mono', Consolas, monospace;
     font-size: 0.9em;
-  }
-  /* Ensure lists have proper spacing */
-  ul, ol { padding-left: 24px; margin: 8px 0; }
-  li { margin: 4px 0; }
-  /* Ensure headings have proper spacing */
-  h1, h2, h3, h4, h5, h6 {
-    margin-top: 16px;
-    margin-bottom: 8px;
-    font-weight: 600;
-    line-height: 1.3;
-  }
-  h1 { font-size: 2em; }
-  h2 { font-size: 1.5em; }
-  h3 { font-size: 1.25em; }
-  /* Ensure paragraphs have proper spacing */
-  p { margin: 8px 0; }
-  /* Remove default margins from common elements */
-  div, p, span, a { margin: 0; padding: 0; }
-  /* Reset any inline styles that might conflict */
-  style:not([data-svelte-scoped]) {
-    display: none !important;
-  }
-  /* Only allow styles with specific data attribute */
-  style[data-allow-style] {
-    display: block !important;
-  }
-  /* Dark mode adaptation */
-  @media (prefers-color-scheme: dark) {
-    body { color: #e8e6e3; }
-    a { color: #60a5fa; }
-    pre { background: #2a2a2c; }
   }
 </style>
 </head>
@@ -139,13 +123,11 @@
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', 'Helvetica Neue', sans-serif;
     font-size: 15px;
     line-height: 1.7;
-    color: #37352f;
+    color: #1d1d1f;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
-  @media (prefers-color-scheme: dark) {
-    body { color: #e8e6e3; }
-  }
+  ${darkStyles}
 </style>
 </head>
 <body>${escaped}</body>
