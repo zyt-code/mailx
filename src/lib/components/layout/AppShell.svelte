@@ -99,7 +99,7 @@ const DEFAULTS = { sidebarCollapsed: false, mailListWidth: DEFAULT_MAIL_LIST_WID
 		const unsub = activeAccount.subscribe(async (acc) => {
 			if (acc && acc.id !== currentAccount) {
 				currentAccount = acc.id;
-				if (isAccountConfigured) {
+				if (isAccountConfigured && !get(isSyncing)) {
 					try {
 						// Initial sync when account changes
 						await syncAccount(acc.id);

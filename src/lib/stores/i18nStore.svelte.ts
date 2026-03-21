@@ -65,9 +65,11 @@ async function initializeI18n(initialPreferences?: LocalePreferences): Promise<v
     try {
       const { preferences } = await import('./preferencesStore');
       const userPrefs = await new Promise<any>((resolve) => {
-        const unsub = preferences.subscribe((p: any) => {
+        let unsub: (() => void) | undefined;
+        unsub = preferences.subscribe((p: any) => {
           resolve(p);
-          unsub();
+          // Defer unsubscribe — the callback fires synchronously before assignment completes
+          queueMicrotask(() => unsub?.());
         });
       });
       prefs = userPrefs.language;

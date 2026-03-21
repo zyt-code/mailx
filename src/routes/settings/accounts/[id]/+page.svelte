@@ -810,10 +810,10 @@
 		color: #9ca3af;
 	}
 
-	.field-input:focus {
+	.field-input:focus-visible {
 		outline: none;
-		border-color: #8b5cf6;
-		box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.1);
+		border-color: var(--accent-primary);
+		box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-primary) 20%, transparent);
 	}
 
 	/* Input with action button */

@@ -177,7 +177,7 @@
 
 	function getFieldClass(fieldName: string): string {
 		return cn(
-			'w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500',
+			'w-full px-3 py-2 border rounded-md focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-primary)]',
 			errors[fieldName] ? 'border-red-500' : 'border-gray-300'
 		);
 	}
@@ -281,7 +281,7 @@
 						id="imap-port"
 						type="number"
 						bind:value={formData.imap_port}
-						class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+						class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-primary)]"
 						min="1"
 						max="65535"
 						onpaste={handlePaste}
@@ -322,7 +322,7 @@
 						id="smtp-port"
 						type="number"
 						bind:value={formData.smtp_port}
-						class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+						class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-primary)]"
 						min="1"
 						max="65535"
 						onpaste={handlePaste}

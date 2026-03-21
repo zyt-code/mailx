@@ -147,50 +147,17 @@ code, pre, .font-mono, .tabular-nums {
 		color: var(--text-primary);
 	}
 
-	/* Enhanced focus rings with high contrast for accessibility */
+	/* Keyboard-only focus ring for dark mode */
 	:focus-visible {
-		outline: 3px solid var(--accent-primary);
+		outline: 2px solid var(--accent-primary);
 		outline-offset: 2px;
-		box-shadow:
-			0 0 0 1px var(--bg-primary),
-			0 0 0 4px var(--accent-primary),
-			var(--depth-glow);
 		border-radius: var(--radius-xs);
 	}
 
-	/* High contrast focus for better visibility */
-	button:focus-visible,
-	a:focus-visible,
-	input:focus-visible,
-	textarea:focus-visible,
-	select:focus-visible,
-	[role="button"]:focus-visible,
-	[role="tab"]:focus-visible,
-	[role="menuitem"]:focus-visible,
-	[role="option"]:focus-visible,
-	[tabindex]:focus-visible {
-		outline: 3px solid var(--accent-primary);
-		outline-offset: 2px;
-		box-shadow:
-			0 0 0 1px var(--bg-primary),
-			0 0 0 4px var(--accent-primary),
-			0 0 12px rgba(42, 124, 255, 0.4);
-		z-index: 1; /* 确保焦点状态在层叠上下文上方 */
-	}
-
-	/* Enhanced focus for specific components */
-	.dark .theme-option:focus-visible,
-	.dark .accent-option:focus-visible,
-	.dark .density-option:focus-visible,
-	.dark .toggle-row:focus-visible {
-		outline: 3px solid var(--accent-primary);
-		outline-offset: 3px;
-		box-shadow:
-			0 0 0 2px var(--bg-primary),
-			0 0 0 6px var(--accent-primary),
-			0 0 20px rgba(42, 124, 255, 0.5),
-			var(--depth-glow);
-		transform: translateY(-2px);
+	/* Mouse/touch clicks: no visible focus ring */
+	:focus:not(:focus-visible) {
+		outline: none;
+		box-shadow: none;
 	}
 
 	/* Subtle background texture */
@@ -487,34 +454,16 @@ code, pre, .font-mono, .tabular-nums {
 		color: var(--text-primary);
 	}
 
-	/* Accessible focus ring for all interactive elements */
+	/* Keyboard-only focus ring — lightweight, no glow */
 	:focus-visible {
-		outline: 3px solid var(--accent-primary);
+		outline: 2px solid var(--accent-primary);
 		outline-offset: 2px;
-		box-shadow:
-			0 0 0 1px var(--bg-primary),
-			0 0 0 4px var(--accent-primary);
 		border-radius: var(--radius-xs);
 	}
 
-	/* Enhanced focus for light mode specific components */
-	.theme-option:focus-visible,
-	.accent-option:focus-visible,
-	.density-option:focus-visible,
-	.toggle-row:focus-visible {
-		outline: 3px solid var(--accent-primary);
-		outline-offset: 3px;
-		box-shadow:
-			0 0 0 2px var(--bg-primary),
-			0 0 0 6px var(--accent-primary),
-			0 0 20px rgba(0, 122, 255, 0.3);
-		transform: translateY(-2px);
-	}
-
-	/* Ensure focus is visible even when outlines are disabled by user agent */
+	/* Mouse/touch clicks: no visible focus ring */
 	:focus:not(:focus-visible) {
-		outline: 3px solid var(--accent-primary);
-		outline-offset: 2px;
+		outline: none;
 	}
 }
 
@@ -587,23 +536,16 @@ input::placeholder, textarea::placeholder {
 	color: var(--text-tertiary);
 }
 
-input:focus, textarea:focus {
+input:focus-visible, textarea:focus-visible {
 	outline: none;
 	border-color: var(--accent-primary);
-	box-shadow:
-		0 0 0 1px var(--bg-primary),
-		0 0 0 3px var(--accent-primary),
-		0 0 12px rgba(42, 124, 255, 0.2);
+	box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-primary) 20%, transparent);
 }
 
-/* Enhanced focus for dark mode inputs */
-.dark input:focus,
-.dark textarea:focus {
-	box-shadow:
-		0 0 0 1px var(--bg-primary),
-		0 0 0 3px var(--accent-primary),
-		0 0 16px rgba(42, 124, 255, 0.3),
-		var(--depth-glow);
+/* Dark mode input focus */
+.dark input:focus-visible,
+.dark textarea:focus-visible {
+	box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-primary) 25%, transparent);
 }
 
 /* ========================================
@@ -645,28 +587,18 @@ input:focus, textarea:focus {
 
 /* Focus management */
 .focus-ring {
-	outline: 3px solid var(--accent-primary);
+	outline: 2px solid var(--accent-primary);
 	outline-offset: 2px;
-	box-shadow:
-		0 0 0 1px var(--bg-primary),
-		0 0 0 4px var(--accent-primary);
 }
 
 .focus-ring-enhanced {
-	outline: 3px solid var(--accent-primary);
-	outline-offset: 3px;
-	box-shadow:
-		0 0 0 2px var(--bg-primary),
-		0 0 0 6px var(--accent-primary),
-		0 0 20px rgba(0, 122, 255, 0.3);
+	outline: 2px solid var(--accent-primary);
+	outline-offset: 2px;
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-primary) 20%, transparent);
 }
 
 .dark .focus-ring-enhanced {
-	box-shadow:
-		0 0 0 2px var(--bg-primary),
-		0 0 0 6px var(--accent-primary),
-		0 0 20px rgba(42, 124, 255, 0.5),
-		var(--depth-glow);
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-primary) 25%, transparent);
 }
 
 /* ========================================
