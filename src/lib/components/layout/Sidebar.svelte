@@ -404,15 +404,15 @@
 				<div class="flex-1 min-w-0">
 					<p class={cn(
 						"text-sm truncate",
-						isAccountConfigured ? "font-medium text-zinc-900" : "font-medium text-zinc-400"
+						isAccountConfigured ? "font-medium text-[var(--text-primary)]" : "font-medium text-[var(--text-quaternary)]"
 					)}>
 						{currentAccount?.name || $_('account.noAccounts')}
 					</p>
-					<p class="text-xs text-zinc-500 truncate">
+					<p class="text-xs text-[var(--text-tertiary)] truncate">
 						{currentAccount?.email || $_('account.addFirst')}
 					</p>
 					{#if isAccountConfigured && formattedLastSync}
-						<p class="text-[10px] text-zinc-400">
+						<p class="text-[10px] text-[var(--text-quaternary)]">
 							{formattedLastSync}
 						</p>
 					{/if}

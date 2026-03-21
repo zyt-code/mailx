@@ -329,12 +329,12 @@
 							<ContextMenu.Content>
 								{#if !(mail.is_read ?? false)}
 									<ContextMenu.Item onclick={() => onMarkRead?.(mail, true)}>
-										<MailOpen class="size-4 text-zinc-500" strokeWidth={1.5} />
+										<MailOpen class="size-4 text-[var(--text-tertiary)]" strokeWidth={1.5} />
 										{$_('mail.markRead')}
 									</ContextMenu.Item>
 								{:else}
 									<ContextMenu.Item onclick={() => onMarkRead?.(mail, false)}>
-										<MailIcon class="size-4 text-zinc-500" strokeWidth={1.5} />
+										<MailIcon class="size-4 text-[var(--text-tertiary)]" strokeWidth={1.5} />
 										{$_('mail.markUnread')}
 									</ContextMenu.Item>
 								{/if}
@@ -342,43 +342,43 @@
 								<ContextMenu.Separator />
 
 								<ContextMenu.Item onclick={() => onArchive?.(mail)}>
-									<Archive class="size-4 text-zinc-500" strokeWidth={1.5} />
+									<Archive class="size-4 text-[var(--text-tertiary)]" strokeWidth={1.5} />
 									{mail.folder === 'archive' ? $_('mail.unarchive') : $_('mail.archive')}
 								</ContextMenu.Item>
 
 								<ContextMenu.Sub>
 									<ContextMenu.SubTrigger>
-										<FolderInput class="size-4 text-zinc-500" strokeWidth={1.5} />
+										<FolderInput class="size-4 text-[var(--text-tertiary)]" strokeWidth={1.5} />
 										{$_('mail.moveTo')}...
 									</ContextMenu.SubTrigger>
 									<ContextMenu.SubContent>
 										{#if mail.folder !== 'inbox'}
 											<ContextMenu.Item onclick={() => onMoveTo?.(mail, 'inbox')}>
-												<Inbox class="size-4 text-zinc-500" strokeWidth={1.5} />
+												<Inbox class="size-4 text-[var(--text-tertiary)]" strokeWidth={1.5} />
 												{$_('nav.inbox')}
 											</ContextMenu.Item>
 										{/if}
 										{#if mail.folder !== 'sent'}
 											<ContextMenu.Item onclick={() => onMoveTo?.(mail, 'sent')}>
-												<Send class="size-4 text-zinc-500" strokeWidth={1.5} />
+												<Send class="size-4 text-[var(--text-tertiary)]" strokeWidth={1.5} />
 												{$_('nav.sent')}
 											</ContextMenu.Item>
 										{/if}
 										{#if mail.folder !== 'drafts'}
 											<ContextMenu.Item onclick={() => onMoveTo?.(mail, 'drafts')}>
-												<FileText class="size-4 text-zinc-500" strokeWidth={1.5} />
+												<FileText class="size-4 text-[var(--text-tertiary)]" strokeWidth={1.5} />
 												{$_('nav.drafts')}
 											</ContextMenu.Item>
 										{/if}
 										{#if mail.folder !== 'archive'}
 											<ContextMenu.Item onclick={() => onMoveTo?.(mail, 'archive')}>
-												<Archive class="size-4 text-zinc-500" strokeWidth={1.5} />
+												<Archive class="size-4 text-[var(--text-tertiary)]" strokeWidth={1.5} />
 												{$_('nav.archive')}
 											</ContextMenu.Item>
 										{/if}
 										{#if mail.folder !== 'trash'}
 											<ContextMenu.Item onclick={() => onMoveTo?.(mail, 'trash')}>
-												<Trash2 class="size-4 text-zinc-500" strokeWidth={1.5} />
+												<Trash2 class="size-4 text-[var(--text-tertiary)]" strokeWidth={1.5} />
 												{$_('nav.trash')}
 											</ContextMenu.Item>
 										{/if}

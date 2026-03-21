@@ -48,11 +48,11 @@ code, pre, .font-mono, .tabular-nums {
 		--bg-active: #e8e8e8;
 		--bg-selected: #eaf3ff;
 
-		/* Crisp text colors */
+		/* Crisp text colors — WCAG AA compliant on white */
 		--text-primary: #1d1d1f;
-		--text-secondary: #6e6e73;
-		--text-tertiary: #86868b;
-		--text-quaternary: #aeaeb2;
+		--text-secondary: #58585d;
+		--text-tertiary: #6e6e73;
+		--text-quaternary: #8e8e93;
 
 		/* Apple blue accent */
 		--accent-primary: #007aff;
