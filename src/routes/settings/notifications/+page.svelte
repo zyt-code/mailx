@@ -2,7 +2,8 @@
 	import { onMount } from 'svelte';
 	import { Bell, BellRing, Moon, Send } from 'lucide-svelte';
 	import { _ } from 'svelte-i18n';
-	import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification';
+	import { invoke } from '@tauri-apps/api/core';
+	import { isPermissionGranted, requestPermission } from '@tauri-apps/plugin-notification';
 	import { preferences, type NotificationPreferences } from '$lib/stores/preferencesStore.js';
 
 import {
@@ -62,13 +63,22 @@ import {
 
 	async function sendTestAlert() {
 		try {
-			await sendNotification({
-				title: $_('notifications.testTitle'),
-				body: $_('notifications.testBody')
+			// 使用新的通知系统
+			await invoke('show_notification', {
+				request: {
+					account_id: 1,
+					notification_type: { System: "test" },
+					title: $_('notifications.testTitle'),
+					body: $_('notifications.testBody'),
+					priority: 1,
+					actions: [],
+					timeout: null
+				}
 			});
 			permissionMessage = $_('notifications.testSent');
-		} catch {
-			permissionMessage = $_('notifications.testFailed');
+		} catch (error) {
+			console.error('Test notification failed:', error);
+			permissionMessage = $_('notifications.testFailed') + ': ' + error;
 		}
 	}
 
