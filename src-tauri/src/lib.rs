@@ -69,7 +69,7 @@ pub fn run() {
 
             // Initialize notification manager
             // Get app identifier for notifications
-            let app_id = "com.mailx.app".to_string();
+            let app_id = "com.example.mailx".to_string();
             let notification_facade = create_notification_facade(app_id);
             let notification_manager = Arc::new(NotificationManager::new(notification_facade));
 
