@@ -5,14 +5,32 @@
 	import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification';
 	import { preferences, type NotificationPreferences } from '$lib/stores/preferencesStore.js';
 
+import {
+  syncNotificationPreferencesFromBackend,
+  syncNotificationPreferencesToBackend
+} from '$lib/utils/notificationBridge';
+
 	type PermissionState = 'checking' | 'granted' | 'denied' | 'unknown';
 
 	let notifications = $derived($preferences.notifications);
 	let permissionState = $state<PermissionState>('checking');
 	let permissionMessage = $state('');
+	let isSyncing = $state(false);
 
-	function updateNotifications(patch: Partial<NotificationPreferences>) {
+	async function updateNotifications(patch: Partial<NotificationPreferences>) {
 		preferences.updateSection('notifications', patch);
+		if (!isSyncing) {
+			isSyncing = true;
+			try {
+				// 防抖：等待300ms再同步
+				await new Promise(resolve => setTimeout(resolve, 300));
+				await syncNotificationPreferencesToBackend();
+			} catch (error) {
+				console.error('Failed to sync notification preferences:', error);
+			} finally {
+				isSyncing = false;
+			}
+		}
 	}
 
 	async function refreshPermissionState() {
@@ -54,9 +72,11 @@
 		}
 	}
 
-	onMount(() => {
+	onMount(async () => {
 		permissionMessage = $_('notifications.permChecking');
 		void refreshPermissionState();
+		// 从后端加载通知偏好
+		await syncNotificationPreferencesFromBackend();
 	});
 </script>
 
