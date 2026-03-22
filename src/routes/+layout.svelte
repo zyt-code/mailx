@@ -4,6 +4,7 @@
 	import { locale } from 'svelte-i18n';
 	import { page } from '$app/stores';
 	import { AppShell } from '$lib/components/layout/index.js';
+	import { Notification } from '$lib/components/ui/notification/index.js';
 	import { invoke } from '@tauri-apps/api/core';
 	import { listen } from '@tauri-apps/api/event';
 	import { onMount, onDestroy } from 'svelte';
@@ -44,6 +45,7 @@
 	}
 
 	let unlistenNavigate: () => void;
+	let unlistenNotification: () => void;
 
 	// Use addEventListener in capture phase to intercept before anything else
 	onMount(() => {
@@ -74,15 +76,41 @@
 			unlistenNavigate = unlisten;
 		});
 
+		// Listen for notification events from backend
+		listen('notification:show', (event) => {
+			console.log('[Layout] Received notification:show event:', event.payload);
+			const payload = event.payload as { title: string; body?: string };
+
+			// Check if notification API is available
+			if (!(window as any).notification?.show) {
+				console.error('[Layout] window.notification.show not available!');
+				return;
+			}
+
+			console.log('[Layout] Calling notification.show with:', payload);
+			(window as any).notification.show({
+				type: 'info',
+				title: payload.title,
+				message: payload.body,
+				duration: 5000
+			});
+			console.log('[Layout] notification.show called successfully');
+		}).then((unlisten) => {
+			unlistenNotification = unlisten;
+			console.log('[Layout] notification:show listener registered');
+		});
+
 		window.addEventListener('keydown', handleKeyDownCapture, { capture: true });
 		return () => {
 			window.removeEventListener('keydown', handleKeyDownCapture, { capture: true });
 			unlistenNavigate?.();
+			unlistenNotification?.();
 		};
 	});
 
 	onDestroy(() => {
 		unlistenNavigate?.();
+		unlistenNotification?.();
 	});
 </script>
 
@@ -97,4 +125,7 @@
 			</AppShell>
 		{/if}
 	</div>
+
+	<!-- Global notification component (always rendered) -->
+	<Notification />
 {/if}

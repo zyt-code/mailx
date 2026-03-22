@@ -33,8 +33,10 @@
   };
 
   export function show(notification: Omit<NotificationItem, 'id'>): void {
+    console.log('[Notification Component] show() called with:', notification);
     const id = crypto.randomUUID();
     notifications = [...notifications, { id, ...notification }];
+    console.log('[Notification Component] Current notifications:', notifications);
 
     const duration = notification.duration ?? 5000;
     if (duration > 0) {
@@ -49,6 +51,7 @@
   // Expose globally
   if (typeof window !== 'undefined') {
     (window as any).notification = { show, dismiss };
+    console.log('[Notification Component] Initialized and exposed to window.notification');
   }
 </script>
 

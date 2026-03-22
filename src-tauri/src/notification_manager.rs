@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use serde::{Deserialize, Serialize};
 use std::collections::BinaryHeap;
 use std::sync::Arc;
@@ -328,7 +330,7 @@ impl NotificationManager {
 
         // 4. 速率限制检查
         {
-            let mut limiter = self.rate_limiter.lock().await;
+            let limiter = self.rate_limiter.lock().await;
             if !limiter.check(&request.notification_type).await {
                 return Err("Rate limit exceeded".to_string());
             }

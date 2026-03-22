@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 #[cfg(windows)]
 pub mod windows_notification;
 

@@ -32,24 +32,6 @@ import {
 				await syncNotificationPreferencesToBackend();
 			} catch (error) {
 				console.error('Failed to sync notification preferences:', error);
-
-	type PermissionState = 'checking' | 'granted' | 'denied' | 'unknown';
-
-	let notifications = $derived($preferences.notifications);
-	let permissionState = $state<PermissionState>('checking');
-	let permissionMessage = $state('');
-	let isSyncing = $state(false);
-
-	async function updateNotifications(patch: Partial<NotificationPreferences>) {
-		preferences.updateSection('notifications', patch);
-		if (!isSyncing) {
-			isSyncing = true;
-			try {
-				// 防抖：等待300ms再同步
-				await new Promise(resolve => setTimeout(resolve, 300));
-				await syncNotificationPreferencesToBackend();
-			} catch (error) {
-				console.error('Failed to sync notification preferences:', error);
 			} finally {
 				isSyncing = false;
 			}

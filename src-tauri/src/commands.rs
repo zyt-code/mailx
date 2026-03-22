@@ -583,6 +583,7 @@ pub async fn send_mail(
 
 /// Open developer tools
 #[tauri::command]
+#[allow(dead_code)]
 pub fn open_devtools(app_handle: AppHandle) -> Result<(), String> {
     if let Some(window) = app_handle.get_webview_window("main") {
         window.open_devtools();
@@ -706,11 +707,12 @@ pub fn clear_crash_dumps(app_handle: AppHandle) -> Result<usize, String> {
 // ============================================================================
 
 /// Send notification with history tracking
+/// Note: For test notifications without account context, we skip database insertion
 #[tauri::command]
 pub async fn send_notification_with_history(
     title: String,
     body: Option<String>,
-    db: State<'_, Database>,
+    _db: State<'_, Database>,
     app_handle: AppHandle,
 ) -> Result<(), String> {
     // 1. Emit event to frontend for actual notification display
@@ -719,13 +721,11 @@ pub async fn send_notification_with_history(
         "body": body
     }));
 
-    // 2. Save to database
+    // 2. Skip database insertion for test notifications (no account context)
+    // Test notifications don't have an associated account, and the notifications table
+    // has a foreign key constraint requiring a valid account_id
     let body_str = body.as_deref().unwrap_or("");
-    db.inner()
-        .insert_notification(0, None, "sent", &title, body_str, 1, None)
-        .map_err(|e| format!("Failed to save notification: {}", e))?;
-
-    println!("[Notification] ✅ Sent: {} - {}", title, body_str);
+    println!("[Notification] ✅ Sent (test notification, not saved to DB): {} - {}", title, body_str);
     Ok(())
 }
 

@@ -5,7 +5,6 @@
 	import ReadingPane from './ReadingPane.svelte';
 	import Titlebar from './Titlebar.svelte';
 	import { GetStarted } from '$lib/components/get-started/index.js';
-	import { Notification } from '$lib/components/ui/notification/index.js';
 	import type { Mail, Folder } from '$lib/types.js';
 	import * as db from '$lib/db/index.js';
 	import { hasAccounts, activeAccount } from '$lib/stores/accountStore.js';
@@ -359,7 +358,4 @@ const DEFAULTS = { sidebarCollapsed: false, mailListWidth: DEFAULT_MAIL_LIST_WID
 			{/if}
 		{/if}
 	</div>
-
-	<!-- Notifications -->
-	<Notification />
 </div>

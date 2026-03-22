@@ -7,6 +7,7 @@ use thiserror::Error;
 
 /// Error types for crash tracking operations
 #[derive(Error, Debug)]
+#[allow(dead_code)]
 pub enum CrashTrackerError {
     #[error("IO error: {0}")]
     Io(#[from] io::Error),

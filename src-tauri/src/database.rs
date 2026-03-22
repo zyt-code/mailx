@@ -1006,6 +1006,7 @@ impl Database {
     // ========== Notification Methods ==========
 
     /// Insert a notification record into the database
+    #[allow(dead_code)]
     pub fn insert_notification(
         &self,
         account_id: i64,
@@ -1108,6 +1109,7 @@ impl Database {
     }
 
     /// Mark a notification as read
+    #[allow(dead_code)]
     pub fn mark_notification_read(&self, id: i64) -> SqliteResult<()> {
         let conn = self.conn.lock().unwrap();
         let now = chrono::Utc::now().timestamp_millis();
@@ -1121,6 +1123,7 @@ impl Database {
     }
 
     /// Clean up old notifications (older than specified days)
+    #[allow(dead_code)]
     pub fn cleanup_old_notifications(&self, days: i64) -> SqliteResult<usize> {
         let conn = self.conn.lock().unwrap();
         let cutoff = chrono::Utc::now() - chrono::Duration::days(days);
