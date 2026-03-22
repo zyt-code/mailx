@@ -715,6 +715,24 @@ pub async fn show_notification(
     manager.show(request).await
 }
 
+/// Send a test notification (simplified API)
+#[tauri::command]
+pub async fn send_test_notification(
+    manager: State<'_, Arc<NotificationManager>>,
+) -> Result<(), String> {
+    let request = NotificationRequest {
+        account_id: 1,
+        mail_id: None,
+        notification_type: NotificationType::System("Test notification".to_string()),
+        title: "🎉 Test Notification".to_string(),
+        body: "If you see this, the notification system is working!".to_string(),
+        priority: NotificationPriority::Normal,
+        actions: vec![],
+        timeout: None,
+    };
+    manager.show(request).await
+}
+
 /// Set notification preferences
 #[tauri::command]
 pub async fn set_notification_preferences(

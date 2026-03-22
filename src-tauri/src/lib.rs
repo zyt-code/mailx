@@ -212,6 +212,7 @@ pub fn run() {
             commands::send_mail,
             // Notification commands
             commands::show_notification,
+            commands::send_test_notification,
             commands::set_notification_preferences,
             commands::get_notification_preferences,
             commands::close_all_notifications,

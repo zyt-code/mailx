@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<coverage generated="1774058457972" clover="3.2.0">
+  <project timestamp="1774058457972" name="All files">
+    <metrics statements="129" coveredstatements="98" conditionals="77" coveredconditionals="40" methods="46" coveredmethods="30" elements="252" coveredelements="168" complexity="0" loc="129" ncloc="129" packages="3" files="6" classes="6"/>
+    <package name="src.lib.i18n.locales">
+      <metrics statements="0" coveredstatements="0" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+      <file name="en.ts" path="C:\Users\zhangyutong\VscodeProjects\mailx\src\lib\i18n\locales\en.ts">
+        <metrics statements="0" coveredstatements="0" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+      </file>
+      <file name="pt.ts" path="C:\Users\zhangyutong\VscodeProjects\mailx\src\lib\i18n\locales\pt.ts">
+        <metrics statements="0" coveredstatements="0" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+      </file>
+      <file name="zh-CN.ts" path="C:\Users\zhangyutong\VscodeProjects\mailx\src\lib\i18n\locales\zh-CN.ts">
+        <metrics statements="0" coveredstatements="0" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+      </file>
+    </package>
+    <package name="src.lib.stores">
+      <metrics statements="110" coveredstatements="88" conditionals="70" coveredconditionals="38" methods="32" coveredmethods="25"/>
+      <file name="i18nStore.ts" path="C:\Users\zhangyutong\VscodeProjects\mailx\src\lib\stores\i18nStore.ts">
+        <metrics statements="54" coveredstatements="52" conditionals="20" coveredconditionals="15" methods="16" coveredmethods="16"/>
+        <line num="3" count="2" type="stmt"/>
+        <line num="23" count="2" type="stmt"/>
+        <line num="24" count="2" type="stmt"/>
+        <line num="25" count="2" type="stmt"/>
+        <line num="28" count="6" type="cond" truecount="2" falsecount="0"/>
+        <line num="30" count="5" type="stmt"/>
+        <line num="31" count="42" type="stmt"/>
+        <line num="32" count="5" type="cond" truecount="2" falsecount="0"/>
+        <line num="34" count="4" type="stmt"/>
+        <line num="35" count="13" type="stmt"/>
+        <line num="36" count="4" type="cond" truecount="2" falsecount="0"/>
+        <line num="40" count="30" type="stmt"/>
+        <line num="46" count="3" type="cond" truecount="2" falsecount="0"/>
+        <line num="47" count="1" type="stmt"/>
+        <line num="49" count="2" type="stmt"/>
+        <line num="50" count="2" type="stmt"/>
+        <line num="51" count="2" type="stmt"/>
+        <line num="52" count="2" type="stmt"/>
+        <line num="53" count="2" type="stmt"/>
+        <line num="54" count="2" type="stmt"/>
+        <line num="57" count="2" type="stmt"/>
+        <line num="59" count="0" type="stmt"/>
+        <line num="60" count="0" type="stmt"/>
+        <line num="64" count="3" type="cond" truecount="1" falsecount="1"/>
+        <line num="66" count="3" type="stmt"/>
+        <line num="67" count="30" type="stmt"/>
+        <line num="70" count="3" type="stmt"/>
+        <line num="75" count="3" type="stmt"/>
+        <line num="76" count="3" type="stmt"/>
+        <line num="78" count="3" type="stmt"/>
+        <line num="80" count="3" type="cond" truecount="1" falsecount="1"/>
+        <line num="81" count="3" type="stmt"/>
+        <line num="84" count="3" type="stmt"/>
+        <line num="87" count="2" type="stmt"/>
+        <line num="89" count="18" type="stmt"/>
+        <line num="93" count="1" type="stmt"/>
+        <line num="99" count="156" type="cond" truecount="2" falsecount="0"/>
+        <line num="100" count="3" type="stmt"/>
+        <line num="101" count="3" type="stmt"/>
+        <line num="104" count="23" type="stmt"/>
+        <line num="105" count="23" type="stmt"/>
+        <line num="107" count="23" type="stmt"/>
+        <line num="108" count="23" type="stmt"/>
+        <line num="109" count="23" type="stmt"/>
+        <line num="114" count="2" type="stmt"/>
+        <line num="117" count="23" type="cond" truecount="1" falsecount="1"/>
+        <line num="118" count="23" type="stmt"/>
+        <line num="123" count="4" type="cond" truecount="1" falsecount="1"/>
+        <line num="124" count="4" type="stmt"/>
+        <line num="129" count="1" type="stmt"/>
+        <line num="134" count="2" type="cond" truecount="1" falsecount="1"/>
+        <line num="135" count="2" type="stmt"/>
+        <line num="137" count="2" type="stmt"/>
+        <line num="140" count="2" type="stmt"/>
+      </file>
+      <file name="preferencesStore.ts" path="C:\Users\zhangyutong\VscodeProjects\mailx\src\lib\stores\preferencesStore.ts">
+        <metrics statements="56" coveredstatements="36" conditionals="50" coveredconditionals="23" methods="16" coveredmethods="9"/>
+        <line num="54" count="3" type="stmt"/>
+        <line num="66" count="3" type="stmt"/>
+        <line num="101" count="3" type="stmt"/>
+        <line num="106" count="3" type="stmt"/>
+        <line num="141" count="25" type="cond" truecount="3" falsecount="1"/>
+        <line num="142" count="25" type="cond" truecount="3" falsecount="1"/>
+        <line num="145" count="25" type="cond" truecount="3" falsecount="1"/>
+        <line num="148" count="25" type="cond" truecount="3" falsecount="1"/>
+        <line num="151" count="25" type="cond" truecount="3" falsecount="1"/>
+        <line num="154" count="25" type="cond" truecount="3" falsecount="1"/>
+        <line num="158" count="25" type="stmt"/>
+        <line num="183" count="3" type="cond" truecount="1" falsecount="1"/>
+        <line num="184" count="0" type="stmt"/>
+        <line num="187" count="3" type="stmt"/>
+        <line num="188" count="3" type="stmt"/>
+        <line num="189" count="3" type="cond" truecount="1" falsecount="1"/>
+        <line num="191" count="0" type="stmt"/>
+        <line num="196" count="9" type="cond" truecount="1" falsecount="1"/>
+        <line num="197" count="0" type="stmt"/>
+        <line num="200" count="9" type="cond" truecount="1" falsecount="1"/>
+        <line num="201" count="9" type="stmt"/>
+        <line num="203" count="9" type="stmt"/>
+        <line num="204" count="9" type="stmt"/>
+        <line num="205" count="9" type="stmt"/>
+        <line num="206" count="9" type="stmt"/>
+        <line num="207" count="9" type="stmt"/>
+        <line num="211" count="3" type="stmt"/>
+        <line num="212" count="3" type="stmt"/>
+        <line num="214" count="3" type="cond" truecount="1" falsecount="1"/>
+        <line num="215" count="3" type="stmt"/>
+        <line num="216" count="3" type="stmt"/>
+        <line num="217" count="7" type="stmt"/>
+        <line num="218" count="7" type="stmt"/>
+        <line num="222" count="3" type="stmt"/>
+        <line num="225" count="0" type="stmt"/>
+        <line num="228" count="0" type="stmt"/>
+        <line num="231" count="24" type="stmt"/>
+        <line num="232" count="24" type="stmt"/>
+        <line num="242" count="1" type="stmt"/>
+        <line num="243" count="1" type="stmt"/>
+        <line num="250" count="0" type="stmt"/>
+        <line num="255" count="3" type="stmt"/>
+        <line num="258" count="0" type="stmt"/>
+        <line num="259" count="0" type="cond" truecount="0" falsecount="4"/>
+        <line num="260" count="0" type="stmt"/>
+        <line num="262" count="0" type="stmt"/>
+        <line num="266" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="267" count="0" type="stmt"/>
+        <line num="270" count="0" type="stmt"/>
+        <line num="271" count="0" type="stmt"/>
+        <line num="272" count="0" type="stmt"/>
+        <line num="274" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="275" count="0" type="stmt"/>
+        <line num="278" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="279" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="282" count="0" type="cond" truecount="0" falsecount="2"/>
+      </file>
+    </package>
+    <package name="tests.i18n">
+      <metrics statements="19" coveredstatements="10" conditionals="7" coveredconditionals="2" methods="14" coveredmethods="5"/>
+      <file name="helpers.ts" path="C:\Users\zhangyutong\VscodeProjects\mailx\tests\i18n\helpers.ts">
+        <metrics statements="19" coveredstatements="10" conditionals="7" coveredconditionals="2" methods="14" coveredmethods="5"/>
+        <line num="3" count="1" type="stmt"/>
+        <line num="6" count="0" type="stmt"/>
+        <line num="13" count="1" type="stmt"/>
+        <line num="14" count="1" type="stmt"/>
+        <line num="15" count="10" type="stmt"/>
+        <line num="16" count="29" type="stmt"/>
+        <line num="21" count="9" type="stmt"/>
+        <line num="23" count="9" type="cond" truecount="2" falsecount="0"/>
+        <line num="24" count="1" type="stmt"/>
+        <line num="25" count="1" type="stmt"/>
+        <line num="29" count="9" type="stmt"/>
+        <line num="30" count="0" type="stmt"/>
+        <line num="31" count="0" type="stmt"/>
+        <line num="32" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="33" count="0" type="stmt"/>
+        <line num="34" count="0" type="stmt"/>
+        <line num="36" count="0" type="stmt"/>
+        <line num="37" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="43" count="0" type="stmt"/>
+      </file>
+    </package>
+  </project>
+</coverage>
