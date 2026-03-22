@@ -35,6 +35,14 @@
 		airy: 96
 	};
 
+	const DENSITY_CHAR_LIMITS = {
+		compact: { subject: 28, preview: 36 },
+		comfortable: { subject: 44, preview: 64 },
+		airy: { subject: 64, preview: 108 }
+	};
+
+	const ACCOUNT_COLOR_SWATCHES = ['#3b82f6', '#8b5cf6', '#ec4899', '#f97316', '#10b981', '#06b6d4', '#ef4444', '#6366f1'];
+
 	let { selectedMailId, onSelectMail, onMarkRead, onDelete, onArchive, onMoveTo, width, isAccountConfigured = true, isSyncing = false }: Props = $props();
 
 	// State
@@ -48,6 +56,7 @@
 	// Appearance preferences
 	let mailDensity = $state<'compact' | 'comfortable' | 'airy'>('comfortable');
 	let showPreviewSnippets = $state(true);
+	let showAccountColor = $state(true);
 
 	// Subscriptions
 	$effect(() => {
@@ -61,6 +70,7 @@
 		const unsub = preferences.subscribe((value) => {
 			mailDensity = value.appearance.mailDensity;
 			showPreviewSnippets = value.appearance.showPreviewSnippets;
+			showAccountColor = value.appearance.showAccountColor;
 		});
 		return unsub;
 	});
@@ -164,6 +174,45 @@
 		if (!canLoadMore || isLoadingMore || searchQuery.trim()) return;
 		void loadMoreMails();
 	}
+
+	function getFirstLine(value: string): string {
+		const normalized = value.replace(/\s+/g, ' ').trim();
+		const firstLine = normalized.split('\n')[0] ?? '';
+		return firstLine.trim();
+	}
+
+	function truncate(value: string, limit: number): string {
+		const clean = value.trim();
+		if (clean.length <= limit) return clean;
+		return `${clean.slice(0, Math.max(0, limit - 1)).trimEnd()}…`;
+	}
+
+	function buildSubjectPreview(mail: Mail): string {
+		const fallbackSubject = mail.subject || $_('mail.noSubject');
+		return truncate(fallbackSubject, DENSITY_CHAR_LIMITS[mailDensity].subject);
+	}
+
+	function buildBodyPreview(mail: Mail): string {
+		const firstLine = getFirstLine(mail.preview || '');
+		if (!firstLine) return $_('mail.noPreview');
+		return truncate(firstLine, DENSITY_CHAR_LIMITS[mailDensity].preview);
+	}
+
+	function hashString(input: string): number {
+		let hash = 0;
+		for (let i = 0; i < input.length; i++) {
+			hash = ((hash << 5) - hash) + input.charCodeAt(i);
+			hash |= 0;
+		}
+		return hash;
+	}
+
+	function getAccountMarkerColor(mail: Mail): string {
+		if (!showAccountColor) return 'var(--accent-primary)';
+		const key = mail.account_id || mail.from_email || 'default';
+		const index = Math.abs(hashString(key)) % ACCOUNT_COLOR_SWATCHES.length;
+		return ACCOUNT_COLOR_SWATCHES[index];
+	}
 </script>
 
 <div
@@ -215,6 +264,8 @@
 				{#snippet children(mail: Mail, index: number)}
 					{@const isSelected = mail.id === selectedMailId}
 					{@const isUnread = !(mail.is_read ?? false)}
+					{@const subjectPreview = buildSubjectPreview(mail)}
+					{@const bodyPreview = buildBodyPreview(mail)}
 					<div class="px-2 py-1">
 						<ContextMenu.Root>
 							<ContextMenu.Trigger>
@@ -230,14 +281,14 @@
 									)}
 									onclick={() => handleSelectMail(mail.id)}
 								>
-									<!-- Unread accent bar — left edge, inside card border-radius -->
-									<div class={cn(
-										'shrink-0 w-[3px] rounded-r-sm self-stretch transition-colors duration-150',
-										mailDensity === 'compact' ? 'mx-2' : 'mx-2.5',
-										isUnread && !isSelected
-											? 'bg-[var(--accent-primary)]'
-											: 'bg-transparent'
-									)}></div>
+									<!-- Unread marker (account color aware) -->
+									<div
+										class={cn(
+											'absolute left-[0.45rem] top-[0.5rem] bottom-[0.5rem] w-[3px] rounded-r-sm transition-colors duration-150',
+											isUnread && !isSelected ? 'opacity-100' : 'opacity-0'
+										)}
+										style={`background:${getAccountMarkerColor(mail)};`}
+									></div>
 
 									<div class={cn(
 										'flex min-w-0 flex-1 flex-col justify-between overflow-hidden',
@@ -254,7 +305,7 @@
 																: 'font-medium text-[var(--text-secondary)]'
 													)}
 												>
-													{mail.from_name || mail.from_email}
+													{subjectPreview}
 												</span>
 												<span class={cn(
 													'text-[11px] leading-5 tabular-nums shrink-0',
@@ -264,26 +315,12 @@
 												</span>
 											</div>
 
-											<div class="min-w-0">
-												<span class={cn(
-													'block truncate text-[13px] leading-5',
-													isSelected
-														? 'text-[var(--text-primary)] font-semibold'
-														: isUnread
-															? 'font-semibold text-[var(--text-primary)]'
-															: 'font-medium text-[var(--text-secondary)]'
-												)}>
-													{mail.subject}
-												</span>
-											</div>
-
 											{#if showPreviewSnippets}
 												<p class={cn(
-													mailDensity === 'compact' ? 'line-clamp-1' : 'line-clamp-2',
-													'text-[12px] leading-5',
+													'mail-preview truncate text-[12px] leading-5',
 													isSelected ? 'text-[var(--text-secondary)]' : 'text-[var(--text-tertiary)]'
 												)}>
-													{mail.preview || $_('mail.noPreview')}
+													{bodyPreview}
 												</p>
 											{/if}
 										</div>

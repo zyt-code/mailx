@@ -31,6 +31,12 @@ describe('preferencesStore - Language Integration', () => {
     vi.clearAllMocks();
     localStorageMock.getItem.mockReturnValue(null);
     localStorageMock.length = 0;
+    document.documentElement.classList.remove('dark');
+    document.documentElement.removeAttribute('data-mail-density');
+    document.documentElement.style.removeProperty('--accent-primary');
+    document.documentElement.style.removeProperty('--accent-secondary');
+    document.documentElement.style.removeProperty('--accent-light');
+    document.documentElement.style.removeProperty('--accent-muted');
     
     Object.defineProperty(window, 'localStorage', { value: localStorageMock, writable: true });
   });
@@ -106,6 +112,26 @@ describe('preferencesStore - Language Integration', () => {
       expect(resetPrefs?.language?.autoDetect).toBe(DEFAULT_PREFERENCES.language.autoDetect);
       
       unsubscribe();
+    });
+  });
+
+  describe('Appearance Effects', () => {
+    it('should apply accent vars, density data attribute, and dark class to DOM', async () => {
+      const { preferences } = await import('./preferencesStore');
+
+      preferences.updateSection('appearance' as any, {
+        accentTone: 'forest',
+        mailDensity: 'airy',
+        theme: 'dark'
+      });
+
+      const root = document.documentElement;
+      expect(root.style.getPropertyValue('--accent-primary')).toBe('#2f8f63');
+      expect(root.style.getPropertyValue('--accent-secondary')).toBe('#206b48');
+      expect(root.style.getPropertyValue('--accent-light')).toBe('#e4f4eb');
+      expect(root.style.getPropertyValue('--accent-muted')).toBe('#cdebd8');
+      expect(root.dataset.mailDensity).toBe('airy');
+      expect(root.classList.contains('dark')).toBe(true);
     });
   });
 

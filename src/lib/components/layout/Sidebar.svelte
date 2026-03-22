@@ -21,12 +21,15 @@
 		SquarePen,
 		Archive,
 		RefreshCw,
-		Settings,
 		Lock,
 		Layers,
-		ChevronDown
+		ChevronDown,
+		Settings
 	} from 'lucide-svelte';
 	import { ComposeModal } from '$lib/components/compose/index.js';
+	import ComposeButton from './ComposeButton.svelte';
+	import AccountSelector from './AccountSelector.svelte';
+	import FolderNavigation from './FolderNavigation.svelte';
 
 	interface Props {
 		collapsed: boolean;
@@ -36,11 +39,11 @@
 		onSelectFolder: (folder: Folder) => void;
 		onRefresh?: () => void;
 		currentRoute?: string;
-		onOpenSettings?: () => void;
 		onSelectAccount?: (accountId: string | null) => void;
+		onOpenSettings?: () => void;
 	}
 
-	let { collapsed, isMobile, activeFolder, onToggle, onSelectFolder, onRefresh, currentRoute = '/', onOpenSettings, onSelectAccount }: Props = $props();
+	let { collapsed, isMobile, activeFolder, onToggle, onSelectFolder, onRefresh, currentRoute = '/', onSelectAccount, onOpenSettings }: Props = $props();
 
 	// Reactive navigation items with i18n
 	const navItems = $derived([
@@ -216,11 +219,6 @@
 		}
 	}
 
-	function navigateToSettings() {
-		onOpenSettings?.();
-		if (isMobile) onToggle();
-	}
-
 	function showDisabledFeedback() {
 		// Show brief feedback
 		showDisabledTooltip = true;
@@ -288,153 +286,27 @@
 
 	{#if !collapsed || isMobile}
 		<!-- Compose Button -->
-		<div class="px-2.5 mt-2.5">
-			<button
-				onclick={openCompose}
-				disabled={!isAccountConfigured}
-				class={cn(
-					"flex items-center justify-center gap-2 w-full px-3 py-2 rounded-lg transition-all duration-150 font-semibold text-[13px]",
-					isAccountConfigured
-						? "bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-secondary)] shadow-sm hover:shadow-md active:scale-[0.97]"
-						: "bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] cursor-not-allowed"
-				)}
-				aria-label={$_('nav.newMessage')}
-			>
-				{#if isAccountConfigured}
-					<SquarePen class="size-[15px]" strokeWidth={1.8} />
-					<span>{$_('nav.newMessage')}</span>
-				{:else}
-					<Lock class="size-[15px]" strokeWidth={1.8} />
-					<span>{$_('account.add')}</span>
-				{/if}
-			</button>
-		</div>
+		<ComposeButton
+			isAccountConfigured={isAccountConfigured}
+			collapsed={collapsed}
+			isMobile={isMobile}
+			onOpenCompose={openCompose}
+		/>
 
-		<!-- Account Rail (Multi-Account Support) -->
-		{#if hasMultipleAccounts && allAccounts.length > 0}
-			<!-- "All Inboxes" option -->
-			<button
-				onclick={() => {
-					if (selectedAccountId !== null) {
-						handleAccountClick(null);
-					}
-					toggleAccountsCollapse();
-				}}
-				class={cn(
-					"group flex items-center gap-2.5 px-2.5 py-2 rounded-lg mx-2 mt-3 relative transition-all duration-150",
-					selectedAccountId === null
-						? "bg-[var(--bg-active)] text-[var(--text-primary)] shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
-						: "hover:bg-[var(--bg-hover)] text-[var(--text-secondary)]"
-				)}
-				title={$_('nav.allInboxes')}
-				aria-expanded={!accountsCollapsed}
-				aria-controls="account-list"
-			>
-				{#if selectedAccountId === null}
-					<div class="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full bg-[var(--accent-primary)] transition-all duration-200"></div>
-				{/if}
-				<div class="flex size-7 items-center justify-center rounded-md bg-[var(--bg-tertiary)] text-[var(--text-secondary)] transition-colors duration-150 group-hover:bg-[var(--bg-hover)]">
-					<Layers class="size-[15px]" strokeWidth={1.8} />
-				</div>
-				<div class="flex-1 min-w-0 text-left">
-					<p class="text-[13px] font-semibold truncate">{$_('nav.allInboxes')}</p>
-					{#if formattedLastSync && selectedAccountId === null}
-						<p class="text-[11px] text-[var(--text-tertiary)] tabular-nums">
-							{formattedLastSync}
-						</p>
-					{/if}
-				</div>
-				<div class={cn(
-					"transition-transform duration-200 text-[var(--text-quaternary)]",
-					accountsCollapsed ? "-rotate-90" : "rotate-0"
-				)}>
-					<ChevronDown class="size-3.5" strokeWidth={1.8} />
-				</div>
-			</button>
-
-			<!-- Individual accounts (collapsible with CSS grid) -->
-			<div
-				id="account-list"
-				role="region"
-				class="account-collapse-wrapper mx-2"
-				class:collapsed={accountsCollapsed}
-				aria-hidden={accountsCollapsed}
-			>
-				<div class="overflow-hidden">
-					<div class="pt-1 space-y-0.5">
-						{#each allAccounts as account}
-							{@const color = getAccountColor(account.email)}
-							<button
-								onclick={() => handleAccountClick(account.id)}
-								class={cn(
-									"group flex items-center gap-2.5 px-2.5 py-2 rounded-lg w-full relative transition-all duration-150",
-									selectedAccountId === account.id
-										? "bg-[var(--bg-active)] text-[var(--text-primary)] shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
-										: "hover:bg-[var(--bg-hover)] text-[var(--text-secondary)]"
-								)}
-								title={account.email}
-							>
-								{#if selectedAccountId === account.id}
-									<div class="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full bg-[var(--accent-primary)] transition-all duration-200"></div>
-								{/if}
-								<div
-									class="flex size-7 items-center justify-center rounded-md text-[11px] font-bold shrink-0 transition-transform duration-150 group-hover:scale-105 group-active:scale-95"
-									style:background-color={color.bg}
-									style:color={color.text}
-								>
-									{getInitials(account.name)}
-								</div>
-								<div class="flex-1 min-w-0 text-left">
-									<p class="text-[13px] font-medium truncate">{account.name}</p>
-									<p class="text-[11px] text-[var(--text-tertiary)] truncate">{account.email}</p>
-								</div>
-								{#if isRefreshing && (currentSyncAccountId === account.id || currentSyncAccountId === null)}
-									<RefreshCw class="size-3 text-[var(--accent-primary)] animate-spin shrink-0" strokeWidth={1.8} />
-								{/if}
-							</button>
-						{/each}
-					</div>
-				</div>
-			</div>
-
-			<!-- Separator -->
-			<div class="mx-4 mt-2 mb-1 h-px bg-[var(--border-primary)] opacity-60"></div>
-		{:else}
-			<!-- Single account display (original layout) -->
-			<div
-				class={cn(
-					"flex items-center gap-2.5 px-2.5 py-2 rounded-lg mx-2 mt-3 relative",
-					isAccountConfigured ? "hover:bg-[var(--bg-hover)]" : "opacity-60"
-				)}
-			>
-				<div class={cn(
-					isAccountConfigured ? "" : "grayscale opacity-50"
-				)}>
-					<Avatar
-						src={undefined}
-						alt={currentAccount?.name || $_('account.noAccounts')}
-						fallback={currentAccount?.name}
-						size="sm"
-					/>
-				</div>
-				<div class="flex-1 min-w-0">
-					<p class={cn(
-						"text-sm truncate",
-						isAccountConfigured ? "font-medium text-[var(--text-primary)]" : "font-medium text-[var(--text-quaternary)]"
-					)}>
-						{currentAccount?.name || $_('account.noAccounts')}
-					</p>
-					<p class="text-xs text-[var(--text-tertiary)] truncate">
-						{currentAccount?.email || $_('account.addFirst')}
-					</p>
-					{#if isAccountConfigured && formattedLastSync}
-						<p class="text-[10px] text-[var(--text-quaternary)]">
-							{formattedLastSync}
-						</p>
-					{/if}
-				</div>
-			</div>
-		{/if}
+		<!-- Account Selector -->
+		<AccountSelector
+			accounts={allAccounts}
+			selectedAccountId={selectedAccountId}
+			hasMultipleAccounts={hasMultipleAccounts}
+			formattedLastSync={formattedLastSync}
+			accountsCollapsed={accountsCollapsed}
+			currentSyncAccountId={currentSyncAccountId}
+			isRefreshing={isRefreshing}
+			isAccountConfigured={isAccountConfigured}
+			currentAccount={currentAccount}
+			onSelectAccount={handleAccountClick}
+			onToggleAccountsCollapse={toggleAccountsCollapse}
+		/>
 
 		<!-- Disabled feedback tooltip -->
 		{#if showDisabledTooltip}
@@ -444,120 +316,50 @@
 		{/if}
 
 		<!-- Navigation -->
-		<nav class="flex-1 overflow-y-auto px-2 mt-1">
-			<div class="space-y-0.5 pb-2">
-				{#each navItems as item}
-					<button
-						class={cn(
-							'group flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-[13px] relative transition-all duration-150',
-							isAccountConfigured && item.folder === activeFolder
-								? 'bg-[var(--bg-active)] text-[var(--text-primary)] font-semibold shadow-[0_1px_2px_rgba(0,0,0,0.04)]'
-								: '',
-							isAccountConfigured
-								? 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] cursor-pointer active:scale-[0.98]'
-								: 'text-[var(--text-quaternary)] cursor-not-allowed'
-						)}
-						onclick={() => handleFolderClick(item.folder)}
-						disabled={!isAccountConfigured}
-					>
-						{#if isAccountConfigured && item.folder === activeFolder}
-							<div class="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full bg-[var(--accent-primary)] transition-all duration-200"></div>
-						{/if}
-						<item.icon class={cn(
-							"size-[17px] shrink-0 transition-colors duration-150",
-							isAccountConfigured && item.folder === activeFolder && "text-[var(--accent-primary)]"
-						)} strokeWidth={1.8} />
-						<span class="flex-1 text-left truncate">
-							{item.label}
-						</span>
-						{#if item.folder === 'inbox' && unreadCount > 0}
-							<span class="text-[11px] font-semibold text-[var(--accent-primary)] bg-[var(--accent-light)] rounded-full px-1.5 py-0.5 min-w-[20px] text-center tabular-nums">
-								{unreadCount}
-							</span>
-						{/if}
-					</button>
-				{/each}
-			</div>
-		</nav>
-
-		<!-- Footer -->
-		<div class="shrink-0 px-2 pb-2.5 pt-1">
-			<div class="mx-2 h-px bg-[var(--border-primary)] opacity-40 mb-2"></div>
-			<button
-				onclick={navigateToSettings}
-				class="settings-icon group flex items-center gap-2.5 w-full px-2.5 py-1.5 rounded-lg text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-all duration-150 cursor-pointer active:scale-[0.98]"
-				aria-label={$_('settings.title')}
-				title={showShortcutHints ? 'Cmd/Ctrl+,' : $_('settings.title')}
-			>
-				<Settings class="size-[17px] transition-transform duration-300 group-hover:rotate-45" strokeWidth={1.8} />
-				<span class="text-[13px]">{$_('settings.title')}</span>
-			</button>
-		</div>
+		<FolderNavigation
+			navItems={navItems}
+			activeFolder={activeFolder}
+			isAccountConfigured={isAccountConfigured}
+			unreadCount={unreadCount}
+			collapsed={collapsed}
+			isMobile={isMobile}
+			onSelectFolder={handleFolderClick}
+		/>
 	{:else}
 		<!-- Collapsed state - show compose icon button -->
-		<div class="flex flex-col items-center gap-1 px-2 mt-2">
-			<button
-				onclick={openCompose}
-				disabled={!isAccountConfigured}
-				class={cn(
-					"flex size-8 items-center justify-center rounded-md relative z-10 transition-all duration-120",
-					isAccountConfigured
-						? "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] cursor-pointer"
-						: "text-[var(--text-quaternary)] cursor-not-allowed"
-				)}
-				aria-label={$_('mail.compose')}
-			>
-				{#if isAccountConfigured}
-					<SquarePen class="size-[16px]" strokeWidth={1.8} />
-				{:else}
-					<Lock class="size-[16px]" strokeWidth={1.8} />
-				{/if}
-			</button>
-		</div>
+		<ComposeButton
+			isAccountConfigured={isAccountConfigured}
+			collapsed={collapsed}
+			isMobile={isMobile}
+			onOpenCompose={openCompose}
+		/>
 
 		<!-- Collapsed navigation -->
-		<nav class="flex-1 overflow-y-auto px-2 mt-1">
-			<div class="flex flex-col items-center gap-0.5 pb-2">
-				{#each navItems as item}
-					<button
-						class={cn(
-							'group flex size-8 items-center justify-center rounded-md relative z-10 transition-all duration-120',
-							isAccountConfigured && item.folder === activeFolder
-								? 'bg-[var(--bg-active)] text-[var(--text-primary)]'
-								: '',
-							isAccountConfigured
-								? 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] cursor-pointer'
-								: 'text-[var(--text-quaternary)] cursor-not-allowed'
-						)}
-						onclick={() => handleFolderClick(item.folder)}
-						disabled={!isAccountConfigured}
-						aria-label={item.label}
-					>
-						<div class="relative">
-							<item.icon class="size-[17px]" strokeWidth={1.8} />
-							{#if item.folder === 'inbox' && unreadCount > 0}
-								<span class="absolute -top-0.5 -right-0.5 size-2 bg-[var(--accent-primary)] rounded-full border-2 border-[var(--bg-secondary)]"></span>
-							{/if}
-						</div>
-					</button>
-				{/each}
-			</div>
-		</nav>
+		<FolderNavigation
+			navItems={navItems}
+			activeFolder={activeFolder}
+			isAccountConfigured={isAccountConfigured}
+			unreadCount={unreadCount}
+			collapsed={collapsed}
+			isMobile={isMobile}
+			onSelectFolder={handleFolderClick}
+		/>
 
-		<!-- Collapsed footer -->
-		<div class="shrink-0 px-2 pb-2">
-			<div class="flex flex-col items-center gap-1">
-			<button
-				onclick={navigateToSettings}
-				class="settings-icon group flex size-8 items-center justify-center rounded-md text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-all duration-120 relative z-10 cursor-pointer"
-				aria-label={$_('settings.title')}
-				title={showShortcutHints ? 'Cmd/Ctrl+,' : $_('settings.title')}
-			>
-				<Settings class="size-[17px] transition-transform duration-300 group-hover:rotate-45" strokeWidth={1.8} />
-			</button>
-			</div>
-		</div>
 	{/if}
+
+	<!-- Spacer to push settings to bottom -->
+	<div class="flex-1"></div>
+
+	<!-- Settings button - bottom left -->
+	<div class="shrink-0 px-2.5 pb-2.5">
+		<button
+			onclick={() => onOpenSettings?.()}
+			class="flex size-8 items-center justify-center rounded-md text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-all"
+			aria-label={$_('common.settings')}
+		>
+			<Settings class="size-[16px]" strokeWidth={1.8} />
+		</button>
+	</div>
 
 	<!-- Compose Modal -->
 	<ComposeModal

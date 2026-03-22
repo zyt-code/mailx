@@ -330,8 +330,8 @@ const DEFAULTS = { sidebarCollapsed: false, mailListWidth: DEFAULT_MAIL_LIST_WID
 		onToggle={toggleSidebar}
 		onSelectFolder={selectFolder}
 		onRefresh={loadMails}
-		onOpenSettings={openSettings}
 		onSelectAccount={handleSelectAccount}
+		onOpenSettings={openSettings}
 	/>
 
 	{#if isMobile}

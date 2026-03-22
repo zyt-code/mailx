@@ -2,7 +2,6 @@
 	import { goto } from '$app/navigation';
 	import { invoke } from '@tauri-apps/api/core';
 	import { Plus, Loader2, AtSign, Trash2, RefreshCw, Edit, CheckCircle, XCircle, Clock } from 'lucide-svelte';
-	import * as db from '$lib/db/index.js';
 	import { syncAccount } from '$lib/sync/index.js';
 	import type { SyncStatus } from '$lib/types.js';
 	import { _ } from 'svelte-i18n';
@@ -20,7 +19,6 @@
 	let syncStatuses = $state<Record<string, SyncStatus>>({});
 	let isLoading = $state(true);
 	let error = $state<string | null>(null);
-	let isClearing = $state(false);
 	let syncingAccountId = $state<string | null>(null);
 
 	interface StatusInfo {
@@ -111,21 +109,6 @@
 		}
 	}
 
-	async function handleClearDatabase() {
-		if (!confirm($_('account.clearDbConfirm'))) {
-			return;
-		}
-		isClearing = true;
-		try {
-			await db.clearDatabase();
-			alert($_('account.clearDbSuccess'));
-		} catch (e) {
-			alert($_('account.failedToClearDb') + ': ' + (e instanceof Error ? e.message : String(e)));
-		} finally {
-			isClearing = false;
-		}
-	}
-
 	async function handleSyncAccount(accountId: string, event: Event) {
 		event.stopPropagation();
 		syncingAccountId = accountId;
@@ -172,25 +155,6 @@
 		</button>
 	{/if}
 </header>
-
-<!-- Developer Tools Section -->
-<div class="devtools-section">
-	<h3 class="devtools-title">{$_('account.devTools')}</h3>
-	<p class="devtools-description">{$_('account.devToolsDescription')}</p>
-	<button
-		onclick={handleClearDatabase}
-		disabled={isClearing}
-		class="clear-db-button"
-	>
-		{#if isClearing}
-			<Loader2 class="size-4 animate-spin" />
-		{:else}
-			<Trash2 class="size-4" />
-		{/if}
-		<span>{isClearing ? $_('account.clearingDatabase') : $_('account.clearDatabase')}</span>
-	</button>
-	<p class="devtools-hint">{$_('account.clearDbHint')}</p>
-</div>
 
 <!-- Error State -->
 {#if error}
@@ -709,60 +673,4 @@
 		}
 	}
 
-	/* Devtools Section */
-	.devtools-section {
-		padding: 1.5rem;
-		margin-bottom: 1.5rem;
-		background: color-mix(in srgb, var(--bg-primary) 70%, transparent);
-		backdrop-filter: blur(10px);
-		border: 1px solid var(--border-primary);
-		border-radius: 16px;
-		animation: fadeIn 0.4s ease-out;
-	}
-
-	.devtools-title {
-		font-size: 1rem;
-		font-weight: 560;
-		letter-spacing: -0.01em;
-		color: var(--text-primary);
-		margin-bottom: 0.25rem;
-	}
-
-	.devtools-description {
-		font-size: 0.8125rem;
-		color: var(--text-secondary);
-		margin-bottom: 1rem;
-	}
-
-	.clear-db-button {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		padding: 0.625rem 1rem;
-		font-size: 0.8125rem;
-		font-weight: 500;
-		color: var(--error);
-		background: color-mix(in srgb, var(--error) 8%, transparent);
-		border: 1px solid color-mix(in srgb, var(--error) 20%, transparent);
-		border-radius: 10px;
-		cursor: pointer;
-		transition: all 0.2s ease;
-	}
-
-	.clear-db-button:hover:not(:disabled) {
-		background: color-mix(in srgb, var(--error) 12%, transparent);
-		border-color: color-mix(in srgb, var(--error) 30%, transparent);
-	}
-
-	.clear-db-button:disabled {
-		opacity: 0.6;
-		cursor: not-allowed;
-	}
-
-	.devtools-hint {
-		margin-top: 0.75rem;
-		font-size: 11px;
-		color: var(--text-tertiary);
-		line-height: 1.4;
-	}
 </style>

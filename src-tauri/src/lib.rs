@@ -141,24 +141,11 @@ pub fn run() {
 
             #[cfg(not(target_os = "macos"))]
             {
-                // Windows/Linux: Hide menu bar by using empty menu
-                use tauri::menu::{Menu, MenuItem, Submenu};
+                // Windows/Linux: No native menu bar
+                use tauri::menu::Menu;
 
-                let about_item = MenuItem::with_id(app, MENU_ID_ABOUT, "About", true, None::<&str>)?;
-                let tools_menu = Submenu::with_items(app, "Tools", true, &[&about_item])?;
-
-                let menu = Menu::with_items(app, &[&tools_menu])?;
+                let menu = Menu::new(app)?;
                 app.set_menu(menu)?;
-
-                // Handle menu events for Windows/Linux
-                app.on_menu_event(|app, event| match event.id.as_ref() {
-                    MENU_ID_ABOUT => {
-                        if let Some(window) = app.get_webview_window(WINDOW_ID_MAIN) {
-                            let _ = window.emit("navigate", NAV_ROUTE_ABOUT);
-                        }
-                    }
-                    _ => {}
-                });
             }
 
             Ok(())

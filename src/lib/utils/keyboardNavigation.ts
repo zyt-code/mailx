@@ -61,7 +61,7 @@ export function getFocusableElements(container: HTMLElement = document.body): HT
     }
 
     // In test environment, skip offset checks for JSDOM
-    if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') {
+    if (typeof window !== 'undefined' && 'jest' in window) {
       return true;
     }
 

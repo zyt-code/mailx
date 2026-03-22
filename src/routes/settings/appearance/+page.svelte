@@ -1,17 +1,13 @@
 <script lang="ts">
-	import { Palette, Sun, Moon, Monitor, Check } from 'lucide-svelte';
+	import { Palette, Sun, Moon, Monitor, Check, Sparkles } from 'lucide-svelte';
 	import { _ } from 'svelte-i18n';
 	import { preferences, ACCENT_PRESETS, type AccentTone, type MailDensity, type AppearancePreferences, type Theme } from '$lib/stores/preferencesStore.js';
 
-
-	const themeKeys: Record<Theme, { labelKey: string; descKey: string; icon: typeof Sun }> = {
-		light: { labelKey: 'theme.light', descKey: 'theme.lightDescription', icon: Sun },
-		dark: { labelKey: 'theme.dark', descKey: 'theme.darkDescription', icon: Moon },
-		system: { labelKey: 'theme.system', descKey: 'theme.systemDescription', icon: Monitor }
-	};
-
-	const themes: Theme[] = ['light', 'dark', 'system'];
-
+	const themes: Array<{ id: Theme; labelKey: string; descKey: string; icon: typeof Sun }> = [
+		{ id: 'light', labelKey: 'theme.light', descKey: 'theme.lightDescription', icon: Sun },
+		{ id: 'dark', labelKey: 'theme.dark', descKey: 'theme.darkDescription', icon: Moon },
+		{ id: 'system', labelKey: 'theme.system', descKey: 'theme.systemDescription', icon: Monitor }
+	];
 
 	const accentKeys: Record<AccentTone, { nameKey: string; descKey: string }> = {
 		blue: { nameKey: 'appearance.accentBlue', descKey: 'appearance.accentBlueDesc' },
@@ -20,25 +16,32 @@
 		graphite: { nameKey: 'appearance.accentGraphite', descKey: 'appearance.accentGraphiteDesc' }
 	};
 
-	const accentOptions = Object.entries(ACCENT_PRESETS).map(([id, palette]) => ({
-		id: id as AccentTone,
-		...palette
-	}));
-
-	const densityKeys: Record<MailDensity, { labelKey: string; descKey: string }> = {
-		compact: { labelKey: 'theme.compact', descKey: 'theme.compactDescription' },
-		comfortable: { labelKey: 'theme.comfortable', descKey: 'theme.comfortableDescription' },
-		airy: { labelKey: 'theme.airy', descKey: 'theme.airyDescription' }
+	const densityMeta: Record<MailDensity, { labelKey: string; descKey: string; subjectChars: number; snippetChars: number }> = {
+		compact: { labelKey: 'theme.compact', descKey: 'theme.compactDescription', subjectChars: 24, snippetChars: 32 },
+		comfortable: { labelKey: 'theme.comfortable', descKey: 'theme.comfortableDescription', subjectChars: 36, snippetChars: 56 },
+		airy: { labelKey: 'theme.airy', descKey: 'theme.airyDescription', subjectChars: 48, snippetChars: 84 }
 	};
 
+	const accentOptions = Object.entries(ACCENT_PRESETS).map(([id, palette]) => ({ id: id as AccentTone, ...palette }));
 	const densityOptions: MailDensity[] = ['compact', 'comfortable', 'airy'];
+	const densityHeights: Record<MailDensity, number> = { compact: 58, comfortable: 74, airy: 92 };
 
-	let activeTheme = $derived($preferences.appearance.theme);
+	const sampleSubject = 'Sprint update: design review and launch readiness check';
+	const sampleBody = 'First line preview keeps only meaningful words and removes extra wrapping before clipping.';
+
 	let appearance = $derived($preferences.appearance);
 
 	function updateAppearance(patch: Partial<AppearancePreferences>) {
 		preferences.updateSection('appearance', patch);
 	}
+
+	function truncateText(value: string, limit: number): string {
+		if (value.length <= limit) return value;
+		return `${value.slice(0, Math.max(0, limit - 1)).trimEnd()}…`;
+	}
+
+	let previewSubject = $derived(truncateText(sampleSubject, densityMeta[appearance.mailDensity].subjectChars));
+	let previewSnippet = $derived(truncateText(sampleBody, densityMeta[appearance.mailDensity].snippetChars));
 </script>
 
 <div class="settings-page">
@@ -49,9 +52,7 @@
 		<div>
 			<p class="page-kicker">{$_('appearance.kicker')}</p>
 			<h2 class="page-title">{$_('appearance.title')}</h2>
-			<p class="page-subtitle">
-				{$_('appearance.subtitle')}
-			</p>
+			<p class="page-subtitle">{$_('appearance.subtitle')}</p>
 		</div>
 	</header>
 
@@ -62,44 +63,26 @@
 				<p class="section-description">{$_('appearance.themeDescription')}</p>
 			</div>
 		</div>
-
-		<div class="theme-grid">
-			{#each themes as themeId}
-				{@const meta = themeKeys[themeId]}
+		<div class="theme-segmented" role="radiogroup" aria-label={$_('appearance.themeTitle')}>
+			{#each themes as theme}
 				<button
-					class="theme-option"
-					class:active={activeTheme === themeId}
-					onclick={() => updateAppearance({ theme: themeId })}
-					aria-label={$_('appearance.switchTo', { values: { name: $_( meta.labelKey) } })}
-					aria-pressed={activeTheme === themeId}
+					type="button"
+					class="theme-segment"
+					class:active={appearance.theme === theme.id}
+					role="radio"
+					aria-checked={appearance.theme === theme.id}
+					aria-label={$_('appearance.switchTo', { values: { name: $_(theme.labelKey) } })}
+					onclick={() => updateAppearance({ theme: theme.id })}
 				>
-					<div class="theme-preview">
-						{#if themeId === 'system'}
-							<div class="system-preview">
-								<div class="system-preview-light"></div>
-								<div class="system-preview-dark"></div>
-							</div>
-						{:else}
-							<div class="simple-preview {themeId === 'light' ? 'bg-white border border-[var(--border-primary)]' : 'bg-[var(--bg-primary)] border border-[var(--border-primary)]'}"></div>
-						{/if}
-					</div>
-
-					<div class="theme-icon">
-						<meta.icon class="size-4" strokeWidth={1.7} />
-					</div>
-
-					<div class="theme-info">
-						<p class="option-label">{$_(meta.labelKey)}</p>
-						<p class="option-description">{$_(meta.descKey)}</p>
-					</div>
-
-					{#if activeTheme === themeId}
-						<div class="selection-indicator">
-							<Check class="check-icon" strokeWidth={2.2} />
-						</div>
-					{/if}
+					<theme.icon class="size-4" strokeWidth={1.7} />
+					<span>{$_(theme.labelKey)}</span>
 				</button>
 			{/each}
+		</div>
+		<div class="theme-summary">
+			<p class="option-description">
+				{$_(themes.find((t) => t.id === appearance.theme)?.descKey ?? 'theme.systemDescription')}
+			</p>
 		</div>
 	</section>
 
@@ -115,13 +98,14 @@
 			{#each accentOptions as accent}
 				{@const keys = accentKeys[accent.id]}
 				<button
+					type="button"
 					class="accent-option"
 					class:active={appearance.accentTone === accent.id}
 					onclick={() => updateAppearance({ accentTone: accent.id })}
 				>
 					<div class="accent-preview" style={`--swatch-primary:${accent.primary}; --swatch-secondary:${accent.secondary}; --swatch-light:${accent.light};`}>
-						<div class="accent-strip"></div>
-						<div class="accent-pill"></div>
+						<div class="accent-chip"></div>
+						<div class="accent-line"></div>
 						<div class="accent-dot"></div>
 					</div>
 					<div class="accent-copy">
@@ -149,19 +133,40 @@
 		</div>
 
 		<div class="density-grid">
-			{#each densityOptions as optionId}
-				{@const keys = densityKeys[optionId]}
+			{#each densityOptions as density}
+				{@const meta = densityMeta[density]}
 				<button
+					type="button"
 					class="density-option"
-					class:active={appearance.mailDensity === optionId}
-					onclick={() => updateAppearance({ mailDensity: optionId })}
+					class:active={appearance.mailDensity === density}
+					onclick={() => updateAppearance({ mailDensity: density })}
+					aria-pressed={appearance.mailDensity === density}
 				>
 					<div>
-						<p class="option-label">{$_(keys.labelKey)}</p>
-						<p class="option-description">{$_(keys.descKey)}</p>
+						<p class="option-label">{$_(meta.labelKey)}</p>
+						<p class="option-description">{$_(meta.descKey)}</p>
 					</div>
+					{#if appearance.mailDensity === density}
+						<Check class="size-4 text-[var(--accent-primary)]" strokeWidth={2.1} />
+					{/if}
 				</button>
 			{/each}
+		</div>
+
+		<div class="density-preview">
+			<div class="density-preview-header">
+				<div class="density-preview-title">
+					<Sparkles class="size-4" strokeWidth={1.8} />
+					<span>{$_('theme.mailDensity')}</span>
+				</div>
+				<span class="density-badge">{$_(densityMeta[appearance.mailDensity].labelKey)}</span>
+			</div>
+			<div class="mail-row-preview" style={`height:${densityHeights[appearance.mailDensity]}px`}>
+				<div class="preview-subject">{previewSubject}</div>
+				{#if appearance.showPreviewSnippets}
+					<div class="preview-snippet">{previewSnippet}</div>
+				{/if}
+			</div>
 		</div>
 	</section>
 
@@ -171,13 +176,13 @@
 				<h3 class="section-title">{$_('appearance.threadDetails')}</h3>
 				<p class="section-description">{$_('appearance.threadDetailsDescription')}</p>
 			</div>
-			<button class="reset-button" onclick={() => preferences.resetSection('appearance')}>
+			<button class="reset-button" type="button" onclick={() => preferences.resetSection('appearance')}>
 				{$_('appearance.resetAppearance')}
 			</button>
 		</div>
 
 		<div class="toggle-stack">
-			<button class="toggle-row" onclick={() => updateAppearance({ showPreviewSnippets: !appearance.showPreviewSnippets })}>
+			<button type="button" class="toggle-row" onclick={() => updateAppearance({ showPreviewSnippets: !appearance.showPreviewSnippets })}>
 				<div>
 					<p class="option-label">{$_('appearance.previewSnippets')}</p>
 					<p class="option-description">{$_('appearance.previewSnippetsDescription')}</p>
@@ -187,7 +192,7 @@
 				</span>
 			</button>
 
-			<button class="toggle-row" onclick={() => updateAppearance({ showAccountColor: !appearance.showAccountColor })}>
+			<button type="button" class="toggle-row" onclick={() => updateAppearance({ showAccountColor: !appearance.showAccountColor })}>
 				<div>
 					<p class="option-label">{$_('appearance.accountColorMarkers')}</p>
 					<p class="option-description">{$_('appearance.accountColorMarkersDescription')}</p>
@@ -201,16 +206,48 @@
 </div>
 
 <style>
-	.theme-grid,
-	.density-grid {
+	.theme-segmented {
 		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+		padding: 0.25rem;
+		border-radius: 14px;
+		background: color-mix(in srgb, var(--bg-secondary) 72%, transparent);
+		border: 1px solid color-mix(in srgb, var(--border-primary) 88%, transparent);
+	}
+
+	.theme-segment {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.45rem;
+		height: 2.35rem;
+		border-radius: 10px;
+		border: none;
+		background: transparent;
+		color: var(--text-secondary);
+		font-size: 0.84rem;
+		font-weight: 620;
+		cursor: pointer;
+	}
+
+	.theme-segment.active {
+		background: var(--bg-primary);
+		color: var(--text-primary);
+		box-shadow: var(--shadow-xs);
+	}
+
+	.theme-summary {
+		padding: 0.15rem 0.1rem 0;
+	}
+
+	.accent-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
 		gap: 0.8rem;
 	}
 
-	.theme-option,
-	.density-option,
-	.accent-option {
+	.accent-option,
+	.density-option {
 		display: grid;
 		gap: 0.7rem;
 		padding: 0.9rem 1rem;
@@ -221,81 +258,57 @@
 		cursor: pointer;
 	}
 
-	.theme-option:hover,
-	.density-option:hover,
-	.accent-option:hover {
+	.accent-option:hover,
+	.density-option:hover {
 		border-color: color-mix(in srgb, var(--accent-primary) 22%, var(--border-primary));
 		transform: translateY(-1px);
 		box-shadow: var(--shadow-sm);
 	}
 
-	.theme-option.active,
-	.density-option.active,
-	.accent-option.active {
+	.accent-option.active,
+	.density-option.active {
 		background: color-mix(in srgb, var(--accent-light) 85%, var(--bg-primary));
 		border-color: color-mix(in srgb, var(--accent-primary) 28%, var(--border-primary));
 	}
 
-	.theme-option {
-		align-items: center;
-	}
-
-	.theme-icon {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		width: 2.35rem;
-		height: 2.35rem;
-		border-radius: 14px;
-		background: color-mix(in srgb, var(--bg-primary) 88%, transparent);
-		color: var(--accent-primary);
-	}
-
-	.accent-grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-		gap: 0.8rem;
-	}
-
 	.accent-preview {
 		position: relative;
-		height: 4.6rem;
-		border-radius: 16px;
+		height: 4.2rem;
+		border-radius: 14px;
 		background:
-			linear-gradient(140deg, var(--swatch-light) 0%, white 65%),
+			linear-gradient(150deg, var(--swatch-light), white 65%),
 			linear-gradient(140deg, var(--swatch-primary), var(--swatch-secondary));
 		overflow: hidden;
 	}
 
-	.accent-strip {
+	.accent-chip {
 		position: absolute;
-		top: 0.8rem;
-		left: 0.9rem;
-		width: 3.2rem;
-		height: 0.48rem;
+		top: 0.75rem;
+		left: 0.75rem;
+		width: 2.8rem;
+		height: 0.9rem;
 		border-radius: 999px;
 		background: var(--swatch-primary);
 	}
 
-	.accent-pill {
+	.accent-line {
 		position: absolute;
-		left: 0.9rem;
-		bottom: 0.95rem;
-		width: 5.4rem;
-		height: 1rem;
+		bottom: 0.9rem;
+		left: 0.75rem;
+		width: 5.2rem;
+		height: 0.42rem;
 		border-radius: 999px;
-		background: color-mix(in srgb, var(--swatch-primary) 16%, white);
+		background: color-mix(in srgb, var(--swatch-secondary) 30%, white);
 	}
 
 	.accent-dot {
 		position: absolute;
-		right: 1rem;
-		bottom: 0.9rem;
-		width: 1.05rem;
-		height: 1.05rem;
+		right: 0.9rem;
+		bottom: 0.75rem;
+		width: 0.95rem;
+		height: 0.95rem;
 		border-radius: 999px;
 		background: var(--swatch-secondary);
-		box-shadow: 0 0 0 6px color-mix(in srgb, var(--swatch-primary) 12%, transparent);
 	}
 
 	.accent-copy {
@@ -306,7 +319,7 @@
 	}
 
 	.check-badge {
-		display: flex;
+		display: inline-flex;
 		align-items: center;
 		justify-content: center;
 		width: 1.6rem;
@@ -317,177 +330,84 @@
 		flex-shrink: 0;
 	}
 
-	/* Enhanced theme option styles */
-	.theme-option {
-		position: relative;
-		grid-template-columns: auto 1fr auto;
-		align-items: start;
+	.density-grid {
+		display: grid;
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+		gap: 0.75rem;
 	}
 
-	.theme-preview {
-		grid-column: 1 / -1;
-		height: 4.5rem;
-		border-radius: 12px;
-		margin-bottom: 0.75rem;
-		overflow: hidden;
-		background: var(--bg-secondary);
-		transition: transform 0.3s cubic-bezier(0.2, 0, 0, 1);
-	}
-
-	.simple-preview {
-		width: 100%;
-		height: 100%;
-		border-radius: 10px;
-	}
-
-	.system-preview {
-		display: flex;
-		width: 100%;
-		height: 100%;
-		position: relative;
-		overflow: hidden;
-	}
-
-	.system-preview-light {
-		flex: 1;
-		background: white;
-		border-right: 1px solid var(--border-primary);
-	}
-
-	.system-preview-dark {
-		flex: 1;
-		background: #1c1c1e;
-	}
-
-	.theme-icon {
-		grid-column: 1;
-		grid-row: 2;
-	}
-
-	.theme-info {
-		grid-column: 2;
-		grid-row: 2;
-	}
-
-	.selection-indicator {
-		grid-column: 3;
-		grid-row: 2;
+	.density-option {
 		display: flex;
 		align-items: center;
-		justify-content: center;
-		width: 1.6rem;
-		height: 1.6rem;
+		justify-content: space-between;
+	}
+
+	.density-preview {
+		display: grid;
+		gap: 0.65rem;
+		padding: 0.95rem;
+		border-radius: 16px;
+		background: color-mix(in srgb, var(--bg-secondary) 72%, transparent);
+		border: 1px solid color-mix(in srgb, var(--border-primary) 88%, transparent);
+	}
+
+	.density-preview-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+	}
+
+	.density-preview-title {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.45rem;
+		font-size: 0.8rem;
+		font-weight: 650;
+		color: var(--text-secondary);
+	}
+
+	.density-badge {
+		padding: 0.25rem 0.6rem;
 		border-radius: 999px;
-		background: var(--accent-primary);
-		color: white;
-		margin-left: 0.5rem;
-		animation: check-pop 0.3s cubic-bezier(0.2, 0, 0, 1);
+		font-size: 0.72rem;
+		font-weight: 650;
+		color: var(--accent-primary);
+		background: color-mix(in srgb, var(--accent-primary) 10%, transparent);
 	}
 
-	.selection-indicator :global(.check-icon) {
-		width: 0.9rem;
-		height: 0.9rem;
+	.mail-row-preview {
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+		gap: 0.35rem;
+		padding: 0.65rem 0.8rem;
+		border-radius: 12px;
+		background: var(--bg-primary);
+		border: 1px solid color-mix(in srgb, var(--border-primary) 90%, transparent);
 	}
 
-	
-
-	/* Active theme enhancement */
-	.theme-option.active {
-		position: relative;
-		z-index: 1;
-		border-color: var(--accent-primary);
-		background: color-mix(in srgb, var(--accent-light) 92%, var(--bg-primary));
-		box-shadow:
-			0 0 0 1px color-mix(in srgb, var(--accent-primary) 30%, transparent),
-			0 4px 12px color-mix(in srgb, var(--accent-light) 40%, transparent);
-		animation: theme-select-pulse 0.4s cubic-bezier(0.2, 0, 0, 1);
+	.preview-subject {
+		font-size: 0.9rem;
+		font-weight: 620;
+		color: var(--text-primary);
+		line-height: 1.4;
 	}
 
-	@keyframes theme-select-pulse {
-		0% {
-			transform: translateY(0);
-			box-shadow:
-				0 0 0 1px color-mix(in srgb, var(--accent-primary) 30%, transparent),
-				0 0 0 0 color-mix(in srgb, var(--accent-light) 0%, transparent);
+	.preview-snippet {
+		font-size: 0.8rem;
+		color: var(--text-tertiary);
+		line-height: 1.4;
+	}
+
+	@media (max-width: 900px) {
+		.density-grid {
+			grid-template-columns: 1fr;
 		}
-		50% {
-			transform: translateY(-2px);
-			box-shadow:
-				0 0 0 1px color-mix(in srgb, var(--accent-primary) 40%, transparent),
-				0 8px 20px color-mix(in srgb, var(--accent-light) 60%, transparent);
-		}
-		100% {
-			transform: translateY(0);
-			box-shadow:
-				0 0 0 1px color-mix(in srgb, var(--accent-primary) 30%, transparent),
-				0 4px 12px color-mix(in srgb, var(--accent-light) 40%, transparent);
-		}
-	}
-
-	.theme-option:hover:not(.active) {
-		transform: translateY(-1px);
-		border-color: color-mix(in srgb, var(--accent-primary) 35%, var(--border-primary));
-		box-shadow: 0 4px 12px color-mix(in srgb, var(--border-primary) 20%, transparent);
-	}
-
-	/* System preview shimmer */
-	.system-preview::after {
-		content: '';
-		position: absolute;
-		top: 0;
-		left: 0;
-		right: 0;
-		bottom: 0;
-		background: linear-gradient(90deg,
-			transparent 0%,
-			color-mix(in srgb, white 15%, transparent) 50%,
-			transparent 100%
-		);
-		opacity: 0;
-		animation: system-shimmer 3s ease-in-out infinite;
-	}
-
-	@keyframes system-shimmer {
-		0%, 100% {
-			opacity: 0;
-			transform: translateX(-100%);
-		}
-		10%, 90% {
-			opacity: 0.4;
-		}
-		50% {
-			opacity: 0.4;
-			transform: translateX(100%);
-		}
-	}
-
-	@keyframes check-pop {
-		0% { transform: scale(0); opacity: 0; }
-		80% { transform: scale(1.1); }
-		100% { transform: scale(1); opacity: 1; }
-	}
-
-	.theme-option:hover .theme-preview {
-		transform: scale(1.02);
-	}
-
-	.theme-option.active .theme-preview {
-		transform: scale(1.03);
-		box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-primary) 20%, transparent);
 	}
 
 	@media (max-width: 640px) {
-		.theme-option {
-			grid-template-columns: auto 1fr;
-		}
-
-		.theme-preview {
-			grid-column: 1 / -1;
-		}
-
-		.selection-indicator {
-			grid-column: 2;
-			justify-self: end;
+		.theme-segmented {
+			grid-template-columns: 1fr;
 		}
 	}
 </style>
