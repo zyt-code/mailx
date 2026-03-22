@@ -43,8 +43,6 @@
 	{#if platform === 'windows'}
 	<!-- Windows 11 Style Titlebar -->
 	<div class="titlebar titlebar-windows">
-		<div class="titlebar-drag-region" data-tauri-drag-region></div>
-
 		<!-- Left side: App icon/title area (draggable) -->
 		<div class="titlebar-left" data-tauri-drag-region>
 			<div class="titlebar-icon">
@@ -83,8 +81,6 @@
 {:else}
 	<!-- macOS/Linux Style Titlebar with Traffic Lights -->
 	<div class="titlebar titlebar-unix">
-		<div class="titlebar-drag-region" data-tauri-drag-region></div>
-
 		<!-- Traffic Lights (left side) -->
 		<div class="titlebar-controls">
 			<button onclick={closeWindow} class="traffic-light traffic-light-close" aria-label={$_('titlebar.close')}></button>
@@ -107,12 +103,6 @@
 		-webkit-user-select: none;
 		position: relative;
 		overflow: hidden;
-	}
-
-	.titlebar-drag-region {
-		position: absolute;
-		inset: 0;
-		z-index: 1;
 	}
 
 	/* ============================================
@@ -178,6 +168,8 @@
 		transition: background 0.1s ease;
 		pointer-events: auto;
 		color: var(--text-primary);
+		position: relative;
+		z-index: 101;
 	}
 
 	/* Minimize and Maximize hover */
@@ -203,10 +195,6 @@
 		padding: 0 14px;
 		background: var(--bg-primary);
 		border-bottom: 1px solid var(--border-primary);
-	}
-
-	.titlebar-unix .titlebar-drag-region {
-		margin: 0 60px; /* Leave space for traffic lights */
 	}
 
 	.titlebar-unix .titlebar-controls {
