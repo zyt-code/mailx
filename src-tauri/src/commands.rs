@@ -1,12 +1,9 @@
 use crate::accounts::{Account, AccountManager};
 use crate::credentials_legacy::CredentialManager;
-use crate::database::{Attachment, Database, Mail};
+use crate::database::{Attachment, Database, Mail, NotificationRecord};
 use crate::html_sanitize;
 use crate::imap_client::ImapClient;
-use crate::notification_manager::{
-    NotificationAction, NotificationManager, NotificationPreferences, NotificationPriority,
-    NotificationRequest, NotificationType,
-};
+
 use crate::provider_defaults;
 use crate::smtp_client::SmtpClient;
 use crate::sync_manager::{SyncManager, SyncStatus};
@@ -706,55 +703,38 @@ pub fn clear_crash_dumps(app_handle: AppHandle) -> Result<usize, String> {
 // Notification Commands
 // ============================================================================
 
-/// Show a notification
-#[tauri::command]
-pub async fn show_notification(
-    request: NotificationRequest,
-    manager: State<'_, Arc<NotificationManager>>,
-) -> Result<(), String> {
-    manager.show(request).await
-}
+// ============================================================================
 
-/// Send a test notification (simplified API)
+/// Send notification with history tracking
 #[tauri::command]
-pub async fn send_test_notification(
-    manager: State<'_, Arc<NotificationManager>>,
+pub async fn send_notification_with_history(
+    title: String,
+    body: Option<String>,
+    db: State<'_, Database>,
+    app_handle: AppHandle,
 ) -> Result<(), String> {
-    let request = NotificationRequest {
-        account_id: 1,
-        mail_id: None,
-        notification_type: NotificationType::System("Test notification".to_string()),
-        title: "🎉 Test Notification".to_string(),
-        body: "If you see this, the notification system is working!".to_string(),
-        priority: NotificationPriority::Normal,
-        actions: vec![],
-        timeout: None,
-    };
-    manager.show(request).await
-}
+    // 1. Emit event to frontend for actual notification display
+    let _ = app_handle.emit("notification:show", json!({
+        "title": title,
+        "body": body
+    }));
 
-/// Set notification preferences
-#[tauri::command]
-pub async fn set_notification_preferences(
-    prefs: NotificationPreferences,
-    manager: State<'_, Arc<NotificationManager>>,
-) -> Result<(), String> {
-    manager.set_preferences(prefs).await;
+    // 2. Save to database
+    let body_str = body.as_deref().unwrap_or("");
+    db.inner()
+        .insert_notification(0, None, "sent", &title, body_str, 1, None)
+        .map_err(|e| format!("Failed to save notification: {}", e))?;
+
+    println!("[Notification] ✅ Sent: {} - {}", title, body_str);
     Ok(())
 }
 
-/// Get notification preferences
+/// Get notification history from database
 #[tauri::command]
-pub async fn get_notification_preferences(
-    manager: State<'_, Arc<NotificationManager>>,
-) -> Result<NotificationPreferences, String> {
-    Ok(manager.get_preferences().await)
-}
-
-/// Close all notifications
-#[tauri::command]
-pub async fn close_all_notifications(
-    manager: State<'_, Arc<NotificationManager>>,
-) -> Result<(), String> {
-    manager.close_all().await
+pub async fn get_notification_history(
+    limit: Option<i64>,
+    db: State<'_, Database>,
+) -> Result<Vec<NotificationRecord>, String> {
+    db.get_notifications(None, limit.unwrap_or(10))
+        .map_err(|e| e.to_string())
 }

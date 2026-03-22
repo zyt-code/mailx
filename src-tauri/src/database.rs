@@ -80,8 +80,8 @@ pub struct Mail {
 
 /// Database wrapper for SQLite operations
 pub struct Database {
-    conn: Mutex<Connection>,
-    attachments_root: PathBuf,
+    pub conn: Mutex<Connection>,
+    pub attachments_root: PathBuf,
 }
 
 // SAFETY: rusqlite::Connection is Send + Sync when using bundled features
@@ -1184,3 +1184,7 @@ fn strip_html(html: &str) -> String {
     // Clean up extra whitespace that may result from HTML removal
     clean.split_whitespace().collect::<Vec<_>>().join(" ")
 }
+
+#[cfg(test)]
+#[path = "../test/notification_history_tests.rs"]
+mod notification_history_tests;

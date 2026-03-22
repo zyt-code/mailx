@@ -19,8 +19,6 @@ mod windows;
 use accounts::AccountManager;
 use credentials_legacy::CredentialManager;
 use database::Database;
-use notification_manager::NotificationManager;
-use platform::create_notification_facade;
 use std::sync::Arc;
 
 // Menu and navigation constants
@@ -67,12 +65,6 @@ pub fn run() {
                 Arc::new(sync_db),
             ));
 
-            // Initialize notification manager
-            // Get app identifier for notifications
-            let app_id = "com.example.mailx".to_string();
-            let notification_facade = create_notification_facade(app_id);
-            let notification_manager = Arc::new(NotificationManager::new(notification_facade));
-
             // Start background sync
             let _ = sync_manager.start_background_sync();
 
@@ -88,8 +80,6 @@ pub fn run() {
             app.manage(db);
             app.manage(account_manager);
             app.manage(credential_manager);
-            app.manage(sync_manager);
-            app.manage(notification_manager);
 
             // Create application menu
             #[cfg(target_os = "macos")]
@@ -211,13 +201,8 @@ pub fn run() {
             // Send mail command
             commands::send_mail,
             // Notification commands
-            commands::show_notification,
-            commands::send_test_notification,
-            commands::set_notification_preferences,
-            commands::get_notification_preferences,
-            commands::close_all_notifications,
-            // Devtools command
-            commands::open_devtools,
+            commands::get_notification_history,
+            commands::send_notification_with_history,
             // Windows diagnostics commands (platform-specific)
             #[cfg(windows)]
             commands::get_windows_diagnostics,
