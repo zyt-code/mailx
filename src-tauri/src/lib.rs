@@ -6,9 +6,12 @@ mod database;
 mod html_sanitize;
 mod imap_client;
 mod mail_provider;
+mod notification_manager;
 mod provider_defaults;
 mod smtp_client;
 mod sync_manager;
+
+mod platform;
 
 #[cfg(windows)]
 mod windows;
@@ -16,6 +19,8 @@ mod windows;
 use accounts::AccountManager;
 use credentials_legacy::CredentialManager;
 use database::Database;
+use notification_manager::NotificationManager;
+use platform::create_notification_facade;
 use std::sync::Arc;
 
 // Menu and navigation constants
@@ -62,6 +67,12 @@ pub fn run() {
                 Arc::new(sync_db),
             ));
 
+            // Initialize notification manager
+            // Get app identifier for notifications
+            let app_id = "com.mailx.app".to_string();
+            let notification_facade = create_notification_facade(app_id);
+            let notification_manager = Arc::new(NotificationManager::new(notification_facade));
+
             // Start background sync
             let _ = sync_manager.start_background_sync();
 
@@ -78,6 +89,7 @@ pub fn run() {
             app.manage(account_manager);
             app.manage(credential_manager);
             app.manage(sync_manager);
+            app.manage(notification_manager);
 
             // Create application menu
             #[cfg(target_os = "macos")]
@@ -198,6 +210,11 @@ pub fn run() {
             commands::test_imap_connection,
             // Send mail command
             commands::send_mail,
+            // Notification commands
+            commands::show_notification,
+            commands::set_notification_preferences,
+            commands::get_notification_preferences,
+            commands::close_all_notifications,
             // Devtools command
             commands::open_devtools,
             // Windows diagnostics commands (platform-specific)

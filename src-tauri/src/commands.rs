@@ -3,6 +3,10 @@ use crate::credentials_legacy::CredentialManager;
 use crate::database::{Attachment, Database, Mail};
 use crate::html_sanitize;
 use crate::imap_client::ImapClient;
+use crate::notification_manager::{
+    NotificationAction, NotificationManager, NotificationPreferences, NotificationPriority,
+    NotificationRequest, NotificationType,
+};
 use crate::provider_defaults;
 use crate::smtp_client::SmtpClient;
 use crate::sync_manager::{SyncManager, SyncStatus};
@@ -696,4 +700,43 @@ pub fn clear_crash_dumps(app_handle: AppHandle) -> Result<usize, String> {
     tracker
         .clear_crash_dumps()
         .map_err(|e| format!("Failed to clear crash dumps: {}", e))
+}
+
+// ============================================================================
+// Notification Commands
+// ============================================================================
+
+/// Show a notification
+#[tauri::command]
+pub async fn show_notification(
+    request: NotificationRequest,
+    manager: State<'_, Arc<NotificationManager>>,
+) -> Result<(), String> {
+    manager.show(request).await
+}
+
+/// Set notification preferences
+#[tauri::command]
+pub async fn set_notification_preferences(
+    prefs: NotificationPreferences,
+    manager: State<'_, Arc<NotificationManager>>,
+) -> Result<(), String> {
+    manager.set_preferences(prefs).await;
+    Ok(())
+}
+
+/// Get notification preferences
+#[tauri::command]
+pub async fn get_notification_preferences(
+    manager: State<'_, Arc<NotificationManager>>,
+) -> Result<NotificationPreferences, String> {
+    Ok(manager.get_preferences().await)
+}
+
+/// Close all notifications
+#[tauri::command]
+pub async fn close_all_notifications(
+    manager: State<'_, Arc<NotificationManager>>,
+) -> Result<(), String> {
+    manager.close_all().await
 }

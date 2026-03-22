@@ -26,6 +26,22 @@ pub struct Attachment {
     pub created_at: i64,
 }
 
+
+/// Notification record for history tracking
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct NotificationRecord {
+    pub id: i64,
+    pub account_id: i64,
+    pub mail_id: Option<i64>,
+    pub notification_type: String,
+    pub title: String,
+    pub body: String,
+    pub priority: i32,
+    pub actions: Option<String>,
+    pub created_at: i64,
+    pub read_at: Option<i64>,
+}
+
 /// Mail structure matching frontend types
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Mail {
@@ -284,6 +300,46 @@ impl Database {
 
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_mail_attachments_mail_id ON mail_attachments(mail_id)",
+            [],
+        )?;
+
+
+        // Create notifications table for history tracking
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS notifications (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                account_id INTEGER NOT NULL,
+                mail_id INTEGER,
+                type TEXT NOT NULL,
+                title TEXT NOT NULL,
+                body TEXT NOT NULL,
+                priority INTEGER NOT NULL DEFAULT 1,
+                actions TEXT,
+                created_at INTEGER NOT NULL,
+                read_at INTEGER,
+                FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE
+            )",
+            [],
+        )?;
+
+        // Create indexes for notifications
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_notifications_account ON notifications(account_id)",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_notifications_type ON notifications(type)",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_notifications_created ON notifications(created_at DESC)",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_notifications_account_created ON notifications(account_id, created_at DESC)",
             [],
         )?;
 
@@ -945,6 +1001,136 @@ impl Database {
             params![folder],
             |row| row.get(0),
         )
+    }
+
+    // ========== Notification Methods ==========
+
+    /// Insert a notification record into the database
+    pub fn insert_notification(
+        &self,
+        account_id: i64,
+        mail_id: Option<i64>,
+        notification_type: &str,
+        title: &str,
+        body: &str,
+        priority: i32,
+        actions: Option<&str>,
+    ) -> SqliteResult<i64> {
+        let conn = self.conn.lock().unwrap();
+        let now = chrono::Utc::now().timestamp_millis();
+
+        conn.execute(
+            "INSERT INTO notifications (account_id, mail_id, type, title, body, priority, actions, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![
+                account_id,
+                mail_id,
+                notification_type,
+                title,
+                body,
+                priority,
+                actions,
+                now,
+            ],
+        )?;
+
+        Ok(conn.last_insert_rowid())
+    }
+
+    /// Get notification history, optionally filtered by account
+    pub fn get_notifications(
+        &self,
+        account_id: Option<i64>,
+        limit: i64,
+    ) -> SqliteResult<Vec<NotificationRecord>> {
+        let conn = self.conn.lock().unwrap();
+
+        let notifications = if let Some(acc_id) = account_id {
+            let mut stmt = conn.prepare(
+                "SELECT id, account_id, mail_id, type, title, body, priority, actions, created_at, read_at
+                 FROM notifications
+                 WHERE account_id = ?1
+                 ORDER BY created_at DESC
+                 LIMIT ?2"
+            )?;
+
+            let iter = stmt.query_map(params![acc_id, limit], |row| {
+                Ok(NotificationRecord {
+                    id: row.get(0)?,
+                    account_id: row.get(1)?,
+                    mail_id: row.get(2)?,
+                    notification_type: row.get(3)?,
+                    title: row.get(4)?,
+                    body: row.get(5)?,
+                    priority: row.get(6)?,
+                    actions: row.get(7)?,
+                    created_at: row.get(8)?,
+                    read_at: row.get(9)?,
+                })
+            })?;
+
+            let mut result = Vec::new();
+            for notif in iter {
+                result.push(notif?);
+            }
+            result
+        } else {
+            let mut stmt = conn.prepare(
+                "SELECT id, account_id, mail_id, type, title, body, priority, actions, created_at, read_at
+                 FROM notifications
+                 ORDER BY created_at DESC
+                 LIMIT ?1"
+            )?;
+
+            let iter = stmt.query_map(params![limit], |row| {
+                Ok(NotificationRecord {
+                    id: row.get(0)?,
+                    account_id: row.get(1)?,
+                    mail_id: row.get(2)?,
+                    notification_type: row.get(3)?,
+                    title: row.get(4)?,
+                    body: row.get(5)?,
+                    priority: row.get(6)?,
+                    actions: row.get(7)?,
+                    created_at: row.get(8)?,
+                    read_at: row.get(9)?,
+                })
+            })?;
+
+            let mut result = Vec::new();
+            for notif in iter {
+                result.push(notif?);
+            }
+            result
+        };
+
+        Ok(notifications)
+    }
+
+    /// Mark a notification as read
+    pub fn mark_notification_read(&self, id: i64) -> SqliteResult<()> {
+        let conn = self.conn.lock().unwrap();
+        let now = chrono::Utc::now().timestamp_millis();
+
+        conn.execute(
+            "UPDATE notifications SET read_at = ?1 WHERE id = ?2",
+            params![now, id],
+        )?;
+
+        Ok(())
+    }
+
+    /// Clean up old notifications (older than specified days)
+    pub fn cleanup_old_notifications(&self, days: i64) -> SqliteResult<usize> {
+        let conn = self.conn.lock().unwrap();
+        let cutoff = chrono::Utc::now() - chrono::Duration::days(days);
+
+        let count = conn.execute(
+            "DELETE FROM notifications WHERE created_at < ?1",
+            params![cutoff.timestamp_millis()],
+        )?;
+
+        Ok(count)
     }
 }
 
