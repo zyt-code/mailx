@@ -112,6 +112,7 @@
 	.titlebar-drag-region {
 		position: absolute;
 		inset: 0;
+		z-index: 1;
 	}
 
 	/* ============================================
@@ -133,7 +134,7 @@
 		padding-left: 12px;
 		height: 100%;
 		position: relative;
-		z-index: 10;
+		z-index: 100;
 		pointer-events: auto;
 	}
 
@@ -161,7 +162,7 @@
 		display: flex;
 		height: 100%;
 		position: relative;
-		z-index: 10;
+		z-index: 100;
 		pointer-events: auto;
 	}
 
@@ -213,7 +214,7 @@
 		align-items: center;
 		gap: 8px;
 		position: relative;
-		z-index: 10;
+		z-index: 100;
 		pointer-events: auto;
 	}
 
