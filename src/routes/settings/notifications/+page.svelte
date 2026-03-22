@@ -62,13 +62,20 @@ import {
 	}
 
 	async function sendTestAlert() {
+		console.log('[Test] sendTestAlert called, desktopNotifications:', notifications.desktopNotifications);
+
 		try {
+			permissionMessage = '正在发送测试通知...';
+			console.log('[Test] Calling send_test_notification command...');
+
 			// 使用简化的测试命令
 			await invoke('send_test_notification');
-			permissionMessage = $_('notifications.testSent');
+
+			console.log('[Test] Command executed successfully');
+			permissionMessage = $_('notifications.testSent') + ' ✅';
 		} catch (error) {
-			console.error('Test notification failed:', error);
-			permissionMessage = $_('notifications.testFailed') + ': ' + error;
+			console.error('[Test] Test notification failed:', error);
+			permissionMessage = '测试失败: ' + error;
 		}
 	}
 
@@ -127,7 +134,7 @@ import {
 					<BellRing class="size-4" strokeWidth={1.7} />
 					{$_('notifications.requestAccess')}
 				</button>
-				<button class="subtle-button" onclick={sendTestAlert} disabled={!notifications.desktopNotifications}>
+				<button class="subtle-button" onclick={sendTestAlert}>
 					<Send class="size-4" strokeWidth={1.7} />
 					{$_('notifications.sendTest')}
 				</button>

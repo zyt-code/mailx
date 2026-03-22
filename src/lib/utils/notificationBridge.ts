@@ -54,18 +54,25 @@ function toBackendPreferences(
 
 /**
  * Mapping: Backend → Frontend
+ *
+ * IMPORTANT: Only map fields that the backend actually controls.
+ * Frontend-only fields (syncSuccessToasts) should NOT be included
+ * to avoid overwriting user preferences with undefined values.
  */
 function toFrontendPreferences(
 	backend: BackendNotificationPreferences
 ): Partial<FrontendNotificationPreferences> {
-	return {
+	// Only return fields that exist in backend data
+	// This prevents frontend-only fields from being overwritten
+	const result: Partial<FrontendNotificationPreferences> = {
 		desktopNotifications: backend.enabled,
 		syncFailureToasts: backend.sync_errors,
 		quietHoursEnabled: backend.quiet_hours.enabled,
 		quietHoursStart: backend.quiet_hours.start,
 		quietHoursEnd: backend.quiet_hours.end
-		// Note: syncSuccessToasts is frontend-only, not mapped from backend
 	};
+
+	return result;
 }
 
 /**
