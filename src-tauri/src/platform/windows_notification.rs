@@ -71,25 +71,33 @@ impl WindowsNotification {
 #[async_trait::async_trait]
 impl NotificationFacade for WindowsNotification {
     async fn show(&self, request: &NotificationRequest) -> std::result::Result<(), Box<dyn std::error::Error>> {
+        println!("[WindowsNotification] 🔔 Preparing to show notification: {}", request.title);
+
         // 构建Toast XML
         let xml_str = self.build_toast_xml(request)?;
-        
+        println!("[WindowsNotification] 📄 Toast XML generated (length: {})", xml_str.len());
+
         // 创建XML文档
         let xml_doc = XmlDocument::new()?;
         xml_doc.LoadXml(&HSTRING::from(xml_str))?;
-        
+        println!("[WindowsNotification] ✅ XML document loaded");
+
         // 创建Toast通知管理器
         let notifier = ToastNotificationManager::CreateToastNotifierWithId(&HSTRING::from(&self.app_id))
             .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
-        
+        println!("[WindowsNotification] ✅ ToastNotifier created for app_id: {}", self.app_id);
+
         // 创建ToastNotification
         let toast = ToastNotification::CreateToastNotification(&xml_doc)
             .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
-        
+        println!("[WindowsNotification] ✅ ToastNotification created");
+
         // 显示通知
+        println!("[WindowsNotification] 📢 Calling Show() on toast...");
         notifier.Show(&toast)
             .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
-        
+        println!("[WindowsNotification] ✅ Toast shown successfully! Check Windows notification center.");
+
         Ok(())
     }
 
