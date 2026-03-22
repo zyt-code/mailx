@@ -3,7 +3,7 @@
 	import { ensureInitialized } from '$lib/stores/i18nStore.svelte.js';
 	import { locale } from 'svelte-i18n';
 	import { page } from '$app/stores';
-	import { AppShell, Titlebar } from '$lib/components/layout/index.js';
+	import { AppShell } from '$lib/components/layout/index.js';
 	import { Notification } from '$lib/components/ui/notification/index.js';
 	import { invoke } from '@tauri-apps/api/core';
 	import { listen } from '@tauri-apps/api/event';
@@ -116,9 +116,6 @@
 
 {#if $locale}
 	<div class="app-root">
-		<!-- Global titlebar (always rendered) -->
-		<Titlebar />
-
 		<!-- Content area with context menu -->
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div oncontextmenu={handleContextMenu} class="app-content">
