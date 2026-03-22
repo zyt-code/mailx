@@ -40,6 +40,24 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "publisher": "mailx",
+    "copyright": "",
+    "category": "Productivity",
+    "shortDescription": "A modern email client",
+    "longDescription": "mailx is a modern, cross-platform email client built with Tauri and Svelte.",
+    "windows": {
+      "wix": {
+        "language": "en-US"
+      },
+      "nsis": {
+        "displayLanguageSelector": true,
+        "languages": ["English", "SimpChinese", "TradChinese"],
+        "installMode": "perMachine"
+      },
+      "webviewInstallMode": {
+        "type": "embedBootstrapper"
+      }
+    }
   }
 }

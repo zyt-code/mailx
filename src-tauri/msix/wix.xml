@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Package
+    Manufacturer="mailx"
+    Version="$(var.Version)"
+    Compressed="true"
+    InstallScope="perMachine"
+    Platform="$(var.Platform)"
+    Id="*"
+  />
+
+  <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+  <Feature Id="ProductFeature" Title="mailx" Level="1">
+    <ComponentGroupRef Id="Files" />
+    <ComponentGroupRef Id="RegistryEntries" />
+  </Feature>
+
+  <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+
+  <DirectoryRef Id="INSTALLFOLDER">
+    <Component Id="RegistryEntries" Guid="*">
+      <RegistryKey Root="HKCU" Key="Software\mailx">
+        <RegistryValue Name="Version" Type="string" Value="$(var.Version)" />
+      </RegistryKey>
+    </Component>
+  </DirectoryRef>
+</Wix>

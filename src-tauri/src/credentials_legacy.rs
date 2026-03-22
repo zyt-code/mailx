@@ -90,6 +90,7 @@ impl CredentialManager {
         self.store_password(account_id, new_password)
     }
 }
+
 #[cfg(test)]
 #[path = "../test/credentials_tests.rs"]
 mod credentials_tests;

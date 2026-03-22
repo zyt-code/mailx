@@ -1,6 +1,7 @@
 mod accounts;
 mod commands;
-mod credentials;
+mod credentials_legacy;
+pub mod credentials_platform;
 mod database;
 mod html_sanitize;
 mod imap_client;
@@ -9,8 +10,11 @@ mod provider_defaults;
 mod smtp_client;
 mod sync_manager;
 
+#[cfg(windows)]
+mod windows;
+
 use accounts::AccountManager;
-use credentials::CredentialManager;
+use credentials_legacy::CredentialManager;
 use database::Database;
 use std::sync::Arc;
 
@@ -60,6 +64,14 @@ pub fn run() {
 
             // Start background sync
             let _ = sync_manager.start_background_sync();
+
+            // Initialize crash handler for Windows
+            #[cfg(windows)]
+            {
+                if let Err(e) = crate::windows::minidump::init_crash_handler(app.handle()) {
+                    eprintln!("Failed to initialize crash handler: {}", e);
+                }
+            }
 
             // Manage state
             app.manage(db);
@@ -188,6 +200,13 @@ pub fn run() {
             commands::send_mail,
             // Devtools command
             commands::open_devtools,
+            // Windows diagnostics commands (platform-specific)
+            #[cfg(windows)]
+            commands::get_windows_diagnostics,
+            #[cfg(windows)]
+            commands::get_crash_dumps,
+            #[cfg(windows)]
+            commands::clear_crash_dumps,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -11,6 +11,6 @@
 
 <ContextMenuPrimitive.Separator
 	bind:ref
-	class={cn("-mx-1 my-1 h-px bg-zinc-100", className)}
+	class={cn("-mx-1 my-1 h-px bg-[var(--border-primary)]", className)}
 	{...restProps}
 />

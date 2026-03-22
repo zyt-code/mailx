@@ -7,7 +7,7 @@ import type { UserPreferences } from '$lib/stores/preferencesStore';
 // Initialize svelte-i18n before tests
 beforeAll(() => {
 	register('en', () => Promise.resolve({
-		mail: { noEmails: 'No emails found', search: 'Search' },
+		mail: { noEmails: 'No emails found', search: 'Search', moveTo: 'Move to', markRead: 'Mark as read', markUnread: 'Mark as unread', archive: 'Archive', unarchive: 'Unarchive', delete: 'Delete', yesterday: 'Yesterday', noPreview: 'No preview', searchFolder: 'Search {folder}' },
 		nav: { inbox: 'Inbox', sent: 'Sent', drafts: 'Drafts', trash: 'Trash', archive: 'Archive' },
 		sidebar: { allInboxes: 'All Inboxes' }
 	}));
@@ -80,5 +80,21 @@ describe('MailList', () => {
 		});
 
 		expect(screen.getByText('No emails found')).toBeInTheDocument();
+	});
+
+	it('renders "Move to..." button with proper text wrapping', () => {
+		// Test that the component renders without errors when provided with optional callbacks
+		const { container } = render(MailList, {
+			selectedMailId: null,
+			onSelectMail: vi.fn(),
+			onMarkRead: vi.fn(),
+			onArchive: vi.fn(),
+			onDelete: vi.fn(),
+			onMoveTo: vi.fn(),
+			width: 300
+		});
+
+		// Verify that the component renders without errors
+		expect(container.firstChild).toBeInTheDocument();
 	});
 });

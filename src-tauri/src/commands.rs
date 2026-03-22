@@ -1,5 +1,5 @@
 use crate::accounts::{Account, AccountManager};
-use crate::credentials::CredentialManager;
+use crate::credentials_legacy::CredentialManager;
 use crate::database::{Attachment, Database, Mail};
 use crate::html_sanitize;
 use crate::imap_client::ImapClient;
@@ -634,4 +634,66 @@ pub fn provider_defaults_for_email(
     }
 
     Ok(Some(ProviderDefaultsResponse { domain, imap, smtp }))
+}
+
+// ============================================================================
+// Windows Diagnostics Commands
+// ============================================================================
+
+#[cfg(windows)]
+use crate::windows::{CrashDumpInfo, CrashTracker, WindowsDiagnostics};
+
+/// Get Windows system diagnostics information
+#[cfg(windows)]
+#[tauri::command]
+pub fn get_windows_diagnostics(app_handle: AppHandle) -> Result<WindowsDiagnostics, String> {
+    // Get app version from Cargo.toml
+    let app_version = env!("CARGO_PKG_VERSION");
+
+    // Get crash directory and count crash dumps
+    let app_data_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to get app data dir: {}", e))?;
+    let crash_dir = app_data_dir.join("crashes");
+    let tracker = CrashTracker::new(crash_dir);
+    let crash_dumps_count = tracker.get_crash_dumps()
+        .map_err(|e| format!("Failed to get crash dumps: {}", e))?
+        .len();
+
+    // Collect diagnostics
+    let diagnostics = crate::windows::diagnostics::collect_diagnostics(app_version, crash_dumps_count);
+    Ok(diagnostics)
+}
+
+/// Get list of crash dumps
+#[cfg(windows)]
+#[tauri::command]
+pub fn get_crash_dumps(app_handle: AppHandle) -> Result<Vec<CrashDumpInfo>, String> {
+    let app_data_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to get app data dir: {}", e))?;
+    let crash_dir = app_data_dir.join("crashes");
+    let tracker = CrashTracker::new(crash_dir);
+
+    tracker
+        .get_crash_dumps()
+        .map_err(|e| format!("Failed to get crash dumps: {}", e))
+}
+
+/// Clear all crash dumps
+#[cfg(windows)]
+#[tauri::command]
+pub fn clear_crash_dumps(app_handle: AppHandle) -> Result<usize, String> {
+    let app_data_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to get app data dir: {}", e))?;
+    let crash_dir = app_data_dir.join("crashes");
+    let tracker = CrashTracker::new(crash_dir);
+
+    tracker
+        .clear_crash_dumps()
+        .map_err(|e| format!("Failed to clear crash dumps: {}", e))
 }

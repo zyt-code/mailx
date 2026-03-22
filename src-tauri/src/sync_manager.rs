@@ -1,5 +1,5 @@
 use crate::accounts::{Account, AccountManager};
-use crate::credentials::CredentialManager;
+use crate::credentials_legacy::CredentialManager;
 use crate::database::Database;
 use crate::imap_client::ImapClient;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -162,7 +162,7 @@ impl SyncManager {
         let password = self
             .credential_manager
             .get_password(account_id)
-            .map_err(|e| {
+            .map_err(|e: crate::credentials_legacy::CredentialError| {
                 println!("[Sync] Credential error for '{}': {}", account.email, e);
                 SyncError::Credential(e.to_string())
             })?;
@@ -333,7 +333,7 @@ impl SyncManager {
         let password = self
             .credential_manager
             .get_password(account_id)
-            .map_err(|e| SyncError::Credential(e.to_string()))?;
+            .map_err(|e: crate::credentials_legacy::CredentialError| SyncError::Credential(e.to_string()))?;
 
         // Get IMAP config
         let imap_config = self

@@ -532,5 +532,39 @@ export default {
   },
   notification: {
     dismiss: 'Dismiss'
+  },
+  diagnostics: {
+    title: 'Diagnostics',
+    kicker: 'System Diagnostics',
+    description: 'View system information and crash reports for troubleshooting.',
+    refresh: 'Refresh',
+    refreshing: 'Refreshing...',
+    // System Information
+    systemInfo: 'System Information',
+    osVersion: 'OS Version',
+    buildNumber: 'Build Number',
+    architecture: 'Architecture',
+    locale: 'Locale',
+    totalMemory: 'Total Memory',
+    availableMemory: 'Available Memory',
+    cpuCores: 'CPU Cores',
+    totalDisk: 'Total Disk Space',
+    availableDisk: 'Available Disk Space',
+    appVersion: 'App Version',
+    tauriVersion: 'Tauri Version',
+    // Crash Dumps
+    crashDumps: 'Crash Reports',
+    noCrashes: 'No crash reports found',
+    crashFilename: 'File Name',
+    crashSize: 'Size',
+    crashDate: 'Date',
+    clearCrashes: 'Clear All Reports',
+    clearingCrashes: 'Clearing...',
+    clearCrashesConfirm: 'Are you sure you want to delete all crash reports? This cannot be undone.',
+    clearCrashesSuccess: 'Crash reports cleared successfully.',
+    // Error states
+    failedToLoad: 'Failed to load diagnostics',
+    failedToLoadCrashes: 'Failed to load crash reports',
+    failedToRefresh: 'Failed to refresh diagnostics'
   }
 } as const;

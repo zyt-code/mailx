@@ -17,14 +17,15 @@
 <ContextMenuPrimitive.SubTrigger
 	bind:ref
 	class={cn(
-		"relative flex cursor-default select-none items-center gap-2 rounded-md px-2 py-1.5 text-[13px] text-zinc-700 outline-none",
-		"data-[highlighted]:bg-zinc-100 data-[highlighted]:text-zinc-900",
-		"data-[state=open]:bg-zinc-100",
+		"relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-[13px] outline-none transition-colors duration-100",
+		"text-[var(--text-secondary)]",
+		"data-[highlighted]:bg-[var(--bg-hover)] data-[highlighted]:text-[var(--text-primary)]",
+		"data-[state=open]:bg-[var(--bg-hover)]",
 		inset && "pl-8",
 		className
 	)}
 	{...restProps}
 >
 	{@render children?.()}
-	<ChevronRight class="ml-auto size-3.5 text-zinc-400" />
+	<ChevronRight class="size-3.5 text-[var(--text-tertiary)] shrink-0" />
 </ContextMenuPrimitive.SubTrigger>

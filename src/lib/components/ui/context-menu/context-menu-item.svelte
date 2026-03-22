@@ -16,8 +16,9 @@
 <ContextMenuPrimitive.Item
 	bind:ref
 	class={cn(
-		"relative flex cursor-default select-none items-center gap-2 rounded-md px-2 py-1.5 text-[13px] text-zinc-700 outline-none transition-colors",
-		"data-[highlighted]:bg-zinc-100 data-[highlighted]:text-zinc-900",
+		"relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-[13px] outline-none transition-colors duration-100",
+		"text-[var(--text-secondary)]",
+		"data-[highlighted]:bg-[var(--bg-hover)] data-[highlighted]:text-[var(--text-primary)]",
 		"data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
 		inset && "pl-8",
 		className

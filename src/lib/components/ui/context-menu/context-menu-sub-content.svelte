@@ -13,7 +13,9 @@
 <ContextMenuPrimitive.SubContent
 	bind:ref
 	class={cn(
-		"z-50 min-w-[160px] overflow-hidden rounded-lg border border-zinc-200/80 bg-white/95 p-1 shadow-lg backdrop-blur-md",
+		"z-50 min-w-[8rem] w-auto overflow-hidden rounded-md border p-1",
+		"border-[var(--border-primary)] bg-[var(--bg-primary)]",
+		"shadow-[var(--shadow-md)]",
 		"animate-in fade-in-0 zoom-in-95 data-[side=right]:slide-in-from-left-2 data-[side=left]:slide-in-from-right-2",
 		className
 	)}
