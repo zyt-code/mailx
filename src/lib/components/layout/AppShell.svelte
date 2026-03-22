@@ -3,7 +3,6 @@
 	import MailList from './MailList.svelte';
 	import Resizer from './Resizer.svelte';
 	import ReadingPane from './ReadingPane.svelte';
-	import Titlebar from './Titlebar.svelte';
 	import { GetStarted } from '$lib/components/get-started/index.js';
 	import type { Mail, Folder } from '$lib/types.js';
 	import * as db from '$lib/db/index.js';
@@ -323,39 +322,34 @@ const DEFAULTS = { sidebarCollapsed: false, mailListWidth: DEFAULT_MAIL_LIST_WID
 	});
 </script>
 
-<div class="flex flex-col h-screen w-screen overflow-hidden bg-[var(--bg-primary)]">
-	<!-- Custom Titlebar -->
-	<Titlebar />
+<div class="flex flex-1 overflow-hidden bg-[var(--bg-primary)] w-full h-full">
+	<Sidebar
+		collapsed={sidebarCollapsed}
+		{isMobile}
+		{activeFolder}
+		onToggle={toggleSidebar}
+		onSelectFolder={selectFolder}
+		onRefresh={loadMails}
+		onOpenSettings={openSettings}
+		onSelectAccount={handleSelectAccount}
+	/>
 
-	<div class="flex flex-1 overflow-hidden">
-		<Sidebar
-			collapsed={sidebarCollapsed}
-			{isMobile}
-			{activeFolder}
-			onToggle={toggleSidebar}
-			onSelectFolder={selectFolder}
-			onRefresh={loadMails}
-			onOpenSettings={openSettings}
-			onSelectAccount={handleSelectAccount}
-		/>
-
-		{#if isMobile}
-			{#if mobileView === 'list'}
-				<MailList {selectedMailId} onSelectMail={selectMail} onMarkRead={handleMarkRead} onDelete={handleContextDelete} onArchive={handleContextArchive} onMoveTo={handleMoveTo} width={undefined} {isAccountConfigured} isSyncing={syncing} />
-			{:else}
-				<ReadingPane mail={selectedMail} {isMobile} onBack={goBackToList} onRefresh={loadMails} />
-			{/if}
+	{#if isMobile}
+		{#if mobileView === 'list'}
+			<MailList {selectedMailId} onSelectMail={selectMail} onMarkRead={handleMarkRead} onDelete={handleContextDelete} onArchive={handleContextArchive} onMoveTo={handleMoveTo} width={undefined} {isAccountConfigured} isSyncing={syncing} />
 		{:else}
-			{#if isAccountConfigured}
-				<MailList {selectedMailId} onSelectMail={selectMail} onMarkRead={handleMarkRead} onDelete={handleContextDelete} onArchive={handleContextArchive} onMoveTo={handleMoveTo} width={mailListWidth} {isAccountConfigured} isSyncing={syncing} />
-				<Resizer {onResize} {onResizeEnd} />
-				<ReadingPane mail={selectedMail} {isMobile} onBack={goBackToList} onRefresh={loadMails} />
-			{:else}
-				<!-- Get Started View -->
-				<div class="flex-1 pointer-events-auto relative z-10">
-					<GetStarted onOpenSettings={openSettings} />
-				</div>
-			{/if}
+			<ReadingPane mail={selectedMail} {isMobile} onBack={goBackToList} onRefresh={loadMails} />
 		{/if}
-	</div>
+	{:else}
+		{#if isAccountConfigured}
+			<MailList {selectedMailId} onSelectMail={selectMail} onMarkRead={handleMarkRead} onDelete={handleContextDelete} onArchive={handleContextArchive} onMoveTo={handleMoveTo} width={mailListWidth} {isAccountConfigured} isSyncing={syncing} />
+			<Resizer {onResize} {onResizeEnd} />
+			<ReadingPane mail={selectedMail} {isMobile} onBack={goBackToList} onRefresh={loadMails} />
+		{:else}
+			<!-- Get Started View -->
+			<div class="flex-1 pointer-events-auto relative z-10">
+				<GetStarted onOpenSettings={openSettings} />
+			</div>
+		{/if}
+	{/if}
 </div>

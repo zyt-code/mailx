@@ -3,7 +3,7 @@
 	import { ensureInitialized } from '$lib/stores/i18nStore.svelte.js';
 	import { locale } from 'svelte-i18n';
 	import { page } from '$app/stores';
-	import { AppShell } from '$lib/components/layout/index.js';
+	import { AppShell, Titlebar } from '$lib/components/layout/index.js';
 	import { Notification } from '$lib/components/ui/notification/index.js';
 	import { invoke } from '@tauri-apps/api/core';
 	import { listen } from '@tauri-apps/api/event';
@@ -115,17 +115,39 @@
 </script>
 
 {#if $locale}
-	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<div oncontextmenu={handleContextMenu} class="contents">
-		{#if $page.url.pathname.startsWith('/settings')}
-			<slot />
-		{:else}
-			<AppShell>
+	<div class="app-root">
+		<!-- Global titlebar (always rendered) -->
+		<Titlebar />
+
+		<!-- Content area with context menu -->
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div oncontextmenu={handleContextMenu} class="app-content">
+			{#if $page.url.pathname.startsWith('/settings')}
 				<slot />
-			</AppShell>
-		{/if}
+			{:else}
+				<AppShell>
+					<slot />
+				</AppShell>
+			{/if}
+		</div>
 	</div>
 
 	<!-- Global notification component (always rendered) -->
 	<Notification />
 {/if}
+
+<style>
+	.app-root {
+		display: flex;
+		flex-direction: column;
+		height: 100vh;
+		width: 100vw;
+		overflow: hidden;
+	}
+
+	.app-content {
+		flex: 1;
+		overflow: hidden;
+		position: relative;
+	}
+</style>

@@ -86,8 +86,8 @@
 	.settings-shell {
 		display: grid;
 		grid-template-columns: 300px minmax(0, 1fr);
-		min-height: 100vh;
-		width: 100vw;
+		height: 100%;
+		width: 100%;
 		background:
 			radial-gradient(circle at top left, color-mix(in srgb, var(--accent-light) 72%, transparent) 0, transparent 38%),
 			linear-gradient(160deg, color-mix(in srgb, var(--bg-secondary) 82%, white) 0%, var(--bg-primary) 56%);

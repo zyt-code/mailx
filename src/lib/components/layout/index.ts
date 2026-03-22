@@ -3,3 +3,4 @@ export { default as Sidebar } from './Sidebar.svelte';
 export { default as MailList } from './MailList.svelte';
 export { default as ReadingPane } from './ReadingPane.svelte';
 export { default as Resizer } from './Resizer.svelte';
+export { default as Titlebar } from './Titlebar.svelte';
