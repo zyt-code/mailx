@@ -8,8 +8,8 @@
 	import ComposeEditor from './ComposeEditor.svelte';
 	import ComposeActions from './ComposeActions.svelte';
 	import type { Account, Attachment, EmailAddress, Folder, Mail } from '$lib/types.js';
-	import { onMount } from 'svelte';
 	import { preferences } from '$lib/stores/preferencesStore.js';
+	import { buildComposerPayload, buildForwardDraft, buildReplyDraft } from '$lib/utils/mailContent.js';
 
 	interface Props {
 		isOpen: boolean;
@@ -39,11 +39,8 @@
 		bcc: [] as EmailAddress[],
 		subject: '',
 		body: '',
+		html_body: '',
 		folder: 'drafts' as Folder
-	});
-
-	onMount(async () => {
-		await loadAccounts();
 	});
 
 	$effect(() => {
@@ -83,23 +80,40 @@
 		draftAttachments = [];
 
 		if (replyTo) {
+			const replyDraft = buildReplyDraft(replyTo, {
+				rePrefix: $_('compose.rePrefix'),
+				originalMessage: $_('compose.originalMessage'),
+				fromField: $_('compose.fromField'),
+				dateField: $_('compose.dateField'),
+				subjectField: $_('compose.subjectField')
+			});
 			draft.to = replyTo.to?.[0] ? [replyTo.to[0]] : [];
 			draft.cc = [];
 			draft.bcc = [];
-			draft.subject = replyTo.subject.startsWith('Re:') ? replyTo.subject : `${$_('compose.rePrefix')}${replyTo.subject}`;
-			draft.body = `\n\n${$_('compose.originalMessage')}\n${$_('compose.fromField')}${replyTo.from_name} <${replyTo.from_email}>\n${$_('compose.dateField')}${new Date(replyTo.timestamp).toLocaleString()}\n${$_('compose.subjectField')}${replyTo.subject}\n\n${replyTo.body}`;
+			draft.subject = replyDraft.subject;
+			draft.body = replyDraft.body;
+			draft.html_body = replyDraft.html_body;
 		} else if (forward) {
+			const forwardDraft = buildForwardDraft(forward, {
+				fwdPrefix: $_('compose.fwdPrefix'),
+				forwardedMessage: $_('compose.forwardedMessage'),
+				fromField: $_('compose.fromField'),
+				dateField: $_('compose.dateField'),
+				subjectField: $_('compose.subjectField')
+			});
 			draft.to = [];
 			draft.cc = [];
 			draft.bcc = [];
-			draft.subject = forward.subject.startsWith('Fwd:') ? forward.subject : `${$_('compose.fwdPrefix')}${forward.subject}`;
-			draft.body = `\n\n${$_('compose.forwardedMessage')}\n${$_('compose.fromField')}${forward.from_name} <${forward.from_email}>\n${$_('compose.dateField')}${new Date(forward.timestamp).toLocaleString()}\n${$_('compose.subjectField')}${forward.subject}\n\n${forward.body}`;
+			draft.subject = forwardDraft.subject;
+			draft.body = forwardDraft.body;
+			draft.html_body = forwardDraft.html_body;
 		} else {
 			draft.to = [];
 			draft.cc = [];
 			draft.bcc = [];
 			draft.subject = '';
 			draft.body = '';
+			draft.html_body = '';
 		}
 
 		const timer = setInterval(() => {
@@ -113,7 +127,8 @@
 
 	async function loadAccounts(): Promise<void> {
 		try {
-			availableAccounts = await accounts.getAccounts();
+			const loadedAccounts = await accounts.getAccounts();
+			availableAccounts = Array.isArray(loadedAccounts) ? loadedAccounts : [];
 			if (availableAccounts.length > 0 && !selectedAccountId) {
 				selectedAccountId = availableAccounts.find((account) => account.is_active)?.id || availableAccounts[0].id;
 			}
@@ -128,14 +143,18 @@
 		const selectedAccount = availableAccounts.find((account) => account.id === selectedAccountId);
 		if (!selectedAccount) return;
 
-		const mail: Omit<Mail, 'id'> & { id?: string; account_id?: string } = {
-			id: draftId || undefined,
+		const content = buildComposerPayload(draft.html_body, draft.body);
+
+		const mailId = draftId ?? crypto.randomUUID();
+		const mail: Mail = {
+			id: mailId,
 			account_id: selectedAccount.id,
 			from_name: selectedAccount.name,
 			from_email: selectedAccount.email,
 			subject: draft.subject || $_('mail.noSubject'),
-			preview: draft.body.slice(0, 100),
-			body: draft.body,
+			preview: content.preview,
+			body: content.body,
+			html_body: content.html_body,
 			timestamp: Date.now(),
 			folder: draft.folder,
 			unread: false,
@@ -147,7 +166,11 @@
 		};
 
 		try {
-			draftId = await db.createMail(mail);
+			if (draftId) {
+				await db.updateMail(mail);
+			} else {
+				draftId = await db.createMail(mail);
+			}
 			lastSaved = new Date();
 		} catch (error) {
 			console.error('Failed to save draft:', error);
@@ -411,6 +434,7 @@
 				<ComposeHeader bind:values={draft} />
 				<ComposeEditor
 					bind:value={draft.body}
+					bind:htmlValue={draft.html_body}
 					attachments={draftAttachments}
 					onAttach={openAttachmentPicker}
 					onRemoveAttachment={removeAttachment}

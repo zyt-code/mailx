@@ -204,18 +204,46 @@ impl SmtpClient {
         }
 
         let message_builder = message_builder.header(header::Date::now());
+        let plain_body = if mail.body.trim().is_empty() {
+            mail.html_body
+                .as_deref()
+                .map(strip_html_markup)
+                .unwrap_or_default()
+        } else {
+            mail.body.clone()
+        };
+        let html_body = mail
+            .html_body
+            .as_ref()
+            .map(|html| html.trim())
+            .filter(|html| !html.is_empty());
 
         // Build the final message with body / multipart attachments.
         let message = if attachments.is_empty() {
-            message_builder
-                .body(mail.body.clone())
-                .map_err(|e| SmtpError::Build(format!("Failed to build message: {}", e)))?
+            if let Some(html) = html_body {
+                message_builder
+                    .multipart(MultiPart::alternative_plain_html(
+                        plain_body.clone(),
+                        html.to_string(),
+                    ))
+                    .map_err(|e| SmtpError::Build(format!("Failed to build message: {}", e)))?
+            } else {
+                message_builder
+                    .body(plain_body.clone())
+                    .map_err(|e| SmtpError::Build(format!("Failed to build message: {}", e)))?
+            }
         } else {
-            let mut multipart = MultiPart::mixed().singlepart(
-                SinglePart::builder()
-                    .header(header::ContentType::TEXT_PLAIN)
-                    .body(mail.body.clone()),
-            );
+            let body_part = if let Some(html) = html_body {
+                MultiPart::alternative_plain_html(plain_body.clone(), html.to_string())
+            } else {
+                MultiPart::mixed().singlepart(
+                    SinglePart::builder()
+                        .header(header::ContentType::TEXT_PLAIN)
+                        .body(plain_body.clone()),
+                )
+            };
+
+            let mut multipart = MultiPart::mixed().multipart(body_part);
 
             for attachment in attachments {
                 let bytes = std::fs::read(&attachment.stored_path).map_err(|e| {
@@ -224,21 +252,21 @@ impl SmtpClient {
                         attachment.file_name, e
                     ))
                 })?;
-                let content_type = header::ContentType::parse(&attachment.content_type).map_err(
-                    |e| {
+                let content_type =
+                    header::ContentType::parse(&attachment.content_type).map_err(|e| {
                         SmtpError::Build(format!(
                             "Invalid content type for '{}': {}",
                             attachment.file_name, e
                         ))
-                    },
-                )?;
-                let part = MimeAttachment::new(attachment.file_name.clone()).body(bytes, content_type);
+                    })?;
+                let part =
+                    MimeAttachment::new(attachment.file_name.clone()).body(bytes, content_type);
                 multipart = multipart.singlepart(part);
             }
 
-            message_builder
-                .multipart(multipart)
-                .map_err(|e| SmtpError::Build(format!("Failed to build multipart message: {}", e)))?
+            message_builder.multipart(multipart).map_err(|e| {
+                SmtpError::Build(format!("Failed to build multipart message: {}", e))
+            })?
         };
 
         Ok(message)
@@ -306,6 +334,95 @@ impl SmtpClient {
         format!("{:x}", hasher.finish())
     }
 }
+
+fn strip_html_markup(html: &str) -> String {
+    let mut plain = String::with_capacity(html.len());
+    let mut chars = html.chars().peekable();
+
+    while let Some(ch) = chars.next() {
+        match ch {
+            '<' => {
+                let mut tag = String::new();
+                while let Some(next) = chars.next() {
+                    if next == '>' {
+                        break;
+                    }
+                    tag.push(next);
+                }
+                push_tag_breaks(&mut plain, &tag);
+            }
+            '&' => {
+                let mut entity = String::new();
+                while let Some(&next) = chars.peek() {
+                    chars.next();
+                    if next == ';' {
+                        break;
+                    }
+                    entity.push(next);
+                }
+
+                plain.push(match entity.as_str() {
+                    "nbsp" => ' ',
+                    "lt" => '<',
+                    "gt" => '>',
+                    "amp" => '&',
+                    "quot" => '"',
+                    "#39" => '\'',
+                    _ => ' ',
+                });
+            }
+            _ => plain.push(ch),
+        }
+    }
+
+    plain
+        .lines()
+        .map(|line| line.trim())
+        .filter(|line| !line.is_empty())
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn push_tag_breaks(plain: &mut String, tag: &str) {
+    let normalized = tag.trim().to_ascii_lowercase();
+    if normalized.is_empty() {
+        return;
+    }
+
+    let is_closing = normalized.starts_with('/');
+    let tag_name = normalized
+        .trim_start_matches('/')
+        .split_whitespace()
+        .next()
+        .unwrap_or_default();
+
+    match tag_name {
+        "br" => push_plain_newline(plain),
+        "li" => {
+            if !is_closing {
+                push_plain_newline(plain);
+                plain.push_str("- ");
+            } else {
+                push_plain_newline(plain);
+            }
+        }
+        "p" | "div" | "section" | "article" | "header" | "footer" | "blockquote" | "ul" | "ol"
+        | "table" | "tr" => push_plain_newline(plain),
+        "td" | "th" => {
+            if !plain.ends_with([' ', '\n', '\t']) && !plain.is_empty() {
+                plain.push('\t');
+            }
+        }
+        _ => {}
+    }
+}
+
+fn push_plain_newline(plain: &mut String) {
+    if !plain.ends_with('\n') && !plain.is_empty() {
+        plain.push('\n');
+    }
+}
+
 #[cfg(test)]
 #[path = "../test/smtp_client_tests.rs"]
 mod smtp_client_tests;

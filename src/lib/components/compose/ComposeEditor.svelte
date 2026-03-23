@@ -2,9 +2,13 @@
 	import { _ } from 'svelte-i18n';
 	import { Bold, Italic, Underline, Link2, List, Paperclip, X } from 'lucide-svelte';
 	import type { Attachment } from '$lib/types.js';
+	import RichEditor from './RichEditor.svelte';
+	import { htmlToPlainText, normalizeEditorHtml, plainTextToHtml } from '$lib/utils/mailContent.js';
+	import type { Editor } from '@tiptap/core';
 
 	interface Props {
 		value: string;
+		htmlValue?: string;
 		attachments?: Attachment[];
 		onAttach?: () => void;
 		onRemoveAttachment?: (id: string) => void;
@@ -12,12 +16,21 @@
 
 	let {
 		value = $bindable(),
+		htmlValue = $bindable(''),
 		attachments = [],
 		onAttach,
 		onRemoveAttachment
 	}: Props = $props();
 
-	let editorRef = $state<HTMLTextAreaElement | null>(null);
+	let editor = $state<Editor | null>(null);
+
+	const editorContent = $derived.by(() => {
+		if (htmlValue?.trim()) {
+			return htmlValue;
+		}
+
+		return value.trim() ? plainTextToHtml(value) : '';
+	});
 
 	function formatSize(bytes: number): string {
 		if (bytes < 1024) return `${bytes} B`;
@@ -25,71 +38,90 @@
 		return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 	}
 
-	function withSelection(transform: (selected: string) => { text: string; cursorOffset?: number }): void {
-		const element = editorRef;
-		if (!element) return;
-
-		const start = element.selectionStart;
-		const end = element.selectionEnd;
-		const selected = value.slice(start, end);
-		const { text, cursorOffset } = transform(selected);
-		value = `${value.slice(0, start)}${text}${value.slice(end)}`;
-
-		const next = start + (cursorOffset ?? text.length);
-		requestAnimationFrame(() => {
-			element.focus();
-			element.setSelectionRange(next, next);
-		});
+	function handleEditorChange(instance: Editor | null): void {
+		editor = instance;
 	}
 
-	function wrapSelection(prefix: string, suffix = prefix, placeholder = 'text'): void {
-		withSelection((selected) => {
-			const content = selected || placeholder;
-			const text = `${prefix}${content}${suffix}`;
-			return {
-				text,
-				cursorOffset: selected ? text.length : prefix.length + content.length
-			};
-		});
+	function handleContentChange(nextHtml: string): void {
+		const normalized = normalizeEditorHtml(nextHtml);
+		htmlValue = normalized;
+		value = normalized ? htmlToPlainText(normalized) : '';
 	}
 
-	function addBulletList(): void {
-		withSelection((selected) => {
-			const content = selected || 'list item';
-			const text = content
-				.split('\n')
-				.map((line) => (line.startsWith('- ') ? line : `- ${line}`))
-				.join('\n');
-			return { text, cursorOffset: text.length };
-		});
+	function toggleBold(): void {
+		editor?.chain().focus().toggleBold().run();
+	}
+
+	function toggleItalic(): void {
+		editor?.chain().focus().toggleItalic().run();
+	}
+
+	function toggleUnderline(): void {
+		editor?.chain().focus().toggleUnderline().run();
+	}
+
+	function toggleBulletList(): void {
+		editor?.chain().focus().toggleBulletList().run();
 	}
 
 	function insertLink(): void {
-		withSelection((selected) => {
-			const label = selected || 'link text';
-			const url = 'https://';
-			const text = `[${label}](${url})`;
-			return { text, cursorOffset: text.length - 1 };
-		});
+		if (!editor) return;
+
+		const currentHref = editor.getAttributes('link').href as string | undefined;
+		const nextHref = window.prompt($_('compose.link'), currentHref ?? 'https://');
+		if (nextHref === null) return;
+
+		const href = nextHref.trim();
+		if (!href) {
+			editor.chain().focus().extendMarkRange('link').unsetLink().run();
+			return;
+		}
+
+		editor.chain().focus().extendMarkRange('link').setLink({ href }).run();
 	}
 </script>
 
 <div class="compose-editor-shell">
 	<div class="editor-toolbar" role="toolbar" aria-label={$_('compose.formattingToolbar')}>
-		<button type="button" onclick={() => wrapSelection('**')} aria-label={$_('compose.bold')}>
+		<button
+			type="button"
+			onclick={toggleBold}
+			aria-label={$_('compose.bold')}
+			class:active={editor?.isActive('bold')}
+		>
 			<Bold class="size-3.5" strokeWidth={1.8} />
 		</button>
-		<button type="button" onclick={() => wrapSelection('*')} aria-label={$_('compose.italic')}>
+		<button
+			type="button"
+			onclick={toggleItalic}
+			aria-label={$_('compose.italic')}
+			class:active={editor?.isActive('italic')}
+		>
 			<Italic class="size-3.5" strokeWidth={1.8} />
 		</button>
-		<button type="button" onclick={() => wrapSelection('__')} aria-label={$_('compose.underline')}>
+		<button
+			type="button"
+			onclick={toggleUnderline}
+			aria-label={$_('compose.underline')}
+			class:active={editor?.isActive('underline')}
+		>
 			<Underline class="size-3.5" strokeWidth={1.8} />
 		</button>
 		<div class="toolbar-divider"></div>
-		<button type="button" onclick={addBulletList} aria-label={$_('compose.list')}>
+		<button
+			type="button"
+			onclick={toggleBulletList}
+			aria-label={$_('compose.list')}
+			class:active={editor?.isActive('bulletList')}
+		>
 			<List class="size-3.5" strokeWidth={1.8} />
 		</button>
-		<button type="button" onclick={insertLink} aria-label={$_('compose.link')}>
+		<button
+			type="button"
+			onclick={insertLink}
+			aria-label={$_('compose.link')}
+			class:active={editor?.isActive('link')}
+		>
 			<Link2 class="size-3.5" strokeWidth={1.8} />
 		</button>
 		<div class="toolbar-divider"></div>
@@ -99,12 +131,14 @@
 		</button>
 	</div>
 
-	<textarea
-		bind:value
-		bind:this={editorRef}
-		placeholder={$_('compose.placeholder')}
-		class="compose-editor"
-	></textarea>
+	<div class="compose-editor">
+		<RichEditor
+			content={editorContent}
+			placeholder={$_('compose.placeholder')}
+			onEditorChange={handleEditorChange}
+			onContentChange={handleContentChange}
+		/>
+	</div>
 
 	{#if attachments.length > 0}
 		<div class="attachment-zone" aria-label={$_('compose.attachments')}>
@@ -166,6 +200,11 @@
 		color: var(--text-primary);
 	}
 
+	.editor-toolbar button.active {
+		background: var(--bg-hover);
+		color: var(--accent-primary);
+	}
+
 	.editor-toolbar button:active {
 		background: var(--bg-active);
 	}
@@ -180,19 +219,10 @@
 	.compose-editor {
 		flex: 1;
 		min-height: 340px;
-		padding: 1.25rem 1.5rem;
 		border: none;
 		outline: none;
-		resize: none;
 		background: var(--bg-primary);
-		color: var(--text-primary);
-		font-size: 15px;
-		line-height: 1.8;
-		letter-spacing: -0.01em;
-	}
-
-	.compose-editor::placeholder {
-		color: var(--text-quaternary);
+		overflow: hidden;
 	}
 
 	.attachment-zone {
