@@ -1,6 +1,12 @@
 <script lang="ts">
+	import { onDestroy } from 'svelte';
+	import { browser } from '$app/environment';
 	import { _ } from 'svelte-i18n';
 	import DOMPurify from 'dompurify';
+	import { Editor } from '@tiptap/core';
+	import StarterKit from '@tiptap/starter-kit';
+	import TextAlign from '@tiptap/extension-text-align';
+	import { plainTextToHtml } from '$lib/utils/mailContent.js';
 
 	interface Props {
 		htmlBody?: string;
@@ -9,26 +15,45 @@
 
 	let { htmlBody, plainBody }: Props = $props();
 
-	let iframeEl = $state<HTMLIFrameElement | null>(null);
+	let editorElement = $state<HTMLDivElement | null>(null);
+	let editor = $state<Editor | null>(null);
 
-	// Detect dark mode from parent document's .dark class
-	let isDark = $state(false);
-	$effect(() => {
-		isDark = document.documentElement.classList.contains('dark');
-		const observer = new MutationObserver(() => {
-			isDark = document.documentElement.classList.contains('dark');
-		});
-		observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-		return () => observer.disconnect();
-	});
+	const TIPTAP_SUPPORTED_TAGS = new Set([
+		'A',
+		'B',
+		'BLOCKQUOTE',
+		'BR',
+		'CODE',
+		'DEL',
+		'DIV',
+		'EM',
+		'H1',
+		'H2',
+		'H3',
+		'H4',
+		'H5',
+		'H6',
+		'HR',
+		'I',
+		'LI',
+		'OL',
+		'P',
+		'PRE',
+		'S',
+		'SPAN',
+		'STRONG',
+		'U',
+		'UL'
+	]);
 
-	// Process HTML to ensure links open in new tab
-	function processHtmlLinks(html: string): string {
-		// Create a temporary div to parse HTML
+	function enhanceLinks(html: string): string {
+		if (!browser || !html.trim()) {
+			return '';
+		}
+
 		const tempDiv = document.createElement('div');
 		tempDiv.innerHTML = html;
 
-		// Find all links and add target="_blank" and rel attributes
 		const links = tempDiv.querySelectorAll('a');
 		links.forEach((link) => {
 			link.setAttribute('target', '_blank');
@@ -38,131 +63,208 @@
 		return tempDiv.innerHTML;
 	}
 
-	// Build the srcdoc content for the iframe
-	let srcdoc = $derived.by(() => {
-		// Dark mode styles for plain text emails
-		const darkStyles = isDark ? `
-  body { background: #0f0f10; color: #f8f8f8; }
-  a { color: #60a5fa; }
-  pre { background: #252528; color: #f8f8f8; }` : '';
-
-		if (htmlBody) {
-			const sanitized = DOMPurify.sanitize(htmlBody, {
-				WHOLE_DOCUMENT: false,
-				ADD_TAGS: ['style'],
-				ADD_ATTR: ['target', 'rel']
-			});
-
-			// Post-process to ensure all links have target="_blank"
-			const processed = processHtmlLinks(sanitized);
-
-			return `<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<style>
-  /* Minimal reset — preserve original email formatting */
-  *, *::before, *::after {
-    box-sizing: border-box;
-  }
-  html {
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-  }
-  body {
-    margin: 0;
-    padding: 12px;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', 'Helvetica Neue', sans-serif;
-    font-size: 15px;
-    line-height: 1.7;
-    color: #1d1d1f;
-    word-wrap: break-word;
-    overflow-wrap: break-word;
-  }
-  /* Default link styling (overridable by email styles) */
-  a { color: #2563eb; text-decoration: none; }
-  a:hover { text-decoration: underline; }
-  /* Prevent overflow without destroying layout */
-  img { max-width: 100%; height: auto; }
-  table { max-width: 100%; }
-  pre {
-    overflow-x: auto;
-    background: #f7f6f3;
-    padding: 12px;
-    border-radius: 4px;
-  }
-  code {
-    font-family: 'SF Mono', 'Monaco', 'Cascadia Code', 'Roboto Mono', Consolas, monospace;
-    font-size: 0.9em;
-  }
-</style>
-</head>
-<body>${processed}</body>
-</html>`;
+	function sanitizeHtml(html: string | undefined): string {
+		if (!html?.trim()) {
+			return '';
 		}
 
-		// Plain text fallback — escape HTML and preserve whitespace
-		const escaped = plainBody
-			.replace(/&/g, '&amp;')
-			.replace(/</g, '&lt;')
-			.replace(/>/g, '&gt;')
-			.replace(/\n/g, '<br>');
+		if (!browser) {
+			return html.trim();
+		}
 
-		return `<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<style>
-  *, *::before, *::after {
-    box-sizing: border-box;
-  }
-  body {
-    margin: 0;
-    padding: 12px;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', 'Helvetica Neue', sans-serif;
-    font-size: 15px;
-    line-height: 1.7;
-    color: #1d1d1f;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-  }
-  ${darkStyles}
-</style>
-</head>
-<body>${escaped}</body>
-</html>`;
+		const sanitized = DOMPurify.sanitize(html, {
+			WHOLE_DOCUMENT: false,
+			FORBID_TAGS: ['style', 'script'],
+			FORBID_ATTR: ['style', 'class', 'id']
+		});
+
+		return enhanceLinks(sanitized.trim());
+	}
+
+	function canRenderWithTiptap(html: string): boolean {
+		if (!browser || !html.trim()) {
+			return true;
+		}
+
+		const parser = new DOMParser();
+		const doc = parser.parseFromString(html, 'text/html');
+
+		return Array.from(doc.body.querySelectorAll('*')).every((node) => TIPTAP_SUPPORTED_TAGS.has(node.tagName));
+	}
+
+	const sanitizedHtml = $derived.by(() => sanitizeHtml(htmlBody));
+	const plainHtml = $derived.by(() => plainTextToHtml(plainBody));
+	const renderedHtml = $derived.by(() => sanitizedHtml || plainHtml);
+	const useRawHtmlFallback = $derived.by(() => Boolean(sanitizedHtml) && !canRenderWithTiptap(sanitizedHtml));
+
+	function ensureEditor(): void {
+		if (!editorElement || editor || useRawHtmlFallback) {
+			return;
+		}
+
+		editor = new Editor({
+			element: editorElement,
+			editable: false,
+			extensions: [
+				StarterKit.configure({
+					link: {
+						openOnClick: true,
+						HTMLAttributes: {
+							target: '_blank',
+							rel: 'noopener noreferrer'
+						}
+					}
+				}),
+				TextAlign.configure({
+					types: ['heading', 'paragraph']
+				})
+			],
+			content: renderedHtml
+		});
+	}
+
+	function destroyEditor(): void {
+		editor?.destroy();
+		editor = null;
+	}
+
+	$effect(() => {
+		if (useRawHtmlFallback) {
+			destroyEditor();
+			return;
+		}
+
+		ensureEditor();
 	});
 
-	// Auto-resize iframe to fit content
-	function handleLoad() {
-		resizeIframe();
-	}
-
-	function resizeIframe() {
-		if (!iframeEl?.contentDocument?.body) return;
-		const height = iframeEl.contentDocument.documentElement.scrollHeight;
-		iframeEl.style.height = `${height}px`;
-	}
-
-	// Re-measure on content change
 	$effect(() => {
-		srcdoc; // track dependency
-		if (iframeEl) {
-			// Wait for next frame so the iframe has loaded the new srcdoc
-			requestAnimationFrame(() => {
-				setTimeout(resizeIframe, 100);
-			});
+		if (!editor || useRawHtmlFallback) {
+			return;
 		}
+
+		if (renderedHtml !== editor.getHTML()) {
+			editor.commands.setContent(renderedHtml, { emitUpdate: false });
+		}
+	});
+
+	onDestroy(() => {
+		destroyEditor();
 	});
 </script>
 
-<iframe
-	bind:this={iframeEl}
-	title={$_('mail.emailContent')}
-	{srcdoc}
-	sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin"
-	class="w-full border-none pointer-events-auto"
-	style="min-height: 200px;"
-	onload={handleLoad}
-></iframe>
+{#if useRawHtmlFallback}
+	<div class="mail-renderer-html" role="article" aria-label={$_('mail.emailContent')}>
+		<div class="mail-renderer-html__content">{@html sanitizedHtml}</div>
+	</div>
+{:else}
+	<div class="mail-renderer" role="article" aria-label={$_('mail.emailContent')}>
+		<div class="mail-renderer__content" bind:this={editorElement}></div>
+	</div>
+{/if}
+
+<style>
+	.mail-renderer,
+	.mail-renderer-html {
+		width: 100%;
+		min-height: 200px;
+		background: transparent;
+		color: var(--text-primary);
+	}
+
+	.mail-renderer__content :global(.ProseMirror),
+	.mail-renderer-html__content {
+		min-height: 200px;
+		padding: 1rem 1.25rem 1.5rem;
+		outline: none;
+		font-size: 15px;
+		line-height: 1.7;
+		color: var(--text-primary);
+		word-break: break-word;
+		overflow-wrap: anywhere;
+		background: transparent;
+	}
+
+	.mail-renderer__content :global(p),
+	.mail-renderer-html__content :global(p) {
+		margin: 0 0 0.9rem;
+	}
+
+	.mail-renderer__content :global(h1),
+	.mail-renderer__content :global(h2),
+	.mail-renderer__content :global(h3),
+	.mail-renderer__content :global(h4),
+	.mail-renderer__content :global(h5),
+	.mail-renderer__content :global(h6),
+	.mail-renderer-html__content :global(h1),
+	.mail-renderer-html__content :global(h2),
+	.mail-renderer-html__content :global(h3),
+	.mail-renderer-html__content :global(h4),
+	.mail-renderer-html__content :global(h5),
+	.mail-renderer-html__content :global(h6) {
+		margin: 1.25rem 0 0.75rem;
+		line-height: 1.3;
+		font-weight: 600;
+		color: var(--text-primary);
+	}
+
+	.mail-renderer__content :global(ul),
+	.mail-renderer__content :global(ol),
+	.mail-renderer-html__content :global(ul),
+	.mail-renderer-html__content :global(ol) {
+		margin: 0 0 1rem;
+		padding-left: 1.5rem;
+	}
+
+	.mail-renderer__content :global(li),
+	.mail-renderer-html__content :global(li) {
+		margin-bottom: 0.35rem;
+	}
+
+	.mail-renderer__content :global(blockquote),
+	.mail-renderer-html__content :global(blockquote) {
+		margin: 1rem 0;
+		padding-left: 1rem;
+		border-left: 3px solid var(--border-secondary);
+		color: var(--text-secondary);
+	}
+
+	.mail-renderer__content :global(a),
+	.mail-renderer-html__content :global(a) {
+		color: var(--accent-primary);
+		text-decoration: underline;
+		text-underline-offset: 2px;
+	}
+
+	.mail-renderer__content :global(pre),
+	.mail-renderer-html__content :global(pre) {
+		margin: 1rem 0;
+		padding: 0.875rem 1rem;
+		border-radius: 10px;
+		background: var(--bg-secondary);
+		overflow-x: auto;
+	}
+
+	.mail-renderer__content :global(code),
+	.mail-renderer-html__content :global(code) {
+		font-family: 'SF Mono', 'Menlo', monospace;
+		font-size: 0.875em;
+	}
+
+	.mail-renderer-html__content :global(table) {
+		width: 100%;
+		border-collapse: collapse;
+		margin: 1rem 0;
+	}
+
+	.mail-renderer-html__content :global(th),
+	.mail-renderer-html__content :global(td) {
+		padding: 0.5rem 0.625rem;
+		border: 1px solid var(--border-secondary);
+		text-align: left;
+	}
+
+	.mail-renderer-html__content :global(img) {
+		max-width: 100%;
+		height: auto;
+	}
+</style>
