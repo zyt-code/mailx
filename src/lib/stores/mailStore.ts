@@ -17,6 +17,27 @@ const _totalCount = writable(0);
 
 let _currentOffset = 0;
 
+function resolveFallbackAccountId(accounts: { id: string; is_active: boolean }[]): string | null {
+	return accounts.find((account) => account.is_active)?.id ?? accounts[0]?.id ?? null;
+}
+
+function resolveEffectiveAccountId(
+	folder: Folder,
+	selectedAccountId: string | null,
+	accounts: { id: string; is_active: boolean }[]
+): string | null {
+	if (selectedAccountId) {
+		return selectedAccountId;
+	}
+
+	// Only Inbox supports the "all accounts" aggregate view.
+	if (folder === 'inbox') {
+		return null;
+	}
+
+	return resolveFallbackAccountId(accounts);
+}
+
 function ensureReadState(mail: Mail, read: boolean): Mail {
 	return {
 		...mail,
@@ -60,13 +81,14 @@ export const totalCount: Readable<number> = { subscribe: _totalCount.subscribe }
 
 // Account-filtered emails: if selectedAccountId is null, show all; otherwise filter by account
 export const displayedEmails = derived(
-  [_mails, _selectedAccountId, _activeFolder],
-  ([$mails, $selectedAccountId, $activeFolder]) => {
+  [_mails, _selectedAccountId, _activeFolder, accountListStore],
+  ([$mails, $selectedAccountId, $activeFolder, $accounts]) => {
     let filtered = $mails.filter(m => m.folder === $activeFolder);
-    if ($selectedAccountId !== null) {
+    const effectiveAccountId = resolveEffectiveAccountId($activeFolder, $selectedAccountId, $accounts);
+    if (effectiveAccountId !== null) {
       const beforeFilter = filtered.length;
       // Force both to String for comparison to avoid type mismatch (number vs string)
-      const selectedStr = String($selectedAccountId);
+      const selectedStr = String(effectiveAccountId);
       filtered = filtered.filter(m => String(m.account_id ?? '') === selectedStr);
     }
     return filtered;
@@ -147,7 +169,11 @@ export async function loadMails(folder?: Folder): Promise<void> {
   _currentOffset = 0;
   try {
     const targetFolder = folder || 'inbox';
-    const accountId = get(_selectedAccountId);
+    const accountId = resolveEffectiveAccountId(
+      targetFolder,
+      get(_selectedAccountId),
+      get(accountListStore)
+    );
     const [data, count] = await Promise.all([
       db.getMails(targetFolder, accountId, PAGE_SIZE, 0),
       db.getMailsCount(targetFolder, accountId)
@@ -171,7 +197,11 @@ export async function loadMoreMails(): Promise<void> {
   _isLoadingMore.set(true);
   try {
     const targetFolder = get(_activeFolder);
-    const accountId = get(_selectedAccountId);
+    const accountId = resolveEffectiveAccountId(
+      targetFolder,
+      get(_selectedAccountId),
+      get(accountListStore)
+    );
     const data = await db.getMails(targetFolder, accountId, PAGE_SIZE, _currentOffset);
     if (data.length > 0) {
       const normalized = data.map(normalizeMail);
