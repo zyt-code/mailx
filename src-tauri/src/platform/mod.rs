@@ -7,12 +7,15 @@ use crate::notification_manager::{NotificationFacade, MockFacade};
 use std::sync::Arc;
 
 /// 创建平台特定的通知实现
-pub fn create_notification_facade(app_id: String) -> Arc<dyn NotificationFacade> {
+pub fn create_notification_facade(_app_id: String) -> Arc<dyn NotificationFacade> {
     #[cfg(windows)]
     {
-        println!("[Notification] Attempting to create Windows notification facade with app_id: {}", app_id);
+        println!(
+            "[Notification] Attempting to create Windows notification facade with app_id: {}",
+            _app_id
+        );
 
-        match windows_notification::WindowsNotification::new(app_id) {
+        match windows_notification::WindowsNotification::new(_app_id) {
             Ok(notif) => {
                 println!("[Notification] ✅ Successfully created Windows native notification facade");
                 return Arc::new(notif);

@@ -59,13 +59,14 @@ mod tests {
     fn test_cleanup_old_notifications_30_days() {
         let (db, _temp_dir) = create_test_database();
         let account_id = 123i64;
-        let conn = db.conn.lock().unwrap();
-        let old_timestamp = chrono::Utc::now() - chrono::Duration::days(31);
-        conn.execute("INSERT INTO notifications (account_id, mail_id, type, title, body, priority, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)", rusqlite::params![account_id, 100i64, "old_notification", "Old Notification", "This is old", 1i32, old_timestamp.timestamp_millis()]).unwrap();
-        let recent_old_timestamp = chrono::Utc::now() - chrono::Duration::days(29);
-        conn.execute("INSERT INTO notifications (account_id, mail_id, type, title, body, priority, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)", rusqlite::params![account_id, 101i64, "recent_old_notification", "Recent Old Notification", "This is recent", 1i32, recent_old_timestamp.timestamp_millis()]).unwrap();
+        {
+            let conn = db.conn.lock().unwrap();
+            let old_timestamp = chrono::Utc::now() - chrono::Duration::days(31);
+            conn.execute("INSERT INTO notifications (account_id, mail_id, type, title, body, priority, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)", rusqlite::params![account_id, 100i64, "old_notification", "Old Notification", "This is old", 1i32, old_timestamp.timestamp_millis()]).unwrap();
+            let recent_old_timestamp = chrono::Utc::now() - chrono::Duration::days(29);
+            conn.execute("INSERT INTO notifications (account_id, mail_id, type, title, body, priority, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)", rusqlite::params![account_id, 101i64, "recent_old_notification", "Recent Old Notification", "This is recent", 1i32, recent_old_timestamp.timestamp_millis()]).unwrap();
+        }
         db.insert_notification(account_id, Some(102i64), "new_notification", "New Notification", "This is new", 1, None).unwrap();
-        drop(conn);
         assert_eq!(db.get_notifications(Some(account_id), 100).unwrap().len(), 3);
         assert_eq!(db.cleanup_old_notifications(30).unwrap(), 1);
         assert_eq!(db.get_notifications(Some(account_id), 100).unwrap().len(), 2);

@@ -207,7 +207,7 @@
 		color: var(--text-secondary);
 	}
 
-	.welcome-cta {
+	:global(.welcome-cta) {
 		gap: 0.5rem;
 		padding: 0.75rem 1.2rem;
 		font-weight: 560;
@@ -219,7 +219,7 @@
 		transition: transform 180ms ease, box-shadow 180ms ease;
 	}
 
-	.welcome-cta:hover {
+	:global(.welcome-cta:hover) {
 		transform: translateY(-1px);
 		box-shadow: 0 14px 32px -14px color-mix(in srgb, var(--accent-primary) 70%, transparent);
 	}

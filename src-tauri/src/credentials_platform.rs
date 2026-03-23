@@ -5,6 +5,7 @@
 #[path = "credentials/platform.rs"]
 pub mod platform;
 
+#[cfg(target_os = "windows")]
 #[path = "credentials/windows.rs"]
 pub mod windows;
 
