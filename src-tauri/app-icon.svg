@@ -1,0 +1,21 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1024" height="1024" rx="236" fill="url(#bg)"/>
+  <rect x="46" y="46" width="932" height="932" rx="190" stroke="url(#stroke)" stroke-width="18"/>
+  <path d="M246 760V260H360L512 554L664 260H778V760H688V428L550 694H474L336 428V760H246Z" fill="#F7E6D3"/>
+  <path d="M274 244C335 167 421 128 515 128C672 128 810 233 862 382" stroke="url(#shine)" stroke-width="36" stroke-linecap="round" opacity="0.42"/>
+  <defs>
+    <linearGradient id="bg" x1="138" y1="96" x2="860" y2="942" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#9B633B"/>
+      <stop offset="0.48" stop-color="#7A4727"/>
+      <stop offset="1" stop-color="#5A2F18"/>
+    </linearGradient>
+    <linearGradient id="stroke" x1="128" y1="112" x2="898" y2="922" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#D5A67F" stop-opacity="0.9"/>
+      <stop offset="1" stop-color="#F2D9C1" stop-opacity="0.12"/>
+    </linearGradient>
+    <linearGradient id="shine" x1="280" y1="184" x2="762" y2="398" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFF1E3"/>
+      <stop offset="1" stop-color="#FFF1E3" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+</svg>
