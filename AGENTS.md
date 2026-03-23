@@ -44,3 +44,6 @@ Note: `src-tauri/tauri.conf.json` uses `bun run dev/build` as pre-commands, so k
 ## Configuration Safety Notes
 - Keep frontend/backend defaults aligned; shared provider defaults live in `src/lib/config/provider-defaults.json`.
 - Do not hardcode local-dev-only behavior in production paths; use config or dedicated test harnesses.
+
+## Automation Policy
+- Do not add or reintroduce GitHub Actions workflows unless the user explicitly asks for them.
