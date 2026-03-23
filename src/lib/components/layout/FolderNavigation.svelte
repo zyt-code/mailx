@@ -9,7 +9,7 @@
 		navItems: ReadonlyArray<{ readonly icon: any; readonly labelKey: string; readonly folder: Folder }>;
 		activeFolder: Folder;
 		isAccountConfigured: boolean;
-		unreadCount: number;
+		unreadCounts: Record<Folder, number>;
 		collapsed: boolean;
 		isMobile: boolean;
 		onSelectFolder: (folder: Folder) => void;
@@ -21,7 +21,7 @@
 		navItems,
 		activeFolder,
 		isAccountConfigured,
-		unreadCount,
+		unreadCounts,
 		collapsed,
 		isMobile,
 		onSelectFolder
@@ -106,7 +106,7 @@
 					type="button"
 					use:registerButton={item.folder}
 					class={cn(
-						'folder-nav-button group flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-[13px] relative',
+						'folder-nav-button group relative flex h-10 w-full items-center gap-2.5 rounded-xl pl-2.5 pr-3 text-[13px]',
 						isAccountConfigured && item.folder === activeFolder
 							? 'is-active text-[var(--text-primary)] font-semibold'
 							: '',
@@ -122,20 +122,25 @@
 					onpointercancel={() => releaseButton(item.folder)}
 					onblur={() => releaseButton(item.folder)}
 					disabled={!isAccountConfigured}
-				>
-					<item.icon
+					>
+						<item.icon
+							class={cn(
+								'folder-nav-icon size-[17px] shrink-0',
+								isAccountConfigured && item.folder === activeFolder && 'text-[var(--accent-primary)]'
+							)}
+							strokeWidth={1.8}
+						/>
+					<span
 						class={cn(
-							'folder-nav-icon size-[17px] shrink-0',
-							isAccountConfigured && item.folder === activeFolder && 'text-[var(--accent-primary)]'
+							'flex-1 text-left truncate',
+							unreadCounts[item.folder] > 0 && 'pr-8'
 						)}
-						strokeWidth={1.8}
-					/>
-					<span class="flex-1 text-left truncate">
+					>
 						{$_(item.labelKey)}
 					</span>
-					{#if item.folder === 'inbox' && unreadCount > 0}
+					{#if unreadCounts[item.folder] > 0}
 						<span class="folder-nav-badge">
-							{unreadCount}
+							{unreadCounts[item.folder]}
 						</span>
 					{/if}
 				</button>
@@ -169,7 +174,7 @@
 				>
 					<div class="relative">
 						<item.icon class="size-[17px]" strokeWidth={1.8} />
-						{#if item.folder === 'inbox' && unreadCount > 0}
+						{#if unreadCounts[item.folder] > 0}
 							<span class="absolute -top-0.5 -right-0.5 size-2 bg-[var(--accent-primary)] rounded-full border-2 border-[var(--bg-secondary)]"></span>
 						{/if}
 					</div>
@@ -253,15 +258,25 @@
 	}
 
 	.folder-nav-badge {
+		position: absolute;
+		top: 50%;
+		right: 0.75rem;
+		transform: translate3d(0, -50%, 0);
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		height: 20px;
 		font-size: 11px;
 		font-weight: 700;
+		line-height: 1;
 		color: var(--accent-primary);
 		background: color-mix(in srgb, var(--accent-light) 88%, transparent);
 		border-radius: 999px;
-		padding: 0.18rem 0.42rem;
+		padding: 0 0.42rem;
 		min-width: 20px;
 		text-align: center;
 		font-variant-numeric: tabular-nums;
+		pointer-events: none;
 	}
 
 	.folder-nav-collapsed {

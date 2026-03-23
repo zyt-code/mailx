@@ -4,7 +4,7 @@
 	import type { Folder, Account } from '$lib/types.js';
 	import { hasAccounts, activeAccount, accounts } from '$lib/stores/accountStore.js';
 	import { isSyncing, lastSyncTime, syncingAccountId } from '$lib/stores/syncStore.js';
-	import { inboxUnread } from '$lib/stores/unreadStore.js';
+	import { folderUnreadCounts } from '$lib/stores/unreadStore.js';
 	import { selectedAccountId as storeSelectedAccountId } from '$lib/stores/mailStore.js';
 	import { syncAllAccounts, syncAccount } from '$lib/sync/index.js';
 	import { eventBus } from '$lib/events/index.js';
@@ -65,7 +65,13 @@
 	let currentAccount = $state<Account | null>(null);
 	let isAccountConfigured = $state(false);
 	let lastSync = $state<number | null>(null);
-	let unreadCount = $state(0);
+	let unreadCounts = $state<Record<Folder, number>>({
+		inbox: 0,
+		sent: 0,
+		drafts: 0,
+		archive: 0,
+		trash: 0
+	});
 	let allAccounts = $state<Account[]>([]);
 	let selectedAccountId = $state<string | null>(null); // null = All Inboxes
 	let currentSyncAccountId = $state<string | null>(null); // which account is currently syncing
@@ -92,8 +98,8 @@
 		const unsubLastSync = lastSyncTime.subscribe((value) => {
 			lastSync = value;
 		});
-		const unsubUnread = inboxUnread.subscribe((value) => {
-			unreadCount = value;
+		const unsubUnread = folderUnreadCounts.subscribe((value) => {
+			unreadCounts = value;
 		});
 		const unsubAccounts = accounts.subscribe((value) => {
 			allAccounts = value;
@@ -337,14 +343,14 @@
 		{/if}
 
 		<!-- Navigation -->
-		<FolderNavigation
-			navItems={navItems}
-			activeFolder={activeFolder}
-			isAccountConfigured={isAccountConfigured}
-			unreadCount={unreadCount}
-			collapsed={collapsed}
-			isMobile={isMobile}
-			onSelectFolder={handleFolderClick}
+			<FolderNavigation
+				navItems={navItems}
+				activeFolder={activeFolder}
+				isAccountConfigured={isAccountConfigured}
+				unreadCounts={unreadCounts}
+				collapsed={collapsed}
+				isMobile={isMobile}
+				onSelectFolder={handleFolderClick}
 		/>
 	{:else}
 		<!-- Collapsed state - show compose icon button -->
@@ -356,14 +362,14 @@
 		/>
 
 		<!-- Collapsed navigation -->
-		<FolderNavigation
-			navItems={navItems}
-			activeFolder={activeFolder}
-			isAccountConfigured={isAccountConfigured}
-			unreadCount={unreadCount}
-			collapsed={collapsed}
-			isMobile={isMobile}
-			onSelectFolder={handleFolderClick}
+			<FolderNavigation
+				navItems={navItems}
+				activeFolder={activeFolder}
+				isAccountConfigured={isAccountConfigured}
+				unreadCounts={unreadCounts}
+				collapsed={collapsed}
+				isMobile={isMobile}
+				onSelectFolder={handleFolderClick}
 		/>
 
 	{/if}

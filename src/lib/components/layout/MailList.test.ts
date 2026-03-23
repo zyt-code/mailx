@@ -4,6 +4,11 @@ import { init, register } from 'svelte-i18n';
 import MailList from './MailList.svelte';
 import type { UserPreferences } from '$lib/stores/preferencesStore';
 
+vi.mock('virtua/svelte', async () => {
+	const { default: VList } = await import('$lib/test/VListMock.svelte');
+	return { VList };
+});
+
 let mockMails: unknown[] = [];
 let mockFolder = 'inbox';
 let mockSelectedAccountId: string | null = null;

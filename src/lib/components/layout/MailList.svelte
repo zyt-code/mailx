@@ -16,6 +16,7 @@
 	} from '$lib/stores/mailStore.js';
 	import { markMailAsRead } from '$lib/db/index.js';
 	import { preferences } from '$lib/stores/preferencesStore.js';
+	import { hasOpenModal } from '$lib/stores/modalStore.js';
 
 	interface Props {
 		selectedMailId: string | null;
@@ -57,6 +58,7 @@
 	let mailDensity = $state<'compact' | 'comfortable' | 'airy'>('comfortable');
 	let showPreviewSnippets = $state(true);
 	let showAccountColor = $state(true);
+	let isModalOpen = $state(false);
 
 	// Subscriptions
 	$effect(() => {
@@ -71,6 +73,13 @@
 			mailDensity = value.appearance.mailDensity;
 			showPreviewSnippets = value.appearance.showPreviewSnippets;
 			showAccountColor = value.appearance.showAccountColor;
+		});
+		return unsub;
+	});
+
+	$effect(() => {
+		const unsub = hasOpenModal.subscribe((value) => {
+			isModalOpen = value;
 		});
 		return unsub;
 	});
@@ -176,9 +185,8 @@
 	}
 
 	function getFirstLine(value: string): string {
-		const normalized = value.replace(/\s+/g, ' ').trim();
-		const firstLine = normalized.split('\n')[0] ?? '';
-		return firstLine.trim();
+		const firstLine = value.split('\n')[0] ?? '';
+		return firstLine.replace(/\s+/g, ' ').trim();
 	}
 
 	function truncate(value: string, limit: number): string {
@@ -220,23 +228,38 @@
 	style:width={width !== undefined ? `${width}px` : undefined}
 	class:w-full={width === undefined}
 >
-	<div class="flex items-center gap-2 px-3 py-2 border-b border-[var(--border-primary)] shrink-0 sticky top-0 bg-[var(--bg-primary)] z-10 dark:bg-[var(--bg-primary)] dark:border-[var(--border-primary)]">
-		<Search class={cn(
-			"size-4 shrink-0",
-			isAccountConfigured ? "text-[var(--text-tertiary)]" : "text-[var(--text-quaternary)]"
-		)} strokeWidth={1.8} />
-		<input
-			type="text"
-			placeholder={$_('mail.searchFolder', { values: { folder: folderLabels[activeFolder] } })}
-			disabled={!isAccountConfigured}
+	<div
+		class={cn(
+			"mail-search-header sticky top-0 z-0 shrink-0 border-b border-[var(--border-primary)] bg-[var(--bg-primary)] px-3 py-2 dark:bg-[var(--bg-primary)] dark:border-[var(--border-primary)]",
+			isModalOpen && "pointer-events-none"
+		)}
+		data-testid="mail-search-bar"
+		data-modal-obscured={isModalOpen}
+		aria-hidden={isModalOpen}
+	>
+		<div
 			class={cn(
-				"flex-1 bg-transparent text-[13px] outline-none placeholder:text-[var(--text-tertiary)] transition-colors duration-150 rounded-md px-2 -mx-2",
-				isAccountConfigured
-					? "text-[var(--text-primary)] focus:bg-[var(--bg-secondary)]"
-					: "text-[var(--text-quaternary)] cursor-not-allowed placeholder:text-[var(--text-quaternary)]"
+				"mail-search-shell flex items-center gap-2 rounded-2xl px-3 py-2",
+				isModalOpen && "opacity-70"
 			)}
-			bind:value={searchQuery}
-		/>
+		>
+			<Search class={cn(
+				"size-4 shrink-0 transition-colors duration-200",
+				isAccountConfigured && !isModalOpen ? "text-zinc-500 dark:text-gray-500" : "text-[var(--text-quaternary)]"
+			)} strokeWidth={1.8} />
+			<input
+				type="text"
+				placeholder={$_('mail.searchFolder', { values: { folder: folderLabels[activeFolder] } })}
+				disabled={!isAccountConfigured || isModalOpen}
+				class={cn(
+					"mail-search-input flex-1 bg-transparent text-[13px] outline-none placeholder:text-[var(--text-tertiary)] transition-colors duration-150",
+					isAccountConfigured && !isModalOpen
+						? "text-[var(--text-primary)]"
+						: "text-[var(--text-quaternary)] cursor-not-allowed placeholder:text-[var(--text-quaternary)]"
+				)}
+				bind:value={searchQuery}
+			/>
+		</div>
 	</div>
 
 	{#if isSyncing}
@@ -414,3 +437,60 @@
 		{/if}
 	</div>
 </div>
+
+<style>
+	.mail-search-header {
+		overflow: visible;
+	}
+
+	.mail-search-shell {
+		width: 100%;
+		border: 1px solid color-mix(in srgb, rgb(228 228 231) 84%, transparent);
+		background:
+			linear-gradient(135deg, rgba(255, 255, 255, 0.82), rgba(244, 244, 245, 0.76));
+		box-shadow:
+			0 10px 20px rgba(15, 23, 42, 0.06),
+			inset 0 1px 0 rgba(255, 255, 255, 0.6);
+		backdrop-filter: blur(12px) saturate(122%);
+		transition:
+			width 300ms cubic-bezier(0.4, 0, 0.2, 1),
+			transform 300ms cubic-bezier(0.4, 0, 0.2, 1),
+			box-shadow 240ms cubic-bezier(0.4, 0, 0.2, 1),
+			border-color 220ms cubic-bezier(0.4, 0, 0.2, 1),
+			background-color 220ms cubic-bezier(0.4, 0, 0.2, 1);
+	}
+
+	.mail-search-shell:focus-within {
+		width: calc(100% + 20px);
+		transform: translate3d(-10px, 0, 0);
+		border-color: color-mix(in srgb, var(--border-primary) 82%, rgba(59, 130, 246, 0.12));
+		box-shadow:
+			0 16px 28px rgba(15, 23, 42, 0.08),
+			0 0 0 1px rgba(255, 255, 255, 0.25);
+	}
+
+	.mail-search-input {
+		min-width: 0;
+	}
+
+	.mail-search-input::placeholder {
+		color: var(--text-tertiary);
+	}
+
+	:global(.dark) .mail-search-shell {
+		border-color: rgba(63, 63, 70, 0.82);
+		background:
+			linear-gradient(135deg, rgba(31, 41, 55, 0.52), rgba(17, 24, 39, 0.44));
+		box-shadow:
+			0 18px 30px rgba(2, 6, 23, 0.28),
+			inset 0 1px 0 rgba(255, 255, 255, 0.04);
+		backdrop-filter: blur(14px) saturate(124%);
+	}
+
+	:global(.dark) .mail-search-shell:focus-within {
+		border-color: rgba(82, 82, 91, 0.95);
+		box-shadow:
+			0 20px 34px rgba(2, 6, 23, 0.34),
+			0 0 0 1px rgba(255, 255, 255, 0.04);
+	}
+</style>

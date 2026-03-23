@@ -145,8 +145,11 @@ export async function toggleStar(id: string, starred: boolean): Promise<void> {
 /**
  * Get unread mail count for a folder
  */
-export async function getUnreadCount(folder: Folder): Promise<number> {
-	return invoke<number>('get_unread_count', { folder });
+export async function getUnreadCount(folder: Folder, accountId?: string | null): Promise<number> {
+	return invoke<number>('get_unread_count', {
+		folder,
+		account_id: accountId ?? null
+	});
 }
 
 /**

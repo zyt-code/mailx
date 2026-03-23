@@ -994,13 +994,24 @@ impl Database {
     }
 
     /// Get count of unread mails in a folder
-    pub fn get_unread_count(&self, folder: &str) -> SqliteResult<i64> {
+    pub fn get_unread_count(
+        &self,
+        folder: &str,
+        account_id: Option<&str>,
+    ) -> SqliteResult<i64> {
         let conn = self.conn.lock().unwrap();
-        conn.query_row(
-            "SELECT COUNT(*) FROM mails WHERE folder = ?1 AND unread = 1",
-            params![folder],
-            |row| row.get(0),
-        )
+        match account_id {
+            Some(account_id) => conn.query_row(
+                "SELECT COUNT(*) FROM mails WHERE folder = ?1 AND unread = 1 AND account_id = ?2",
+                params![folder, account_id],
+                |row| row.get(0),
+            ),
+            None => conn.query_row(
+                "SELECT COUNT(*) FROM mails WHERE folder = ?1 AND unread = 1",
+                params![folder],
+                |row| row.get(0),
+            ),
+        }
     }
 
     // ========== Notification Methods ==========

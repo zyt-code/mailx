@@ -3,7 +3,9 @@
 	import * as db from '$lib/db/index.js';
 	import * as accounts from '$lib/accounts/index.js';
 	import { ChevronDown, X } from 'lucide-svelte';
+	import { cubicOut } from 'svelte/easing';
 	import { fade, scale } from 'svelte/transition';
+	import { acquireModalLayer } from '$lib/stores/modalStore.js';
 	import ComposeHeader from './ComposeHeader.svelte';
 	import ComposeEditor from './ComposeEditor.svelte';
 	import ComposeActions from './ComposeActions.svelte';
@@ -32,6 +34,7 @@
 	let fileInputRef = $state<HTMLInputElement | null>(null);
 	let draftAttachments = $state<Attachment[]>([]);
 	let sendWithModEnter = $state(true);
+	let releaseModalLayer: (() => void) | null = null;
 
 	let draft = $state({
 		to: [] as EmailAddress[],
@@ -66,11 +69,17 @@
 
 	$effect(() => {
 		if (!isOpen) {
+			releaseModalLayer?.();
+			releaseModalLayer = null;
 			draftId = null;
 			lastSaved = null;
 			closeAccountDropdown();
 			draftAttachments = [];
 			return;
+		}
+
+		if (!releaseModalLayer) {
+			releaseModalLayer = acquireModalLayer();
 		}
 
 		if (availableAccounts.length === 0) {
@@ -122,6 +131,8 @@
 
 		return () => {
 			clearInterval(timer);
+			releaseModalLayer?.();
+			releaseModalLayer = null;
 		};
 	});
 
@@ -340,118 +351,141 @@
 	function closeModal(): void {
 		onClose();
 	}
+
+	function portal(node: HTMLElement) {
+		if (typeof document === 'undefined') {
+			return {
+				destroy() {}
+			};
+		}
+
+		document.body.appendChild(node);
+
+		return {
+			destroy() {
+				if (node.parentNode === document.body) {
+					document.body.removeChild(node);
+				}
+			}
+		};
+	}
 </script>
 
 {#if isOpen}
-	<div>
+	<div
+		use:portal
+		class="compose-modal-layer fixed inset-0 z-[70] flex items-center justify-center px-0 sm:px-6 py-0 sm:py-8"
+		data-testid="compose-modal-backdrop"
+		onclick={(event) => {
+			if (event.target === event.currentTarget) closeModal();
+		}}
+		onkeydown={(event) => {
+			if (event.key === 'Escape') closeModal();
+			if (sendWithModEnter && (event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+				event.preventDefault();
+				void sendMail();
+			}
+		}}
+		role="dialog"
+		aria-modal="true"
+		aria-labelledby="compose-title"
+		tabindex="-1"
+		in:fade={{ duration: 150 }}
+		out:fade={{ duration: 140 }}
+	>
 		<div
-			class="fixed inset-0 z-50 flex items-center justify-center bg-black/22 backdrop-blur-sm dark:bg-black/45"
-			onclick={(event) => {
-				if (event.target === event.currentTarget) closeModal();
-			}}
-			onkeydown={(event) => {
-				if (event.key === 'Escape') closeModal();
-				if (sendWithModEnter && (event.metaKey || event.ctrlKey) && event.key === 'Enter') {
-					event.preventDefault();
-					void sendMail();
-				}
-			}}
-			role="dialog"
-			aria-modal="true"
-			aria-labelledby="compose-title"
-			tabindex="-1"
-			in:fade={{ duration: 120 }}
-			out:fade={{ duration: 140 }}
+			class="compose-modal-shell flex flex-col w-full h-full sm:h-auto sm:min-h-[60vh] sm:max-h-[88vh] sm:max-w-[780px] overflow-hidden rounded-none sm:rounded-[22px] border border-[var(--border-secondary)] bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-2xl dark:border-[var(--border-primary)] dark:bg-[var(--bg-primary)] dark:text-[var(--text-primary)]"
+			role="document"
+			in:scale={{ duration: 220, start: 0.95, opacity: 0.16, easing: cubicOut }}
+			out:scale={{ duration: 150, start: 1, opacity: 0.12, easing: cubicOut }}
 		>
-			<div
-				class="compose-modal-shell flex flex-col w-full h-full sm:h-auto sm:min-h-[60vh] sm:max-h-[88vh] sm:max-w-[780px] overflow-hidden rounded-none sm:rounded-xl border border-[var(--border-secondary)] bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-2xl dark:border-[var(--border-primary)] dark:bg-[var(--bg-primary)] dark:text-[var(--text-primary)]"
-				role="document"
-				in:scale={{ duration: 160, start: 0.97, opacity: 0.2 }}
-				out:scale={{ duration: 120, start: 1, opacity: 0.15 }}
-			>
-				<header class="flex items-center justify-between gap-3 px-5 py-2.5 border-b border-[var(--border-tertiary)] bg-[var(--bg-primary)] dark:border-[var(--border-primary)] dark:bg-[var(--bg-primary)]">
-					<div class="flex items-center gap-3 min-w-0">
-						<h2 id="compose-title" class="text-[15px] font-semibold text-[var(--text-primary)] shrink-0">{$_('compose.newMessage')}</h2>
+			<header class="flex items-center justify-between gap-3 px-5 py-2.5 border-b border-[var(--border-tertiary)] bg-[var(--bg-primary)] dark:border-[var(--border-primary)] dark:bg-[var(--bg-primary)]">
+				<div class="flex items-center gap-3 min-w-0">
+					<h2 id="compose-title" class="text-[15px] font-semibold text-[var(--text-primary)] shrink-0">{$_('compose.newMessage')}</h2>
 
-						{#if availableAccounts.length > 0}
-							<div class="relative" bind:this={accountMenuRef}>
-								<button
-									type="button"
-									onclick={() => (showAccountDropdown ? closeAccountDropdown() : openAccountDropdown())}
-									onkeydown={handleAccountSwitcherKeydown}
-									class="from-switcher"
-									aria-haspopup="listbox"
-									aria-expanded={showAccountDropdown}
-								>
-									<span class="truncate">{$_('compose.fromLabel', { values: { email: getSelectedAccount()?.email || '' } })}</span>
-									<ChevronDown class="size-3.5" strokeWidth={1.8} />
-								</button>
+					{#if availableAccounts.length > 0}
+						<div class="relative" bind:this={accountMenuRef}>
+							<button
+								type="button"
+								onclick={() => (showAccountDropdown ? closeAccountDropdown() : openAccountDropdown())}
+								onkeydown={handleAccountSwitcherKeydown}
+								class="from-switcher"
+								aria-haspopup="listbox"
+								aria-expanded={showAccountDropdown}
+							>
+								<span class="truncate">{$_('compose.fromLabel', { values: { email: getSelectedAccount()?.email || '' } })}</span>
+								<ChevronDown class="size-3.5" strokeWidth={1.8} />
+							</button>
 
-								{#if showAccountDropdown}
-									<div class="account-dropdown" role="listbox" transition:fade={{ duration: 100 }}>
-										{#each availableAccounts as account, index}
-											<button
-												type="button"
-												onclick={() => selectAccountByIndex(index)}
-												class:selected={selectedAccountId === account.id}
-												class:highlighted={highlightedAccountIndex === index}
-												role="option"
-												aria-selected={selectedAccountId === account.id}
-											>
-												<div class="mail-avatar">{account.name.charAt(0).toUpperCase()}</div>
-												<div class="account-info">
-													<p>{account.name}</p>
-													<p>{account.email}</p>
-												</div>
-											</button>
-										{/each}
-									</div>
-								{/if}
-							</div>
-						{:else}
-							<span class="text-[12px] text-[var(--text-tertiary)]">{$_('compose.noAccountsConfigured')}</span>
-						{/if}
-					</div>
+							{#if showAccountDropdown}
+								<div class="account-dropdown" role="listbox" transition:fade={{ duration: 100 }}>
+									{#each availableAccounts as account, index}
+										<button
+											type="button"
+											onclick={() => selectAccountByIndex(index)}
+											class:selected={selectedAccountId === account.id}
+											class:highlighted={highlightedAccountIndex === index}
+											role="option"
+											aria-selected={selectedAccountId === account.id}
+										>
+											<div class="mail-avatar">{account.name.charAt(0).toUpperCase()}</div>
+											<div class="account-info">
+												<p>{account.name}</p>
+												<p>{account.email}</p>
+											</div>
+										</button>
+									{/each}
+								</div>
+							{/if}
+						</div>
+					{:else}
+						<span class="text-[12px] text-[var(--text-tertiary)]">{$_('compose.noAccountsConfigured')}</span>
+					{/if}
+				</div>
 
-					<button
-						type="button"
-						onclick={closeModal}
-						class="flex size-8 items-center justify-center rounded-md text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] dark:text-[var(--text-tertiary)] dark:hover:text-[var(--text-primary)] dark:hover:bg-[var(--bg-hover)]"
-						aria-label={$_('compose.closeCompose')}
-					>
-						<X class="size-4" strokeWidth={1.8} />
-					</button>
-				</header>
+				<button
+					type="button"
+					onclick={closeModal}
+					class="flex size-8 items-center justify-center rounded-md text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] dark:text-[var(--text-tertiary)] dark:hover:text-[var(--text-primary)] dark:hover:bg-[var(--bg-hover)]"
+					aria-label={$_('compose.closeCompose')}
+				>
+					<X class="size-4" strokeWidth={1.8} />
+				</button>
+			</header>
 
-				<input
-					type="file"
-					multiple
-					bind:this={fileInputRef}
-					onchange={handleAttachmentChange}
-					class="hidden"
-				/>
+			<input
+				type="file"
+				multiple
+				bind:this={fileInputRef}
+				onchange={handleAttachmentChange}
+				class="hidden"
+			/>
 
-				<ComposeHeader bind:values={draft} />
-				<ComposeEditor
-					bind:value={draft.body}
-					bind:htmlValue={draft.html_body}
-					attachments={draftAttachments}
-					onAttach={openAttachmentPicker}
-					onRemoveAttachment={removeAttachment}
-				/>
-				<ComposeActions
-					lastSaved={lastSaved}
-					{isSending}
-					{sendWithModEnter}
-					onSend={sendMail}
-					onDiscard={discardDraft}
-				/>
-			</div>
+			<ComposeHeader bind:values={draft} />
+			<ComposeEditor
+				bind:value={draft.body}
+				bind:htmlValue={draft.html_body}
+				attachments={draftAttachments}
+				onAttach={openAttachmentPicker}
+				onRemoveAttachment={removeAttachment}
+			/>
+			<ComposeActions
+				lastSaved={lastSaved}
+				{isSending}
+				{sendWithModEnter}
+				onSend={sendMail}
+				onDiscard={discardDraft}
+			/>
 		</div>
 	</div>
 {/if}
 
 <style>
+	.compose-modal-layer {
+		background: color-mix(in srgb, rgba(15, 23, 42, 0.18) 68%, transparent);
+		backdrop-filter: blur(14px) saturate(118%);
+	}
+
 	.from-switcher {
 		display: inline-flex;
 		align-items: center;
@@ -546,5 +580,9 @@
 		.compose-modal-shell {
 			border-radius: 0;
 		}
+	}
+
+	:global(.dark) .compose-modal-layer {
+		background: color-mix(in srgb, rgba(2, 6, 23, 0.54) 78%, transparent);
 	}
 </style>

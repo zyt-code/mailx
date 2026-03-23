@@ -120,6 +120,7 @@ export async function loadMails(folder?: Folder): Promise<void> {
     _totalCount.set(count);
     _currentOffset = data.length;
     _hasMore.set(data.length < count);
+    eventBus.emit('mails:loaded', { folder: targetFolder, accountId });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error('Failed to load mails:', msg);
@@ -160,10 +161,20 @@ export function switchFolder(folder: Folder): void {
 
 export function markMailReadLocally(mailId: string): Mail | null {
 	const updated = updateMailInStore(mailId, (mail) => ensureReadState(mail, true));
+	if (updated) {
+		eventBus.emit('mail:updated', {
+			mailId,
+			accountId: updated.account_id ?? null,
+			folder: updated.folder,
+			read: true
+		});
+	}
 	// Persist to database in the background (fire and forget)
 	if (updated) {
 		db.markMailRead(mailId, true).catch((error) => {
 			console.error('[MailStore] Failed to persist read status to DB:', error);
+		}).finally(() => {
+			eventBus.emit('mail:counts:refresh');
 		});
 	}
 	return updated;
@@ -171,10 +182,20 @@ export function markMailReadLocally(mailId: string): Mail | null {
 
 export function markMailUnreadLocally(mailId: string): Mail | null {
 	const updated = updateMailInStore(mailId, (mail) => ensureReadState(mail, false));
+	if (updated) {
+		eventBus.emit('mail:updated', {
+			mailId,
+			accountId: updated.account_id ?? null,
+			folder: updated.folder,
+			read: false
+		});
+	}
 	// Persist to database in the background (fire and forget)
 	if (updated) {
 		db.markMailRead(mailId, false).catch((error) => {
 			console.error('[MailStore] Failed to persist unread status to DB:', error);
+		}).finally(() => {
+			eventBus.emit('mail:counts:refresh');
 		});
 	}
 	return updated;

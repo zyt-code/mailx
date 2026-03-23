@@ -31,7 +31,13 @@ const { mockState } = vi.hoisted(() => ({
 		lastSyncTime: null as number | null,
 		syncingAccountId: null as string | null,
 		selectedAccountId: null as string | null,
-		inboxUnread: 3,
+		folderUnreadCounts: {
+			inbox: 3,
+			sent: 0,
+			drafts: 0,
+			archive: 0,
+			trash: 0
+		},
 		preferences: {
 			appearance: {
 				accentTone: 'blue',
@@ -85,7 +91,12 @@ vi.mock('$lib/stores/syncStore.js', () => ({
 }));
 
 vi.mock('$lib/stores/unreadStore.js', () => ({
-	inboxUnread: { subscribe: (cb: (value: number) => void) => { cb(mockState.inboxUnread); return () => {}; } }
+	folderUnreadCounts: {
+		subscribe: (cb: (value: typeof mockState.folderUnreadCounts) => void) => {
+			cb(mockState.folderUnreadCounts);
+			return () => {};
+		}
+	}
 }));
 
 vi.mock('$lib/stores/mailStore.js', () => ({
@@ -235,6 +246,53 @@ describe('Sidebar - Internationalization', () => {
 
 			const buttons = container.querySelectorAll('button[aria-label]');
 			expect(buttons.length).toBeGreaterThan(0);
+		});
+	});
+
+	describe('Unread badge layout', () => {
+		it('keeps inbox navigation height stable when unread badge is shown', () => {
+			mockState.folderUnreadCounts = {
+				inbox: 12,
+				sent: 0,
+				drafts: 0,
+				archive: 0,
+				trash: 0
+			};
+
+			render(Sidebar, {
+				collapsed: false,
+				isMobile: false,
+				activeFolder: 'inbox',
+				onToggle: () => {},
+				onSelectFolder: () => {}
+			});
+
+			const inboxButton = screen.getByText('Inbox').closest('button');
+			const unreadBadge = screen.getByText('12');
+
+			expect(inboxButton).toHaveClass('h-10');
+			expect(unreadBadge).toHaveClass('folder-nav-badge');
+		});
+
+		it('shows unread counts for non-active folders', () => {
+			mockState.folderUnreadCounts = {
+				inbox: 5,
+				sent: 0,
+				drafts: 2,
+				archive: 0,
+				trash: 0
+			};
+
+			render(Sidebar, {
+				collapsed: false,
+				isMobile: false,
+				activeFolder: 'sent',
+				onToggle: () => {},
+				onSelectFolder: () => {}
+			});
+
+			expect(screen.getByText('5')).toBeInTheDocument();
+			expect(screen.getByText('2')).toBeInTheDocument();
 		});
 	});
 });

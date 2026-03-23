@@ -30,7 +30,13 @@ const {
 		lastSyncTime: null as number | null,
 		syncingAccountId: null as string | null,
 		selectedAccountId: null as string | null,
-		inboxUnread: 3,
+		folderUnreadCounts: {
+			inbox: 3,
+			sent: 0,
+			drafts: 0,
+			archive: 0,
+			trash: 0
+		},
 		preferences: {
 			appearance: {
 				accentTone: 'blue',
@@ -84,7 +90,12 @@ vi.mock('$lib/stores/syncStore.js', () => ({
 }));
 
 vi.mock('$lib/stores/unreadStore.js', () => ({
-	inboxUnread: { subscribe: (cb: (value: number) => void) => { cb(mockState.inboxUnread); return () => {}; } }
+	folderUnreadCounts: {
+		subscribe: (cb: (value: typeof mockState.folderUnreadCounts) => void) => {
+			cb(mockState.folderUnreadCounts);
+			return () => {};
+		}
+	}
 }));
 
 vi.mock('$lib/stores/mailStore.js', () => ({

@@ -225,9 +225,13 @@ pub fn toggle_star(id: String, starred: bool, db: State<'_, Database>) -> Result
 
 /// Get unread mail count for a folder
 #[tauri::command]
-pub fn get_unread_count(folder: String, db: State<'_, Database>) -> Result<i64, String> {
+pub fn get_unread_count(
+    folder: String,
+    account_id: Option<String>,
+    db: State<'_, Database>,
+) -> Result<i64, String> {
     db.inner()
-        .get_unread_count(&folder)
+        .get_unread_count(&folder, account_id.as_deref())
         .map_err(|e| format!("Failed to get unread count: {}", e))
 }
 
