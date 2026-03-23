@@ -115,6 +115,7 @@ export const i18nStore = {
     }
 
     locale.set(newLocale);
+    await waitLocale();
     currentLocale = newLocale;
 
     try {

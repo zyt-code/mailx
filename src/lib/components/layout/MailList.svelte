@@ -216,11 +216,11 @@
 </script>
 
 <div
-	class="flex h-full flex-col bg-[var(--bg-primary)] select-none overflow-hidden shrink-0 border-r border-[var(--border-primary)] [-webkit-user-select:none] [user-select:none]"
+	class="flex h-full flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] select-none overflow-hidden shrink-0 border-r border-[var(--border-primary)] [-webkit-user-select:none] [user-select:none] dark:bg-[var(--bg-primary)] dark:text-[var(--text-primary)] dark:border-[var(--border-primary)]"
 	style:width={width !== undefined ? `${width}px` : undefined}
 	class:w-full={width === undefined}
 >
-	<div class="flex items-center gap-2 px-3 py-2 border-b border-[var(--border-primary)] shrink-0 sticky top-0 bg-[var(--bg-primary)] z-10">
+	<div class="flex items-center gap-2 px-3 py-2 border-b border-[var(--border-primary)] shrink-0 sticky top-0 bg-[var(--bg-primary)] z-10 dark:bg-[var(--bg-primary)] dark:border-[var(--border-primary)]">
 		<Search class={cn(
 			"size-4 shrink-0",
 			isAccountConfigured ? "text-[var(--text-tertiary)]" : "text-[var(--text-quaternary)]"
@@ -414,4 +414,3 @@
 		{/if}
 	</div>
 </div>
-

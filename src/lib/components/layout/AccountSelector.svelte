@@ -70,6 +70,7 @@
 {#if hasMultipleAccounts && accounts.length > 0}
 	<!-- "All Inboxes" option -->
 	<button
+		type="button"
 		onclick={() => {
 			if (selectedAccountId !== null) {
 				handleAccountClick(null);
@@ -121,6 +122,7 @@
 				{#each accounts as account}
 					{@const color = getAccountColor(account.email)}
 					<button
+						type="button"
 						onclick={() => handleAccountClick(account.id)}
 						class={cn(
 							"group flex items-center gap-2.5 px-2.5 py-2 rounded-lg w-full relative transition-all duration-150",
@@ -206,5 +208,9 @@
 
 	.account-collapse-wrapper > div {
 		min-height: 0;
+	}
+
+	button {
+		will-change: transform;
 	}
 </style>

@@ -26,7 +26,37 @@ const MENU_ID_ABOUT: &str = "about";
 const WINDOW_ID_MAIN: &str = "main";
 const NAV_ROUTE_ABOUT: &str = "/about";
 use sync_manager::SyncManager;
-use tauri::{Emitter, Manager};
+use tauri::webview::Color;
+use tauri::{Emitter, Manager, Theme, WebviewWindow};
+
+const LIGHT_WINDOW_BG: Color = Color(255, 255, 255, 255);
+const DARK_WINDOW_BG: Color = Color(13, 17, 23, 255);
+
+fn background_for_theme(theme: Theme) -> Color {
+    match theme {
+        Theme::Dark => DARK_WINDOW_BG,
+        _ => LIGHT_WINDOW_BG,
+    }
+}
+
+fn sync_window_background<R: tauri::Runtime>(window: &WebviewWindow<R>, theme: Theme) {
+    if let Err(error) = window.set_background_color(Some(background_for_theme(theme))) {
+        eprintln!("Failed to sync window background: {error}");
+    }
+}
+
+fn bind_window_theme<R: tauri::Runtime>(window: &WebviewWindow<R>) {
+    if let Ok(theme) = window.theme() {
+        sync_window_background(window, theme);
+    }
+
+    let window_handle = window.clone();
+    window.on_window_event(move |event| {
+        if let tauri::WindowEvent::ThemeChanged(theme) = event {
+            sync_window_background(&window_handle, *theme);
+        }
+    });
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -34,6 +64,10 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
         .setup(|app| {
+            if let Some(window) = app.get_webview_window(WINDOW_ID_MAIN) {
+                bind_window_theme(&window);
+            }
+
             // Initialize database
             let db = Database::new(app.handle()).expect("Failed to initialize database");
 

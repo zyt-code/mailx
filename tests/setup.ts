@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { vi } from 'vitest';
 import { writable } from 'svelte/store';
+import { invoke } from '@tauri-apps/api/core';
 
 // Mock Tauri APIs
 vi.mock('@tauri-apps/api/core', () => ({
@@ -16,8 +17,11 @@ vi.mock('@tauri-apps/api/window', () => ({
 	getCurrentWindow: vi.fn(() => ({
 		onResized: vi.fn(() => Promise.resolve(() => {})),
 		onFocusChanged: vi.fn(() => Promise.resolve(() => {})),
+		onThemeChanged: vi.fn(() => Promise.resolve(() => {})),
 		isFocused: vi.fn(() => Promise.resolve(true)),
-		isMaximized: vi.fn(() => Promise.resolve(false))
+		isMaximized: vi.fn(() => Promise.resolve(false)),
+		theme: vi.fn(() => Promise.resolve('light')),
+		setTheme: vi.fn(() => Promise.resolve())
 	}))
 }));
 
@@ -107,3 +111,12 @@ if (typeof window !== 'undefined') {
 		writable: false
 	});
 }
+
+vi.mocked(invoke).mockImplementation(async (command: string) => {
+	switch (command) {
+		case 'get_accounts':
+			return [];
+		default:
+			return undefined;
+	}
+});

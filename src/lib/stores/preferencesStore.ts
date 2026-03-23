@@ -4,6 +4,7 @@ import type { SupportedLocale } from './i18nStore.svelte';
 export type AccentTone = 'blue' | 'sunset' | 'forest' | 'graphite';
 export type Theme = 'light' | 'dark' | 'system';
 export type MailDensity = 'compact' | 'comfortable' | 'airy';
+export type ResolvedTheme = 'light' | 'dark';
 
 export interface AppearancePreferences {
 	accentTone: AccentTone;
@@ -55,6 +56,13 @@ export interface UserPreferences {
 
 const STORAGE_KEY = 'mailx-preferences';
 const LEGACY_THEME_KEY = 'mailx-theme';
+const THEME_BACKGROUND: Record<ResolvedTheme, string> = {
+	light: '#ffffff',
+	dark: '#0d1117'
+};
+let systemThemeOverride: ResolvedTheme | null = null;
+let appearanceTransitionTimer: ReturnType<typeof setTimeout> | null = null;
+let lastAppearanceSignature: { theme: ResolvedTheme; accentTone: AccentTone } | null = null;
 
 export const ACCENT_PRESETS: Record<
 	AccentTone,
@@ -220,21 +228,53 @@ function loadPreferences(): UserPreferences {
 }
 
 function getSystemPrefersDark(): boolean {
+	if (systemThemeOverride !== null) {
+		return systemThemeOverride === 'dark';
+	}
+
 	if (typeof window === 'undefined') return false;
 	return window.matchMedia('(prefers-color-scheme: dark)').matches;
+}
+
+export function resolveEffectiveTheme(theme: Theme): ResolvedTheme {
+	return theme === 'dark' || (theme === 'system' && getSystemPrefersDark()) ? 'dark' : 'light';
 }
 
 function applyThemeToDOM(theme: Theme): void {
 	if (typeof document === 'undefined') return;
 
 	const root = document.documentElement;
-	const isDark = theme === 'dark' || (theme === 'system' && getSystemPrefersDark());
+	const resolvedTheme = resolveEffectiveTheme(theme);
+	const isDark = resolvedTheme === 'dark';
 
 	if (isDark) {
 		root.classList.add('dark');
 	} else {
 		root.classList.remove('dark');
 	}
+
+	root.style.colorScheme = resolvedTheme;
+	root.style.backgroundColor = THEME_BACKGROUND[resolvedTheme];
+	root.dataset.theme = resolvedTheme;
+	document.body?.style.setProperty('color-scheme', resolvedTheme);
+	document.body?.style.setProperty('background-color', THEME_BACKGROUND[resolvedTheme]);
+}
+
+function triggerAppearanceTransition(): void {
+	if (typeof document === 'undefined') return;
+
+	const root = document.documentElement;
+	root.classList.remove('theme-transitioning');
+	void root.getBoundingClientRect();
+	root.classList.add('theme-transitioning');
+
+	if (appearanceTransitionTimer) {
+		clearTimeout(appearanceTransitionTimer);
+	}
+
+	appearanceTransitionTimer = setTimeout(() => {
+		root.classList.remove('theme-transitioning');
+	}, 430);
 }
 
 function applyAppearance(preferences: UserPreferences): void {
@@ -252,6 +292,21 @@ function applyAppearance(preferences: UserPreferences): void {
 	root.dataset.mailDensity = preferences.appearance.mailDensity;
 
 	applyThemeToDOM(preferences.appearance.theme);
+
+	const nextSignature = {
+		theme: resolveEffectiveTheme(preferences.appearance.theme),
+		accentTone: preferences.appearance.accentTone
+	};
+
+	if (
+		lastAppearanceSignature &&
+		(lastAppearanceSignature.theme !== nextSignature.theme ||
+			lastAppearanceSignature.accentTone !== nextSignature.accentTone)
+	) {
+		triggerAppearanceTransition();
+	}
+
+	lastAppearanceSignature = nextSignature;
 }
 
 function createPreferencesStore() {
@@ -316,6 +371,19 @@ function createPreferencesStore() {
 }
 
 export const preferences = createPreferencesStore();
+
+export function setSystemTheme(theme: ResolvedTheme | null): void {
+	systemThemeOverride = theme;
+	if (typeof document !== 'undefined') {
+		applyAppearance(get(preferences));
+	}
+}
+
+export function refreshAppearance(): void {
+	if (typeof document !== 'undefined') {
+		applyAppearance(get(preferences));
+	}
+}
 
 function parseMinutes(value: string): number {
 	const [hours, minutes] = value.split(':').map((part) => Number.parseInt(part, 10));

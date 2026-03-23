@@ -1,14 +1,19 @@
 <script lang="ts">
-	import '../app.css';
+	import type { Snippet } from 'svelte';
+	import App from '../App.svelte';
 	import { ensureInitialized } from '$lib/stores/i18nStore.svelte.js';
 	import { locale } from 'svelte-i18n';
-	import { page } from '$app/stores';
-	import { AppShell } from '$lib/components/layout/index.js';
 	import { Notification } from '$lib/components/ui/notification/index.js';
 	import { invoke } from '@tauri-apps/api/core';
 	import { listen } from '@tauri-apps/api/event';
 	import { onMount, onDestroy } from 'svelte';
 	import { goto } from '$app/navigation';
+
+	interface Props {
+		children: Snippet;
+	}
+
+	let { children }: Props = $props();
 
 	function handleContextMenu(e: MouseEvent) {
 		// Allow native context menu on elements with data-allow-context-menu or their children
@@ -115,36 +120,10 @@
 </script>
 
 {#if $locale}
-	<div class="app-root">
-		<!-- Content area with context menu -->
-		<!-- svelte-ignore a11y_no_static_element_interactions -->
-		<div oncontextmenu={handleContextMenu} class="app-content">
-			{#if $page.url.pathname.startsWith('/settings')}
-				<slot />
-			{:else}
-				<AppShell>
-					<slot />
-				</AppShell>
-			{/if}
-		</div>
-	</div>
+	<App onContextMenu={handleContextMenu}>
+		{@render children()}
+	</App>
 
 	<!-- Global notification component (always rendered) -->
 	<Notification />
 {/if}
-
-<style>
-	.app-root {
-		display: flex;
-		flex-direction: column;
-		height: 100vh;
-		width: 100vw;
-		overflow: hidden;
-	}
-
-	.app-content {
-		flex: 1;
-		overflow: hidden;
-		position: relative;
-	}
-</style>

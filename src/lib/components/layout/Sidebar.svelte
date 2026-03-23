@@ -45,19 +45,19 @@
 
 	let { collapsed, isMobile, activeFolder, onToggle, onSelectFolder, onRefresh, currentRoute = '/', onSelectAccount, onOpenSettings }: Props = $props();
 
-	// Reactive navigation items with i18n
-	const navItems = $derived([
-		{ icon: Inbox, label: $_('nav.inbox'), folder: 'inbox' as const },
-		{ icon: Send, label: $_('nav.sent'), folder: 'sent' as const },
-		{ icon: FileEdit, label: $_('nav.drafts'), folder: 'drafts' as const },
-		{ icon: Archive, label: $_('nav.archive'), folder: 'archive' as const },
-		{ icon: Trash2, label: $_('nav.trash'), folder: 'trash' as const }
-	] as const);
+	const navItems = [
+		{ icon: Inbox, labelKey: 'nav.inbox', folder: 'inbox' as const },
+		{ icon: Send, labelKey: 'nav.sent', folder: 'sent' as const },
+		{ icon: FileEdit, labelKey: 'nav.drafts', folder: 'drafts' as const },
+		{ icon: Archive, labelKey: 'nav.archive', folder: 'archive' as const },
+		{ icon: Trash2, labelKey: 'nav.trash', folder: 'trash' as const }
+	] as const;
 
 	const SIDEBAR_COLLAPSED_WIDTH = 56;
 
 	let showCompose = $state(false);
 	let isRefreshing = $state(false);
+	let isRefreshPending = $state(false);
 	let showDisabledTooltip = $state(false);
 	let tooltipTimer = $state<number | null>(null);
 
@@ -210,12 +210,27 @@
 	}
 
 	async function handleRefresh() {
-		if (!isAccountConfigured || isRefreshing) return;
+		if (isRefreshing || isRefreshPending) return;
+		if (!isAccountConfigured) {
+			showDisabledFeedback();
+			return;
+		}
+
+		isRefreshPending = true;
 		try {
-			await syncAllAccounts();
+			if (selectedAccountId) {
+				await syncAccount(selectedAccountId);
+			} else if (currentAccount?.id) {
+				await syncAccount(currentAccount.id);
+			} else {
+				await syncAllAccounts();
+			}
+			await onRefresh?.();
 		} catch (e) {
 			console.error('Refresh failed:', e);
 			// Toast is already shown via sync:failed event in syncHandlers
+		} finally {
+			isRefreshPending = false;
 		}
 	}
 
@@ -244,7 +259,7 @@
 	{#if isMobile && !collapsed}
 	<button
 		type="button"
-		class="fixed inset-0 z-30 bg-black/5 backdrop-blur-[2px] transition-opacity duration-100"
+		class="fixed inset-0 z-30 bg-black/5 backdrop-blur-[2px] transition-opacity duration-100 dark:bg-black/35"
 		onclick={onToggle}
 		aria-label={$_('common.close')}
 	></button>
@@ -252,18 +267,19 @@
 
 <aside
 	class={cn(
-		'flex h-full flex-col bg-[var(--bg-secondary)] shrink-0 select-none [-webkit-user-select:none] [user-select:none]',
+		'sidebar-shell flex h-full flex-col bg-[var(--bg-secondary)] text-[var(--text-primary)] shrink-0 select-none [-webkit-user-select:none] [user-select:none] dark:bg-[var(--bg-secondary)] dark:text-[var(--text-primary)]',
 		isMobile && 'fixed inset-y-0 left-0 z-40 shadow-lg',
 		isMobile && collapsed && '-translate-x-full',
-		!isMobile && 'border-r border-[var(--border-primary)]'
+		!isMobile && 'border-r border-[var(--border-primary)] dark:border-[var(--border-primary)]'
 	)}
 	style:width={collapsed && !isMobile ? `${SIDEBAR_COLLAPSED_WIDTH}px` : 'var(--spacing-sidebar)'}
 >
 	<!-- Top controls -->
-	<div class="flex h-9 items-center justify-between px-2.5 shrink-0">
+	<div class="sidebar-topbar flex h-10 items-center justify-between px-2.5 shrink-0">
 		<button
+			type="button"
 			onclick={onToggle}
-			class="flex size-7 items-center justify-center rounded-md text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-all"
+			class="sidebar-chrome-button flex size-8 items-center justify-center rounded-xl text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-all"
 			aria-label={collapsed ? $_('sidebar.expand') : $_('sidebar.collapse')}
 		>
 			{#if collapsed && !isMobile}
@@ -274,12 +290,17 @@
 		</button>
 		{#if !collapsed && onRefresh}
 			<button
-				onclick={handleRefresh}
-				disabled={!isAccountConfigured}
-				class="flex size-auto min-w-7 items-center justify-center gap-1 rounded-md px-2 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-				aria-label={$_('mail.refresh')}
+				type="button"
+				onclick={() => void handleRefresh()}
+				disabled={isRefreshing || isRefreshPending}
+				class={cn(
+					'sidebar-chrome-button sidebar-sync-button flex size-auto min-w-8 items-center justify-center gap-1 rounded-xl px-2.5 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-all',
+					!isAccountConfigured && 'opacity-70'
+				)}
+				aria-label={$_('account.refresh')}
+				aria-busy={isRefreshing || isRefreshPending}
 			>
-				<RefreshCw class={cn('size-[15px]', isRefreshing && 'animate-spin')} strokeWidth={1.8} />
+				<RefreshCw class={cn('size-[15px]', (isRefreshing || isRefreshPending) && 'animate-spin')} strokeWidth={1.8} />
 			</button>
 		{/if}
 	</div>
@@ -353,9 +374,10 @@
 	<!-- Settings button - bottom left -->
 	<div class="shrink-0 px-2.5 pb-2.5">
 		<button
+			type="button"
 			onclick={() => onOpenSettings?.()}
-			class="flex size-8 items-center justify-center rounded-md text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-all"
-			aria-label={$_('common.settings')}
+			class="sidebar-chrome-button flex size-8 items-center justify-center rounded-xl text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-all"
+			aria-label={$_('nav.settings')}
 		>
 			<Settings class="size-[16px]" strokeWidth={1.8} />
 		</button>
@@ -371,6 +393,65 @@
 {/if}
 
 <style>
+	.sidebar-shell {
+		position: relative;
+		background:
+			linear-gradient(180deg, color-mix(in srgb, var(--bg-secondary) 96%, transparent), color-mix(in srgb, var(--bg-primary) 92%, transparent));
+	}
+
+	.sidebar-shell::before {
+		content: '';
+		position: absolute;
+		inset: 0;
+		pointer-events: none;
+		background:
+			radial-gradient(circle at 12% 10%, color-mix(in srgb, var(--accent-primary) 10%, transparent), transparent 28%),
+			radial-gradient(circle at 82% 84%, color-mix(in srgb, var(--accent-light) 34%, transparent), transparent 34%);
+		opacity: 0.85;
+	}
+
+	.sidebar-topbar,
+	.sidebar-shell > :global(*) {
+		position: relative;
+		z-index: 1;
+	}
+
+	.sidebar-chrome-button {
+		will-change: transform;
+	}
+
+	.sidebar-chrome-button:hover {
+		transform: translate3d(0, -1px, 0);
+		box-shadow: var(--shadow-xs);
+	}
+
+	.sidebar-chrome-button:active {
+		transform: scale(0.96);
+	}
+
+	.sidebar-sync-button {
+		backdrop-filter: blur(14px);
+	}
+
+	.sidebar-sync-button[aria-busy='true'] {
+		background: color-mix(in srgb, var(--accent-primary) 12%, var(--bg-hover));
+		color: var(--accent-primary);
+		box-shadow:
+			var(--shadow-xs),
+			0 0 0 1px color-mix(in srgb, var(--accent-primary) 12%, transparent);
+	}
+
+	:global(.dark) .sidebar-shell {
+		background:
+			linear-gradient(180deg, color-mix(in srgb, var(--bg-secondary) 94%, rgba(255, 255, 255, 0.02)), color-mix(in srgb, var(--bg-primary) 94%, transparent));
+	}
+
+	:global(.dark) .sidebar-shell::before {
+		background:
+			radial-gradient(circle at 14% 12%, color-mix(in srgb, var(--accent-primary) 16%, transparent), transparent 28%),
+			radial-gradient(circle at 82% 84%, color-mix(in srgb, var(--accent-light) 28%, transparent), transparent 34%);
+	}
+
 	/* CSS grid-based collapse animation — height-aware, smooth */
 	.account-collapse-wrapper {
 		display: grid;

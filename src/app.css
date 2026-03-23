@@ -96,33 +96,37 @@ code, pre, .font-mono, .tabular-nums {
 		--duration-fast: 100ms;
 		--duration-normal: 120ms;
 		--duration-slow: 150ms;
+		--theme-transition-duration: 400ms;
+		--theme-transition-ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+		/* Shared selection tokens */
+		--selection-bg: #dcecff;
+		--selection-fg: #13233c;
+		--editor-selection-bg: color-mix(in srgb, var(--accent-primary) 22%, transparent);
+		--editor-selection-fg: var(--text-primary);
 	}
 
 	.dark {
-		/* Dark mode - Enhanced with depth, subtle blue undertones, and refined contrast */
-		/* WCAG AA compliant colors (≥4.5:1 contrast for normal text) */
-		--bg-primary: #0f0f10;
-		--bg-secondary: #1a1a1c;
-		--bg-tertiary: #252528;
-		--bg-hover: #2a2a2d;
-		--bg-active: #353539;
-		--bg-selected: #1a2d4a;
+		--bg-primary: #0d1117;
+		--bg-secondary: #121822;
+		--bg-tertiary: #19212d;
+		--bg-hover: #1e2735;
+		--bg-active: #283245;
+		--bg-selected: #16253a;
 
-		--text-primary: #f8f8f8;
-		--text-secondary: #b8b8bd;
-		--text-tertiary: #9a9aa0;
-		--text-quaternary: #5e5e64;
+		--text-primary: #eef3fb;
+		--text-secondary: #b7c1d1;
+		--text-tertiary: #8995a8;
+		--text-quaternary: #5f6b7d;
 
-		/* Enhanced accent colors for better text contrast */
-		--accent-primary: #3a8cff; /* 增强对比度: 从 #1a6cff 改为 #3a8cff (5.2:1) */
-		--accent-secondary: #5aa4ff;
-		--accent-light: #1e304d;
-		--accent-muted: #1a2840;
+		--accent-primary: #5a9bff;
+		--accent-secondary: #7bb3ff;
+		--accent-light: #16263b;
+		--accent-muted: #122033;
 
-		/* Enhanced border colors for better visibility */
-		--border-primary: #4a4a4e; /* Lighter gray: 2.5:1 contrast with background */
-		--border-secondary: #404044;
-		--border-tertiary: #353539;
+		--border-primary: #2b3544;
+		--border-secondary: #232c39;
+		--border-tertiary: #1d2531;
 
 		--shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
 		--shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.3);
@@ -133,6 +137,11 @@ code, pre, .font-mono, .tabular-nums {
 		/* Enhanced depth effects with updated accent color */
 		--depth-glow: 0 0 20px rgba(42, 124, 255, 0.08);
 		--depth-glow-secondary: 0 0 30px rgba(42, 124, 255, 0.05);
+
+		--selection-bg: rgba(90, 155, 255, 0.42);
+		--selection-fg: #f5f9ff;
+		--editor-selection-bg: color-mix(in srgb, var(--accent-primary) 52%, #0f1b2c);
+		--editor-selection-fg: #f8fbff;
 	}
 }
 
@@ -370,6 +379,7 @@ code, pre, .font-mono, .tabular-nums {
 
 @layer base {
 	body {
+		margin: 0;
 		background-color: var(--bg-primary);
 		color: var(--text-primary);
 		font-size: 13px;
@@ -377,10 +387,17 @@ code, pre, .font-mono, .tabular-nums {
 		letter-spacing: -0.01em;
 	}
 
+	html,
+	body {
+		transition:
+			background-color var(--theme-transition-duration) var(--theme-transition-ease),
+			color var(--theme-transition-duration) var(--theme-transition-ease);
+	}
+
 	/* Crisp selection */
 	::selection {
-		background: var(--accent-light);
-		color: var(--text-primary);
+		background: var(--selection-bg);
+		color: var(--selection-fg);
 	}
 
 	/* Keyboard-only focus ring — lightweight, no glow */
@@ -404,6 +421,41 @@ code, pre, .font-mono, .tabular-nums {
 	display: grid;
 	gap: 1rem;
 	animation: settings-fadeIn 180ms ease-out;
+}
+
+.settings-shell,
+.settings-shell::before,
+.settings-sidebar,
+.settings-hero,
+.hero-chip,
+.section-card,
+.nav-item,
+.nav-icon,
+.nav-indicator,
+.theme-segmented,
+.theme-segment,
+.theme-mode-indicator,
+.accent-option,
+.accent-option::before,
+.accent-option::after,
+.accent-preview,
+.density-option,
+.density-preview,
+.mail-row-preview,
+.toggle-row,
+.reset-button,
+.check-badge {
+	transition:
+		background-color var(--theme-transition-duration) var(--theme-transition-ease),
+		background var(--theme-transition-duration) var(--theme-transition-ease),
+		border-color var(--theme-transition-duration) var(--theme-transition-ease),
+		color var(--theme-transition-duration) var(--theme-transition-ease),
+		box-shadow var(--theme-transition-duration) var(--theme-transition-ease),
+		backdrop-filter var(--theme-transition-duration) var(--theme-transition-ease),
+		filter var(--theme-transition-duration) var(--theme-transition-ease),
+		opacity var(--theme-transition-duration) var(--theme-transition-ease),
+		transform var(--theme-transition-duration) var(--theme-transition-ease);
+	will-change: transform, opacity;
 }
 
 .settings-page .page-header {
@@ -461,6 +513,26 @@ code, pre, .font-mono, .tabular-nums {
 	backdrop-filter: blur(16px);
 }
 
+.dark .settings-page .header-icon {
+	background:
+		linear-gradient(160deg, color-mix(in srgb, var(--accent-primary) 18%, rgba(255, 255, 255, 0.02)), rgba(255, 255, 255, 0.03)),
+		linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 70%);
+	border: 1px solid color-mix(in srgb, var(--accent-primary) 18%, var(--border-primary));
+	box-shadow:
+		var(--shadow-sm),
+		inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.dark .section-card {
+	background:
+		linear-gradient(180deg, color-mix(in srgb, var(--bg-secondary) 92%, rgba(255, 255, 255, 0.02)), color-mix(in srgb, var(--bg-primary) 96%, transparent)),
+		radial-gradient(circle at top right, color-mix(in srgb, var(--accent-primary) 11%, transparent), transparent 38%);
+	border-color: color-mix(in srgb, var(--border-primary) 92%, transparent);
+	box-shadow:
+		0 18px 42px rgba(0, 0, 0, 0.32),
+		inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
 .section-copy {
 	display: flex;
 	align-items: flex-start;
@@ -499,10 +571,23 @@ code, pre, .font-mono, .tabular-nums {
 	cursor: pointer;
 }
 
+.dark .toggle-row {
+	background:
+		linear-gradient(180deg, color-mix(in srgb, var(--bg-tertiary) 82%, transparent), color-mix(in srgb, var(--bg-secondary) 90%, transparent));
+	border-color: color-mix(in srgb, var(--border-primary) 94%, transparent);
+	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
 .toggle-row:hover {
 	border-color: color-mix(in srgb, var(--accent-primary) 22%, var(--border-primary));
 	transform: translateY(-1px);
 	box-shadow: var(--shadow-sm);
+}
+
+.dark .toggle-row:hover {
+	box-shadow:
+		var(--shadow-md),
+		inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .row-copy {
@@ -563,6 +648,14 @@ code, pre, .font-mono, .tabular-nums {
 	font-weight: 650;
 	cursor: pointer;
 	white-space: nowrap;
+}
+
+.dark .reset-button {
+	background: linear-gradient(180deg, color-mix(in srgb, var(--bg-tertiary) 78%, transparent), color-mix(in srgb, var(--bg-secondary) 92%, transparent));
+	border-color: color-mix(in srgb, var(--border-primary) 94%, transparent);
+	box-shadow:
+		var(--shadow-xs),
+		inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .reset-button:hover {

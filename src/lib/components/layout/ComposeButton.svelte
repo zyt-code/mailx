@@ -17,12 +17,13 @@
 	<!-- Expanded compose button -->
 	<div class="px-2.5 mt-2.5">
 		<button
+			type="button"
 			onclick={onOpenCompose}
 			disabled={!isAccountConfigured}
 			class={cn(
-				"flex items-center justify-center gap-2 w-full px-3 py-2 rounded-lg transition-all duration-150 font-semibold text-[13px]",
+				"flex items-center justify-center gap-2 w-full px-3 py-2 rounded-xl transition-all duration-200 font-semibold text-[13px] will-change-transform",
 				isAccountConfigured
-					? "bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-secondary)] shadow-sm hover:shadow-md active:scale-[0.97]"
+					? "bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-secondary)] shadow-sm hover:shadow-md hover:-translate-y-0.5 active:scale-[0.97]"
 					: "bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] cursor-not-allowed"
 			)}
 			aria-label={$_('nav.newMessage')}
@@ -40,12 +41,13 @@
 	<!-- Collapsed compose button -->
 	<div class="flex flex-col items-center gap-1 px-2 mt-2">
 		<button
+			type="button"
 			onclick={onOpenCompose}
 			disabled={!isAccountConfigured}
 			class={cn(
-				"flex size-8 items-center justify-center rounded-md relative z-10 transition-all duration-120",
+				"flex size-9 items-center justify-center rounded-xl relative z-10 transition-all duration-200 will-change-transform",
 				isAccountConfigured
-					? "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] cursor-pointer"
+					? "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] hover:-translate-y-0.5 cursor-pointer"
 					: "text-[var(--text-quaternary)] cursor-not-allowed"
 			)}
 			aria-label={$_('mail.compose')}

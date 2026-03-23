@@ -1,7 +1,22 @@
 <script lang="ts">
+	import { fly } from 'svelte/transition';
 	import { Palette, Sun, Moon, Monitor, Check, Sparkles } from 'lucide-svelte';
 	import { _ } from 'svelte-i18n';
-	import { preferences, ACCENT_PRESETS, type AccentTone, type MailDensity, type AppearancePreferences, type Theme } from '$lib/stores/preferencesStore.js';
+	import {
+		preferences,
+		ACCENT_PRESETS,
+		type AccentTone,
+		type MailDensity,
+		type AppearancePreferences,
+		type Theme
+	} from '$lib/stores/preferencesStore.js';
+
+	interface Ripple {
+		id: number;
+		x: number;
+		y: number;
+		size: number;
+	}
 
 	const themes: Array<{ id: Theme; labelKey: string; descKey: string; icon: typeof Sun }> = [
 		{ id: 'light', labelKey: 'theme.light', descKey: 'theme.lightDescription', icon: Sun },
@@ -16,20 +31,48 @@
 		graphite: { nameKey: 'appearance.accentGraphite', descKey: 'appearance.accentGraphiteDesc' }
 	};
 
-	const densityMeta: Record<MailDensity, { labelKey: string; descKey: string; subjectChars: number; snippetChars: number }> = {
+	const densityMeta: Record<
+		MailDensity,
+		{ labelKey: string; descKey: string; subjectChars: number; snippetChars: number }
+	> = {
 		compact: { labelKey: 'theme.compact', descKey: 'theme.compactDescription', subjectChars: 24, snippetChars: 32 },
 		comfortable: { labelKey: 'theme.comfortable', descKey: 'theme.comfortableDescription', subjectChars: 36, snippetChars: 56 },
 		airy: { labelKey: 'theme.airy', descKey: 'theme.airyDescription', subjectChars: 48, snippetChars: 84 }
 	};
 
-	const accentOptions = Object.entries(ACCENT_PRESETS).map(([id, palette]) => ({ id: id as AccentTone, ...palette }));
+	const accentOptions = Object.entries(ACCENT_PRESETS).map(([id, palette]) => ({
+		id: id as AccentTone,
+		...palette
+	}));
 	const densityOptions: MailDensity[] = ['compact', 'comfortable', 'airy'];
 	const densityHeights: Record<MailDensity, number> = { compact: 58, comfortable: 74, airy: 92 };
 
 	const sampleSubject = 'Sprint update: design review and launch readiness check';
-	const sampleBody = 'First line preview keeps only meaningful words and removes extra wrapping before clipping.';
+	const sampleBody =
+		'First line preview keeps only meaningful words and removes extra wrapping before clipping.';
 
 	let appearance = $derived($preferences.appearance);
+	let pulsingTheme = $state<Theme | null>(null);
+	let rippleCounter = 0;
+	let accentRipples = $state<Record<AccentTone, Ripple[]>>({
+		blue: [],
+		sunset: [],
+		forest: [],
+		graphite: []
+	});
+
+	let previewSubject = $derived(
+		truncateText(sampleSubject, densityMeta[appearance.mailDensity].subjectChars)
+	);
+	let previewSnippet = $derived(
+		truncateText(sampleBody, densityMeta[appearance.mailDensity].snippetChars)
+	);
+	let activeThemeIndex = $derived(
+		Math.max(
+			0,
+			themes.findIndex((theme) => theme.id === appearance.theme)
+		)
+	);
 
 	function updateAppearance(patch: Partial<AppearancePreferences>) {
 		preferences.updateSection('appearance', patch);
@@ -40,11 +83,65 @@
 		return `${value.slice(0, Math.max(0, limit - 1)).trimEnd()}…`;
 	}
 
-	let previewSubject = $derived(truncateText(sampleSubject, densityMeta[appearance.mailDensity].subjectChars));
-	let previewSnippet = $derived(truncateText(sampleBody, densityMeta[appearance.mailDensity].snippetChars));
+	function updateInteractiveGlow(event: PointerEvent) {
+		const node = event.currentTarget as HTMLElement;
+		const rect = node.getBoundingClientRect();
+		node.style.setProperty('--pointer-x', `${event.clientX - rect.left}px`);
+		node.style.setProperty('--pointer-y', `${event.clientY - rect.top}px`);
+	}
+
+	function resetInteractiveGlow(event: PointerEvent) {
+		const node = event.currentTarget as HTMLElement;
+		node.style.setProperty('--pointer-x', '50%');
+		node.style.setProperty('--pointer-y', '50%');
+	}
+
+	function triggerThemePulse(themeId: Theme) {
+		pulsingTheme = themeId;
+		setTimeout(() => {
+			if (pulsingTheme === themeId) {
+				pulsingTheme = null;
+			}
+		}, 420);
+	}
+
+	function selectTheme(themeId: Theme, event: MouseEvent) {
+		updateInteractiveGlow(event as unknown as PointerEvent);
+		triggerThemePulse(themeId);
+		updateAppearance({ theme: themeId });
+	}
+
+	function triggerRipple(accentId: AccentTone, event: MouseEvent) {
+		const node = event.currentTarget as HTMLElement;
+		const rect = node.getBoundingClientRect();
+		const ripple: Ripple = {
+			id: rippleCounter++,
+			x: event.clientX - rect.left,
+			y: event.clientY - rect.top,
+			size: Math.max(rect.width, rect.height) * 1.2
+		};
+
+		accentRipples = {
+			...accentRipples,
+			[accentId]: [...accentRipples[accentId], ripple]
+		};
+
+		setTimeout(() => {
+			accentRipples = {
+				...accentRipples,
+				[accentId]: accentRipples[accentId].filter((item) => item.id !== ripple.id)
+			};
+		}, 520);
+	}
+
+	function selectAccent(accentId: AccentTone, event: MouseEvent) {
+		updateInteractiveGlow(event as unknown as PointerEvent);
+		triggerRipple(accentId, event);
+		updateAppearance({ accentTone: accentId });
+	}
 </script>
 
-<div class="settings-page">
+<div class="settings-page appearance-page">
 	<header class="page-header">
 		<div class="header-icon">
 			<Palette class="size-6" strokeWidth={1.55} />
@@ -63,16 +160,23 @@
 				<p class="section-description">{$_('appearance.themeDescription')}</p>
 			</div>
 		</div>
-		<div class="theme-segmented" role="radiogroup" aria-label={$_('appearance.themeTitle')}>
+		<div class="theme-segmented" data-theme-surface role="radiogroup" aria-label={$_('appearance.themeTitle')}>
+			<div
+				class="theme-mode-indicator"
+				style={`transform: translate3d(calc(${activeThemeIndex} * 100%), 0, 0);`}
+			></div>
 			{#each themes as theme}
 				<button
 					type="button"
 					class="theme-segment"
 					class:active={appearance.theme === theme.id}
+					class:pulsing={pulsingTheme === theme.id}
 					role="radio"
 					aria-checked={appearance.theme === theme.id}
 					aria-label={$_('appearance.switchTo', { values: { name: $_(theme.labelKey) } })}
-					onclick={() => updateAppearance({ theme: theme.id })}
+					onclick={(event) => selectTheme(theme.id, event)}
+					onpointermove={updateInteractiveGlow}
+					onpointerleave={resetInteractiveGlow}
 				>
 					<theme.icon class="size-4" strokeWidth={1.7} />
 					<span>{$_(theme.labelKey)}</span>
@@ -101,9 +205,15 @@
 					type="button"
 					class="accent-option"
 					class:active={appearance.accentTone === accent.id}
-					onclick={() => updateAppearance({ accentTone: accent.id })}
+					aria-pressed={appearance.accentTone === accent.id}
+					onclick={(event) => selectAccent(accent.id, event)}
+					onpointermove={updateInteractiveGlow}
+					onpointerleave={resetInteractiveGlow}
 				>
-					<div class="accent-preview" style={`--swatch-primary:${accent.primary}; --swatch-secondary:${accent.secondary}; --swatch-light:${accent.light};`}>
+					<div
+						class="accent-preview"
+						style={`--swatch-primary:${accent.primary}; --swatch-secondary:${accent.secondary}; --swatch-light:${accent.light};`}
+					>
 						<div class="accent-chip"></div>
 						<div class="accent-line"></div>
 						<div class="accent-dot"></div>
@@ -114,10 +224,19 @@
 							<p class="option-description">{$_(keys.descKey)}</p>
 						</div>
 						{#if appearance.accentTone === accent.id}
-							<div class="check-badge">
+							<div class="check-badge" transition:fly={{ y: 8, duration: 220 }}>
 								<Check class="size-3.5" strokeWidth={2.2} />
 							</div>
 						{/if}
+					</div>
+
+					<div class="accent-ripples" aria-hidden="true">
+						{#each accentRipples[accent.id] as ripple (ripple.id)}
+							<span
+								class="accent-ripple"
+								style={`left:${ripple.x}px; top:${ripple.y}px; width:${ripple.size}px; height:${ripple.size}px;`}
+							></span>
+						{/each}
 					</div>
 				</button>
 			{/each}
@@ -147,7 +266,9 @@
 						<p class="option-description">{$_(meta.descKey)}</p>
 					</div>
 					{#if appearance.mailDensity === density}
-						<Check class="size-4 text-[var(--accent-primary)]" strokeWidth={2.1} />
+						<span class="density-check" transition:fly={{ x: 8, duration: 220 }}>
+							<Check class="size-4 text-[var(--accent-primary)]" strokeWidth={2.1} />
+						</span>
 					{/if}
 				</button>
 			{/each}
@@ -182,7 +303,11 @@
 		</div>
 
 		<div class="toggle-stack">
-			<button type="button" class="toggle-row" onclick={() => updateAppearance({ showPreviewSnippets: !appearance.showPreviewSnippets })}>
+			<button
+				type="button"
+				class="toggle-row"
+				onclick={() => updateAppearance({ showPreviewSnippets: !appearance.showPreviewSnippets })}
+			>
 				<div>
 					<p class="option-label">{$_('appearance.previewSnippets')}</p>
 					<p class="option-description">{$_('appearance.previewSnippetsDescription')}</p>
@@ -192,7 +317,11 @@
 				</span>
 			</button>
 
-			<button type="button" class="toggle-row" onclick={() => updateAppearance({ showAccountColor: !appearance.showAccountColor })}>
+			<button
+				type="button"
+				class="toggle-row"
+				onclick={() => updateAppearance({ showAccountColor: !appearance.showAccountColor })}
+			>
 				<div>
 					<p class="option-label">{$_('appearance.accountColorMarkers')}</p>
 					<p class="option-description">{$_('appearance.accountColorMarkersDescription')}</p>
@@ -206,16 +335,61 @@
 </div>
 
 <style>
+	.appearance-page {
+		position: relative;
+	}
+
 	.theme-segmented {
+		position: relative;
 		display: grid;
 		grid-template-columns: repeat(3, minmax(0, 1fr));
 		padding: 0.25rem;
 		border-radius: 14px;
 		background: color-mix(in srgb, var(--bg-secondary) 72%, transparent);
 		border: 1px solid color-mix(in srgb, var(--border-primary) 88%, transparent);
+		overflow: hidden;
+		isolation: isolate;
+	}
+
+	:global(.dark) .theme-segmented {
+		padding: 0.32rem;
+		background:
+			linear-gradient(180deg, color-mix(in srgb, var(--bg-tertiary) 86%, transparent), color-mix(in srgb, var(--bg-secondary) 94%, transparent));
+		border-color: color-mix(in srgb, var(--border-primary) 96%, transparent);
+		box-shadow:
+			inset 0 1px 0 rgba(255, 255, 255, 0.04),
+			inset 0 -1px 0 rgba(0, 0, 0, 0.22);
+	}
+
+	.theme-mode-indicator {
+		position: absolute;
+		top: 0.25rem;
+		left: 0.25rem;
+		bottom: 0.25rem;
+		width: calc((100% - 0.5rem) / 3);
+		border-radius: 10px;
+		background:
+			linear-gradient(180deg, color-mix(in srgb, var(--bg-primary) 92%, transparent), color-mix(in srgb, var(--accent-light) 78%, var(--bg-primary))),
+			radial-gradient(circle at 18% 28%, rgba(255, 255, 255, 0.42), transparent 46%);
+		box-shadow:
+			var(--shadow-xs),
+			0 12px 20px rgba(26, 52, 90, 0.08);
+		backdrop-filter: blur(18px) saturate(126%);
+		pointer-events: none;
+	}
+
+	:global(.dark) .theme-mode-indicator {
+		background:
+			linear-gradient(180deg, color-mix(in srgb, var(--accent-light) 84%, var(--bg-secondary)), color-mix(in srgb, var(--bg-primary) 92%, transparent)),
+			radial-gradient(circle at 18% 28%, rgba(255, 255, 255, 0.12), transparent 42%);
+		box-shadow:
+			0 14px 24px rgba(0, 0, 0, 0.28),
+			inset 0 1px 0 rgba(255, 255, 255, 0.08);
 	}
 
 	.theme-segment {
+		position: relative;
+		z-index: 1;
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
@@ -228,12 +402,37 @@
 		font-size: 0.84rem;
 		font-weight: 620;
 		cursor: pointer;
+		overflow: hidden;
+		--pointer-x: 50%;
+		--pointer-y: 50%;
+	}
+
+	.theme-segment::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		border-radius: inherit;
+		background: radial-gradient(120px circle at var(--pointer-x) var(--pointer-y), rgba(255, 255, 255, 0.22), transparent 65%);
+		opacity: 0;
+		pointer-events: none;
 	}
 
 	.theme-segment.active {
-		background: var(--bg-primary);
 		color: var(--text-primary);
-		box-shadow: var(--shadow-xs);
+		backdrop-filter: blur(16px) saturate(120%);
+	}
+
+	.theme-segment.active::after,
+	.theme-segment:hover::after {
+		opacity: 1;
+	}
+
+	.theme-segment.pulsing {
+		animation: theme-card-pulse 400ms cubic-bezier(0.22, 1, 0.36, 1);
+	}
+
+	:global(.dark) .theme-segment {
+		color: var(--text-tertiary);
 	}
 
 	.theme-summary {
@@ -248,6 +447,7 @@
 
 	.accent-option,
 	.density-option {
+		position: relative;
 		display: grid;
 		gap: 0.7rem;
 		padding: 0.9rem 1rem;
@@ -256,19 +456,93 @@
 		background: color-mix(in srgb, var(--bg-secondary) 62%, transparent);
 		text-align: left;
 		cursor: pointer;
+		overflow: hidden;
+		isolation: isolate;
+		--pointer-x: 50%;
+		--pointer-y: 50%;
+	}
+
+	.accent-option > *,
+	.density-option > * {
+		position: relative;
+		z-index: 1;
+	}
+
+	.accent-option::before {
+		content: '';
+		position: absolute;
+		inset: -1px;
+		padding: 1px;
+		border-radius: 19px;
+		background: conic-gradient(
+			from 0deg,
+			transparent 0deg,
+			color-mix(in srgb, var(--accent-primary) 55%, transparent) 50deg,
+			color-mix(in srgb, white 32%, transparent) 84deg,
+			transparent 124deg,
+			transparent 360deg
+		);
+		-webkit-mask:
+			linear-gradient(#fff 0 0) content-box,
+			linear-gradient(#fff 0 0);
+		mask:
+			linear-gradient(#fff 0 0) content-box,
+			linear-gradient(#fff 0 0);
+		-webkit-mask-composite: xor;
+		mask-composite: exclude;
+		opacity: 0;
+		pointer-events: none;
+		animation: accent-border-orbit 3.4s linear infinite;
+	}
+
+	.accent-option::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		border-radius: inherit;
+		background: radial-gradient(180px circle at var(--pointer-x) var(--pointer-y), color-mix(in srgb, white 14%, transparent), transparent 62%);
+		opacity: 0;
+		pointer-events: none;
+	}
+
+	:global(.dark) .accent-option,
+	:global(.dark) .density-option {
+		background:
+			linear-gradient(180deg, color-mix(in srgb, var(--bg-tertiary) 82%, transparent), color-mix(in srgb, var(--bg-secondary) 92%, transparent));
+		border-color: color-mix(in srgb, var(--border-primary) 96%, transparent);
+		box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 	}
 
 	.accent-option:hover,
 	.density-option:hover {
 		border-color: color-mix(in srgb, var(--accent-primary) 22%, var(--border-primary));
-		transform: translateY(-1px);
+		transform: translate3d(0, -1px, 0);
 		box-shadow: var(--shadow-sm);
+	}
+
+	.accent-option:hover::after,
+	.accent-option.active::after {
+		opacity: 1;
 	}
 
 	.accent-option.active,
 	.density-option.active {
 		background: color-mix(in srgb, var(--accent-light) 85%, var(--bg-primary));
 		border-color: color-mix(in srgb, var(--accent-primary) 28%, var(--border-primary));
+	}
+
+	.accent-option.active::before {
+		opacity: 1;
+	}
+
+	:global(.dark) .accent-option.active,
+	:global(.dark) .density-option.active {
+		background:
+			linear-gradient(160deg, color-mix(in srgb, var(--accent-light) 78%, var(--bg-secondary)), color-mix(in srgb, var(--bg-primary) 94%, transparent));
+		box-shadow:
+			0 18px 30px rgba(0, 0, 0, 0.24),
+			inset 0 1px 0 rgba(255, 255, 255, 0.06),
+			inset 0 0 0 1px color-mix(in srgb, var(--accent-primary) 12%, transparent);
 	}
 
 	.accent-preview {
@@ -279,6 +553,28 @@
 			linear-gradient(150deg, var(--swatch-light), white 65%),
 			linear-gradient(140deg, var(--swatch-primary), var(--swatch-secondary));
 		overflow: hidden;
+	}
+
+	.accent-preview::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		background:
+			radial-gradient(120px circle at var(--pointer-x) var(--pointer-y), rgba(255, 255, 255, 0.3), transparent 62%),
+			linear-gradient(135deg, rgba(255, 255, 255, 0.32), transparent 42%);
+		opacity: 0;
+	}
+
+	.accent-option:hover .accent-preview::after,
+	.accent-option.active .accent-preview::after {
+		opacity: 1;
+	}
+
+	:global(.dark) .accent-preview {
+		border: 1px solid rgba(255, 255, 255, 0.06);
+		box-shadow:
+			inset 0 1px 0 rgba(255, 255, 255, 0.08),
+			0 10px 18px rgba(0, 0, 0, 0.2);
 	}
 
 	.accent-chip {
@@ -318,6 +614,23 @@
 		gap: 0.6rem;
 	}
 
+	.accent-ripples {
+		position: absolute;
+		inset: 0;
+		overflow: hidden;
+		border-radius: inherit;
+		pointer-events: none;
+	}
+
+	.accent-ripple {
+		position: absolute;
+		border-radius: 999px;
+		background: radial-gradient(circle, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0.12) 58%, transparent 72%);
+		transform: translate3d(-50%, -50%, 0) scale(0.15);
+		opacity: 0.7;
+		animation: accent-ripple 520ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+	}
+
 	.check-badge {
 		display: inline-flex;
 		align-items: center;
@@ -342,6 +655,12 @@
 		justify-content: space-between;
 	}
 
+	.density-check {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+	}
+
 	.density-preview {
 		display: grid;
 		gap: 0.65rem;
@@ -349,6 +668,15 @@
 		border-radius: 16px;
 		background: color-mix(in srgb, var(--bg-secondary) 72%, transparent);
 		border: 1px solid color-mix(in srgb, var(--border-primary) 88%, transparent);
+	}
+
+	:global(.dark) .density-preview {
+		background:
+			linear-gradient(180deg, color-mix(in srgb, var(--bg-tertiary) 82%, transparent), color-mix(in srgb, var(--bg-secondary) 92%, transparent));
+		border-color: color-mix(in srgb, var(--border-primary) 96%, transparent);
+		box-shadow:
+			inset 0 1px 0 rgba(255, 255, 255, 0.04),
+			0 16px 28px rgba(0, 0, 0, 0.18);
 	}
 
 	.density-preview-header {
@@ -375,6 +703,11 @@
 		background: color-mix(in srgb, var(--accent-primary) 10%, transparent);
 	}
 
+	:global(.dark) .density-badge {
+		background: color-mix(in srgb, var(--accent-primary) 16%, var(--bg-secondary));
+		border: 1px solid color-mix(in srgb, var(--accent-primary) 20%, transparent);
+	}
+
 	.mail-row-preview {
 		display: flex;
 		flex-direction: column;
@@ -384,6 +717,16 @@
 		border-radius: 12px;
 		background: var(--bg-primary);
 		border: 1px solid color-mix(in srgb, var(--border-primary) 90%, transparent);
+	}
+
+	:global(.dark) .mail-row-preview {
+		background:
+			linear-gradient(180deg, rgba(245, 248, 255, 0.03), rgba(255, 255, 255, 0.02)),
+			linear-gradient(180deg, color-mix(in srgb, var(--bg-primary) 86%, transparent), color-mix(in srgb, var(--bg-secondary) 94%, transparent));
+		border-color: color-mix(in srgb, var(--border-primary) 98%, transparent);
+		box-shadow:
+			inset 0 1px 0 rgba(255, 255, 255, 0.05),
+			0 10px 20px rgba(0, 0, 0, 0.16);
 	}
 
 	.preview-subject {
@@ -399,6 +742,38 @@
 		line-height: 1.4;
 	}
 
+	@keyframes theme-card-pulse {
+		0% {
+			filter: brightness(1);
+			transform: scale(1);
+		}
+		45% {
+			filter: brightness(1.1);
+			transform: scale(0.985);
+		}
+		100% {
+			filter: brightness(1);
+			transform: scale(1);
+		}
+	}
+
+	@keyframes accent-ripple {
+		0% {
+			transform: translate3d(-50%, -50%, 0) scale(0.15);
+			opacity: 0.72;
+		}
+		100% {
+			transform: translate3d(-50%, -50%, 0) scale(1);
+			opacity: 0;
+		}
+	}
+
+	@keyframes accent-border-orbit {
+		to {
+			transform: rotate(1turn);
+		}
+	}
+
 	@media (max-width: 900px) {
 		.density-grid {
 			grid-template-columns: 1fr;
@@ -408,6 +783,11 @@
 	@media (max-width: 640px) {
 		.theme-segmented {
 			grid-template-columns: 1fr;
+			gap: 0.35rem;
+		}
+
+		.theme-mode-indicator {
+			display: none;
 		}
 	}
 </style>

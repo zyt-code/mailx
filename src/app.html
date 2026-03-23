@@ -5,6 +5,36 @@
     <link rel="icon" href="%sveltekit.assets%/favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Tauri + SvelteKit + Typescript App</title>
+    <script>
+      (() => {
+        const THEME_STORAGE_KEY = 'mailx-preferences';
+        const DARK_BG = '#0d1117';
+        const LIGHT_BG = '#ffffff';
+
+        try {
+          const raw = window.localStorage.getItem(THEME_STORAGE_KEY);
+          const theme = raw ? JSON.parse(raw)?.appearance?.theme : 'system';
+          const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)')?.matches ?? false;
+          const isDark = theme === 'dark' || (theme !== 'light' && prefersDark);
+          const background = isDark ? DARK_BG : LIGHT_BG;
+          const root = document.documentElement;
+
+          root.classList.toggle('dark', isDark);
+          root.dataset.theme = isDark ? 'dark' : 'light';
+          root.style.colorScheme = isDark ? 'dark' : 'light';
+          root.style.backgroundColor = background;
+          root.style.setProperty('--initial-bg', background);
+        } catch {
+          document.documentElement.style.setProperty('--initial-bg', LIGHT_BG);
+        }
+      })();
+    </script>
+    <style>
+      html,
+      body {
+        background-color: var(--initial-bg, #ffffff);
+      }
+    </style>
     %sveltekit.head%
   </head>
   <body data-sveltekit-preload-data="hover">

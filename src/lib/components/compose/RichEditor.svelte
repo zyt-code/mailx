@@ -88,7 +88,7 @@
 	// Focus editor when clicking on the wrapper or any child element
 	function handleWrapperClick(event: MouseEvent): void {
 		if (!editor) return;
-		
+
 		// Focus the editor when clicking anywhere in the wrapper
 		// This includes clicks on the editor content area
 		if (!isFocused) {
@@ -101,7 +101,7 @@
 </script>
 
 <div
-	class="rich-editor-wrapper"
+	class="rich-editor-wrapper dark:bg-[var(--bg-primary)] dark:text-[var(--text-primary)]"
 	bind:this={editorWrapper}
 	onclick={handleWrapperClick}
 	onkeydown={(event) => {
@@ -114,7 +114,7 @@
 	aria-multiline="true"
 	tabindex="-1"
 >
-	<div class="rich-editor-content" bind:this={editorElement}></div>
+	<div class="rich-editor-content dark:bg-[var(--bg-primary)] dark:text-[var(--text-primary)]" bind:this={editorElement}></div>
 </div>
 
 <style>
@@ -127,6 +127,8 @@
 		height: 100%;
 		min-height: 400px;
 		cursor: text;
+		background: var(--bg-primary);
+		color: var(--text-primary);
 	}
 
 	/* ========================================
@@ -136,6 +138,8 @@
 		min-height: 400px;
 		padding: 1.5rem;
 		outline: none;
+		background: var(--bg-primary);
+		color: var(--text-primary);
 	}
 
 	/* Ensure the entire editor area is clickable */
@@ -145,6 +149,8 @@
 		height: 100%;
 		outline: none !important;
 		padding: 0;
+		caret-color: var(--accent-primary);
+		color: var(--text-primary);
 	}
 
 	/* Placeholder styling */
@@ -269,7 +275,9 @@
 
 	/* Selection */
 	.rich-editor-content :global(::selection) {
-		background: color-mix(in srgb, var(--accent-primary) 20%, transparent);
+		background: var(--editor-selection-bg);
+		color: var(--editor-selection-fg);
+		text-shadow: none;
 	}
 
 	/* Read-only mode */

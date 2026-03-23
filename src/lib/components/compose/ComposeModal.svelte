@@ -345,7 +345,7 @@
 {#if isOpen}
 	<div>
 		<div
-			class="fixed inset-0 z-50 flex items-center justify-center bg-black/22 backdrop-blur-sm"
+			class="fixed inset-0 z-50 flex items-center justify-center bg-black/22 backdrop-blur-sm dark:bg-black/45"
 			onclick={(event) => {
 				if (event.target === event.currentTarget) closeModal();
 			}}
@@ -364,12 +364,12 @@
 			out:fade={{ duration: 140 }}
 		>
 			<div
-				class="compose-modal-shell flex flex-col w-full h-full sm:h-auto sm:min-h-[60vh] sm:max-h-[88vh] sm:max-w-[780px] overflow-hidden rounded-none sm:rounded-xl border border-[var(--border-secondary)] bg-[var(--bg-primary)] shadow-2xl"
+				class="compose-modal-shell flex flex-col w-full h-full sm:h-auto sm:min-h-[60vh] sm:max-h-[88vh] sm:max-w-[780px] overflow-hidden rounded-none sm:rounded-xl border border-[var(--border-secondary)] bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-2xl dark:border-[var(--border-primary)] dark:bg-[var(--bg-primary)] dark:text-[var(--text-primary)]"
 				role="document"
 				in:scale={{ duration: 160, start: 0.97, opacity: 0.2 }}
 				out:scale={{ duration: 120, start: 1, opacity: 0.15 }}
 			>
-				<header class="flex items-center justify-between gap-3 px-5 py-2.5 border-b border-[var(--border-tertiary)] bg-[var(--bg-primary)]">
+				<header class="flex items-center justify-between gap-3 px-5 py-2.5 border-b border-[var(--border-tertiary)] bg-[var(--bg-primary)] dark:border-[var(--border-primary)] dark:bg-[var(--bg-primary)]">
 					<div class="flex items-center gap-3 min-w-0">
 						<h2 id="compose-title" class="text-[15px] font-semibold text-[var(--text-primary)] shrink-0">{$_('compose.newMessage')}</h2>
 
@@ -416,7 +416,7 @@
 					<button
 						type="button"
 						onclick={closeModal}
-						class="flex size-8 items-center justify-center rounded-md text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
+						class="flex size-8 items-center justify-center rounded-md text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] dark:text-[var(--text-tertiary)] dark:hover:text-[var(--text-primary)] dark:hover:bg-[var(--bg-hover)]"
 						aria-label={$_('compose.closeCompose')}
 					>
 						<X class="size-4" strokeWidth={1.8} />
