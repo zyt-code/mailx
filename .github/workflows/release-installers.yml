@@ -1,0 +1,72 @@
+name: release-installers
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-and-release:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-2022
+            name: windows-x64
+            rust-target: x86_64-pc-windows-msvc
+            tauri-args: --target x86_64-pc-windows-msvc --bundles nsis
+          - runner: macos-14
+            name: macos-apple-silicon
+            rust-target: aarch64-apple-darwin
+            tauri-args: --target aarch64-apple-darwin --bundles dmg
+          - runner: macos-13
+            name: macos-intel
+            rust-target: x86_64-apple-darwin
+            tauri-args: --target x86_64-apple-darwin --bundles dmg
+
+    runs-on: ${{ matrix.runner }}
+    name: ${{ matrix.name }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust-target }}
+
+      - name: Install frontend dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build and upload installers
+        uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: __VERSION__
+          releaseName: mailx v__VERSION__
+          releaseBody: |
+            Automated desktop installers for:
+            - Windows x64
+            - macOS Apple Silicon
+            - macOS Intel
+          releaseDraft: false
+          prerelease: false
+          generateReleaseNotes: true
+          includeDebug: false
+          projectPath: .
+          args: ${{ matrix.tauri-args }}
