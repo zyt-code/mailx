@@ -111,7 +111,7 @@ export async function markMailRead(id: string, read: boolean): Promise<void> {
  * Mark a mail as read on the IMAP server (syncs \Seen flag via UID)
  */
 export async function markMailAsRead(uid: number, accountId: string): Promise<void> {
-	await invoke('mark_as_read', { uid, account_id: accountId });
+	await invoke('mark_as_read', { uid, accountId });
 }
 
 /**

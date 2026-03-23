@@ -111,3 +111,60 @@ fn test_build_email_message_derives_plain_text_from_html_when_body_is_empty() {
     assert!(formatted.contains("Content-Type: text/plain"));
     assert!(formatted.contains("Hello\nSecond line\n- Bullet item"));
 }
+
+#[test]
+fn test_connection_attempt_modes_prioritize_implicit_tls_on_port_465() {
+    let client = SmtpClient::new(
+        SmtpConfig {
+            server: "smtp.163.com".to_string(),
+            port: 465,
+            use_ssl: true,
+        },
+        "sender@example.com".to_string(),
+        "password".to_string(),
+    );
+
+    assert_eq!(
+        client.connection_attempt_modes(),
+        vec![
+            TransportSecurityMode::ImplicitTls,
+            TransportSecurityMode::StartTls,
+            TransportSecurityMode::Plain,
+        ]
+    );
+}
+
+#[test]
+fn test_connection_attempt_modes_fallback_from_plain_to_starttls_on_port_587() {
+    let client = SmtpClient::new(
+        SmtpConfig {
+            server: "smtp.example.com".to_string(),
+            port: 587,
+            use_ssl: false,
+        },
+        "sender@example.com".to_string(),
+        "password".to_string(),
+    );
+
+    assert_eq!(
+        client.connection_attempt_modes(),
+        vec![
+            TransportSecurityMode::Plain,
+            TransportSecurityMode::StartTls,
+            TransportSecurityMode::ImplicitTls,
+        ]
+    );
+}
+
+#[test]
+fn test_retryable_transport_error_detects_protocol_mismatch_messages() {
+    assert!(SmtpClient::is_retryable_transport_error(
+        "Failed to send email via STARTTLS on smtp.example.com:587: response error: incomplete response"
+    ));
+    assert!(SmtpClient::is_retryable_transport_error(
+        "Connection test failed via STARTTLS on smtp.example.com:587: STARTTLS is not supported on this server"
+    ));
+    assert!(!SmtpClient::is_retryable_transport_error(
+        "Failed to send email via implicit TLS on smtp.example.com:465: authentication failed"
+    ));
+}

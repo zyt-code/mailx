@@ -1,10 +1,12 @@
 use crate::accounts::SmtpConfig;
 use crate::database::{Attachment as MailAttachment, EmailAddress, Mail};
+use crate::mail_provider::MailProvider;
 use lettre::message::{
     header, Attachment as MimeAttachment, Mailbox, Message, MultiPart, SinglePart,
 };
 use lettre::transport::smtp::authentication::Credentials;
 use lettre::{SmtpTransport, Transport};
+use std::fmt;
 use thiserror::Error;
 
 /// SMTP client errors
@@ -52,6 +54,23 @@ pub struct SmtpClient {
     password: String,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TransportSecurityMode {
+    ImplicitTls,
+    StartTls,
+    Plain,
+}
+
+impl fmt::Display for TransportSecurityMode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            TransportSecurityMode::ImplicitTls => write!(f, "implicit TLS"),
+            TransportSecurityMode::StartTls => write!(f, "STARTTLS"),
+            TransportSecurityMode::Plain => write!(f, "plain SMTP"),
+        }
+    }
+}
+
 impl SmtpClient {
     /// Create a new SMTP client
     pub fn new(config: SmtpConfig, email: String, password: String) -> Self {
@@ -64,33 +83,75 @@ impl SmtpClient {
 
     /// Test the SMTP connection
     pub async fn test_connection(&self) -> Result<()> {
-        let mailer = self.build_transport()?;
+        let attempt_configs = self.connection_attempt_configs();
+        let mut last_error = None;
 
-        // Try to connect and verify
-        mailer
-            .test_connection()
-            .map_err(|e| SmtpError::ConnectionFailed(format!("Connection test failed: {}", e)))?;
+        for (index, attempt_config) in attempt_configs.iter().enumerate() {
+            let mode = Self::transport_mode_for_config(attempt_config);
+            let mailer = self.build_transport_for_config(attempt_config)?;
+            match mailer.test_connection() {
+                Ok(_) => return Ok(()),
+                Err(error) => {
+                    let message = format!(
+                        "Connection test failed via {} on {}:{}: {}",
+                        mode, attempt_config.server, attempt_config.port, error
+                    );
+                    let should_retry = index + 1 < attempt_configs.len()
+                        && Self::is_retryable_transport_error(&message);
+                    eprintln!("[SMTP] {}", message);
+                    last_error = Some(message);
 
-        Ok(())
+                    if !should_retry {
+                        break;
+                    }
+                }
+            }
+        }
+
+        Err(SmtpError::ConnectionFailed(
+            last_error.unwrap_or_else(|| "Connection test failed".to_string()),
+        ))
     }
 
     /// Send an email
     pub async fn send_mail(&self, mail: &Mail, attachments: &[MailAttachment]) -> Result<String> {
         let email_message = self.build_email_message(mail, attachments)?;
+        let attempt_configs = self.connection_attempt_configs();
+        let mut last_error = None;
 
-        let mailer = self.build_transport()?;
+        for (index, attempt_config) in attempt_configs.iter().enumerate() {
+            let mode = Self::transport_mode_for_config(attempt_config);
+            let mailer = self.build_transport_for_config(attempt_config)?;
+            let result = tokio::task::spawn_blocking({
+                let mailer = mailer;
+                let email_message = email_message.clone();
+                move || mailer.send(&email_message)
+            })
+            .await
+            .map_err(|e| SmtpError::SendFailed(format!("Send task failed: {}", e)))?;
 
-        // Send the email
-        tokio::task::spawn_blocking({
-            let mailer = mailer;
-            let email_message = email_message;
-            move || mailer.send(&email_message)
-        })
-        .await
-        .map_err(|e| SmtpError::SendFailed(format!("Send task failed: {}", e)))?
-        .map_err(|e| SmtpError::SendFailed(e.to_string()))?;
+            match result {
+                Ok(_) => return Ok(mail.id.clone()),
+                Err(error) => {
+                    let message = format!(
+                        "Failed to send email via {} on {}:{}: {}",
+                        mode, attempt_config.server, attempt_config.port, error
+                    );
+                    let should_retry = index + 1 < attempt_configs.len()
+                        && Self::is_retryable_transport_error(&message);
+                    eprintln!("[SMTP] {}", message);
+                    last_error = Some(message);
 
-        Ok(mail.id.clone())
+                    if !should_retry {
+                        break;
+                    }
+                }
+            }
+        }
+
+        Err(SmtpError::SendFailed(
+            last_error.unwrap_or_else(|| "Failed to send email".to_string()),
+        ))
     }
 
     /// Send a raw email message with custom headers
@@ -129,13 +190,18 @@ impl SmtpClient {
     /// - `use_ssl = true` and non-465 ports: STARTTLS (required)
     /// - `use_ssl = false`: plain SMTP (no TLS)
     fn build_transport(&self) -> Result<SmtpTransport> {
+        self.build_transport_for_config(&self.config)
+    }
+
+    fn build_transport_for_config(&self, config: &SmtpConfig) -> Result<SmtpTransport> {
         let creds = Credentials::new(self.email.clone(), self.password.clone());
 
-        let relay = &self.config.server;
-        let port = self.config.port;
+        let relay = &config.server;
+        let port = config.port;
+        let mode = Self::transport_mode_for_config(config);
 
-        let transport = if self.config.use_ssl {
-            if port == 465 {
+        let transport = match mode {
+            TransportSecurityMode::ImplicitTls => {
                 SmtpTransport::relay(relay)
                     .map_err(|e| {
                         SmtpError::ConnectionFailed(format!(
@@ -146,7 +212,8 @@ impl SmtpClient {
                     .port(port)
                     .credentials(creds)
                     .build()
-            } else {
+            }
+            TransportSecurityMode::StartTls => {
                 SmtpTransport::starttls_relay(relay)
                     .map_err(|e| {
                         SmtpError::ConnectionFailed(format!(
@@ -158,14 +225,126 @@ impl SmtpClient {
                     .credentials(creds)
                     .build()
             }
-        } else {
-            SmtpTransport::builder_dangerous(relay)
+            TransportSecurityMode::Plain => SmtpTransport::builder_dangerous(relay)
                 .port(port)
                 .credentials(creds)
-                .build()
+                .build(),
         };
 
         Ok(transport)
+    }
+
+    fn configured_transport_mode(&self) -> TransportSecurityMode {
+        Self::transport_mode_for_config(&self.config)
+    }
+
+    fn connection_attempt_modes(&self) -> Vec<TransportSecurityMode> {
+        Self::connection_attempt_modes_for_config(&self.config)
+    }
+
+    fn transport_mode_for_config(config: &SmtpConfig) -> TransportSecurityMode {
+        if config.use_ssl {
+            if config.port == 465 {
+                TransportSecurityMode::ImplicitTls
+            } else {
+                TransportSecurityMode::StartTls
+            }
+        } else {
+            TransportSecurityMode::Plain
+        }
+    }
+
+    fn connection_attempt_modes_for_config(config: &SmtpConfig) -> Vec<TransportSecurityMode> {
+        let mut modes = vec![Self::transport_mode_for_config(config)];
+
+        match config.port {
+            465 => {
+                modes.push(TransportSecurityMode::ImplicitTls);
+                modes.push(TransportSecurityMode::StartTls);
+                modes.push(TransportSecurityMode::Plain);
+            }
+            587 | 25 => {
+                modes.push(TransportSecurityMode::StartTls);
+                modes.push(TransportSecurityMode::Plain);
+                modes.push(TransportSecurityMode::ImplicitTls);
+            }
+            _ => {
+                modes.push(TransportSecurityMode::StartTls);
+                modes.push(TransportSecurityMode::ImplicitTls);
+                modes.push(TransportSecurityMode::Plain);
+            }
+        }
+
+        let mut deduped = Vec::new();
+        for mode in modes {
+            if !deduped.contains(&mode) {
+                deduped.push(mode);
+            }
+        }
+        deduped
+    }
+
+    fn connection_attempt_configs(&self) -> Vec<SmtpConfig> {
+        let mut configs: Vec<SmtpConfig> = Self::connection_attempt_modes_for_config(&self.config)
+            .into_iter()
+            .map(|mode| Self::config_for_mode(&self.config.server, self.config.port, mode))
+            .collect();
+
+        let provider = MailProvider::detect_from_host(&self.config.server);
+        let canonical = SmtpConfig {
+            server: self.config.server.clone(),
+            port: provider.get_smtp_port(),
+            use_ssl: provider.use_smtp_ssl(),
+        };
+
+        if canonical.server == self.config.server
+            && (canonical.port != self.config.port || canonical.use_ssl != self.config.use_ssl)
+        {
+            configs.push(canonical.clone());
+            for mode in Self::connection_attempt_modes_for_config(&canonical) {
+                configs.push(Self::config_for_mode(&canonical.server, canonical.port, mode));
+            }
+        }
+
+        let mut deduped = Vec::new();
+        for config in configs {
+            if !deduped.iter().any(|existing: &SmtpConfig| {
+                existing.server == config.server
+                    && existing.port == config.port
+                    && existing.use_ssl == config.use_ssl
+            }) {
+                deduped.push(config);
+            }
+        }
+        deduped
+    }
+
+    fn config_for_mode(server: &str, port: u16, mode: TransportSecurityMode) -> SmtpConfig {
+        SmtpConfig {
+            server: server.to_string(),
+            port,
+            use_ssl: !matches!(mode, TransportSecurityMode::Plain),
+        }
+    }
+
+    fn is_retryable_transport_error(message: &str) -> bool {
+        let lower = message.to_ascii_lowercase();
+        [
+            "starttls",
+            "incomplete response",
+            "unexpected eof",
+            "connection reset",
+            "broken pipe",
+            "connection closed",
+            "handshake",
+            "tls error",
+            "ssl error",
+            "timed out",
+            "timeout",
+            "io error",
+        ]
+        .iter()
+        .any(|pattern| lower.contains(pattern))
     }
 
     /// Build an email message from a Mail structure

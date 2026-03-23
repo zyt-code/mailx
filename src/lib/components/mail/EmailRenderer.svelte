@@ -20,6 +20,7 @@
 	let iframeElement = $state<HTMLIFrameElement | null>(null);
 	let iframeHeight = $state(320);
 	let iframeResizeObserver = $state<ResizeObserver | null>(null);
+	let iframeResizeFrame = $state<number | null>(null);
 
 	const TIPTAP_SUPPORTED_TAGS = new Set([
 		'A',
@@ -187,6 +188,10 @@
 	function cleanupIframeObserver(): void {
 		iframeResizeObserver?.disconnect();
 		iframeResizeObserver = null;
+		if (iframeResizeFrame !== null) {
+			cancelAnimationFrame(iframeResizeFrame);
+			iframeResizeFrame = null;
+		}
 		window.removeEventListener('resize', syncIframeHeight);
 	}
 
@@ -202,7 +207,13 @@
 
 		if ('ResizeObserver' in window && observedNodes.length > 0) {
 			iframeResizeObserver = new ResizeObserver(() => {
-				syncIframeHeight();
+				if (iframeResizeFrame !== null) {
+					cancelAnimationFrame(iframeResizeFrame);
+				}
+				iframeResizeFrame = requestAnimationFrame(() => {
+					iframeResizeFrame = null;
+					syncIframeHeight();
+				});
 			});
 
 			observedNodes.forEach((node) => iframeResizeObserver?.observe(node));
