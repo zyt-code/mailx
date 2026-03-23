@@ -177,17 +177,6 @@
 
 	<main class="settings-main" bind:this={mainPanel} onscroll={handleMainScroll}>
 		<div class="main-grid">
-			<div class="settings-hero">
-				<div>
-					<p class="hero-kicker">{$_('settings.controlCenter')}</p>
-					<h2>{$_('settings.lessFriction')}</h2>
-				</div>
-				<div class="hero-chip">
-					<span class="hero-dot"></span>
-					{$_('settings.persistedLocally')}
-				</div>
-			</div>
-
 			<div class="content-wrapper">
 				{@render children()}
 			</div>
@@ -342,8 +331,7 @@
 		gap: 0.55rem;
 	}
 
-	.eyebrow,
-	.hero-kicker {
+	.eyebrow {
 		margin: 0;
 		font-size: 0.72rem;
 		font-weight: 700;
@@ -499,64 +487,6 @@
 		padding: 2rem clamp(1.1rem, 3vw, 3rem) 4rem;
 	}
 
-	.settings-hero {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 1rem;
-		margin-bottom: 1.4rem;
-		padding: 1rem 1.1rem;
-		border: 1px solid color-mix(in srgb, var(--border-primary) 88%, transparent);
-		border-radius: 22px;
-		background: color-mix(in srgb, var(--bg-primary) 80%, transparent);
-		backdrop-filter: blur(18px);
-		box-shadow: var(--shadow-xs);
-	}
-
-	:global(.dark) .settings-hero {
-		background:
-			linear-gradient(180deg, rgba(14, 18, 26, 0.92), rgba(15, 19, 28, 0.84)),
-			radial-gradient(circle at top left, rgba(90, 155, 255, 0.14), transparent 32%);
-		border-color: color-mix(in srgb, var(--border-primary) 98%, transparent);
-		box-shadow:
-			0 24px 48px rgba(0, 0, 0, 0.28),
-			inset 0 1px 0 rgba(255, 255, 255, 0.05);
-	}
-
-	.settings-hero h2 {
-		margin: 0.3rem 0 0;
-		font-size: clamp(1.25rem, 2vw, 1.75rem);
-		letter-spacing: -0.04em;
-	}
-
-	.hero-chip {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.55rem;
-		padding: 0.55rem 0.8rem;
-		border-radius: 999px;
-		background: color-mix(in srgb, var(--bg-secondary) 88%, transparent);
-		font-size: 0.8rem;
-		font-weight: 650;
-		color: var(--text-secondary);
-		white-space: nowrap;
-	}
-
-	:global(.dark) .hero-chip {
-		background:
-			linear-gradient(180deg, color-mix(in srgb, var(--bg-tertiary) 82%, transparent), color-mix(in srgb, var(--bg-secondary) 92%, transparent));
-		border: 1px solid color-mix(in srgb, var(--border-primary) 96%, transparent);
-		box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
-	}
-
-	.hero-dot {
-		width: 0.55rem;
-		height: 0.55rem;
-		border-radius: 999px;
-		background: var(--accent-primary);
-		box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent-light) 75%, transparent);
-	}
-
 	.content-wrapper {
 		min-width: 0;
 	}
@@ -582,10 +512,6 @@
 			display: none;
 		}
 
-		.settings-hero {
-			flex-direction: column;
-			align-items: flex-start;
-		}
 	}
 
 	@media (max-width: 640px) {

@@ -114,9 +114,10 @@
 		syncingAccountId = accountId;
 		try {
 			await syncAccount(accountId);
+			await loadSyncStatus();
 		} catch (e) {
 			console.error('Sync failed:', e);
-			alert($_('account.failedToSync') + ': ' + (e instanceof Error ? e.message : String(e)));
+			// Toast feedback is centralized in syncHandlers to avoid duplicate notifications.
 		} finally {
 			syncingAccountId = null;
 		}
@@ -124,9 +125,7 @@
 
 	function handleDeleteAccount(accountId: string, event: Event) {
 		event.stopPropagation();
-		if (confirm($_('account.deleteConfirm'))) {
-			goto(`/settings/accounts/${accountId}/delete`);
-		}
+		goto(`/settings/accounts/${accountId}`);
 	}
 </script>
 
@@ -231,6 +230,7 @@
 				</div>
 				<div class="account-actions">
 					<button
+						type="button"
 						onclick={(e) => handleSyncAccount(account.id, e)}
 						disabled={syncingAccountId === account.id}
 						class="action-button sync-button"
@@ -243,6 +243,7 @@
 						{/if}
 					</button>
 					<button
+						type="button"
 						onclick={() => editAccount(account.id)}
 						class="action-button edit-button"
 						title={$_('account.editAccount')}
@@ -250,6 +251,7 @@
 						<Edit class="size-4" />
 					</button>
 					<button
+						type="button"
 						onclick={(e) => handleDeleteAccount(account.id, e)}
 						class="action-button delete-button"
 						title={$_('account.deleteAccount')}
@@ -485,6 +487,7 @@
 		left: 0;
 		right: 0;
 		height: 100%;
+		pointer-events: none;
 		background: linear-gradient(135deg, color-mix(in srgb, var(--accent-primary) 5%, transparent) 0%, color-mix(in srgb, var(--accent-secondary) 3%, transparent) 100%);
 		opacity: 0;
 		transition: opacity 0.3s ease;

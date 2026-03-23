@@ -87,13 +87,19 @@ pub fn add_mail_attachment(
 
 /// List persisted attachments for a mail.
 #[tauri::command]
-pub fn get_mail_attachments(mail_id: String, db: State<'_, Database>) -> Result<Vec<Attachment>, String> {
+pub fn get_mail_attachments(
+    mail_id: String,
+    db: State<'_, Database>,
+) -> Result<Vec<Attachment>, String> {
     db.inner().get_mail_attachments(&mail_id)
 }
 
 /// Remove one attachment by id.
 #[tauri::command]
-pub fn remove_mail_attachment(attachment_id: String, db: State<'_, Database>) -> Result<(), String> {
+pub fn remove_mail_attachment(
+    attachment_id: String,
+    db: State<'_, Database>,
+) -> Result<(), String> {
     db.inner().delete_mail_attachment(&attachment_id)
 }
 
@@ -566,7 +572,7 @@ pub async fn send_mail(
     smtp_client
         .send_mail(&mail, &attachments)
         .await
-        .map_err(|e| format!("Failed to send email: {}", e))?;
+        .map_err(|e| e.to_string())?;
 
     // Move mail to sent folder
     db.inner()
@@ -663,12 +669,14 @@ pub fn get_windows_diagnostics(app_handle: AppHandle) -> Result<WindowsDiagnosti
         .map_err(|e| format!("Failed to get app data dir: {}", e))?;
     let crash_dir = app_data_dir.join("crashes");
     let tracker = CrashTracker::new(crash_dir);
-    let crash_dumps_count = tracker.get_crash_dumps()
+    let crash_dumps_count = tracker
+        .get_crash_dumps()
         .map_err(|e| format!("Failed to get crash dumps: {}", e))?
         .len();
 
     // Collect diagnostics
-    let diagnostics = crate::windows::diagnostics::collect_diagnostics(app_version, crash_dumps_count);
+    let diagnostics =
+        crate::windows::diagnostics::collect_diagnostics(app_version, crash_dumps_count);
     Ok(diagnostics)
 }
 
@@ -720,16 +728,22 @@ pub async fn send_notification_with_history(
     app_handle: AppHandle,
 ) -> Result<(), String> {
     // 1. Emit event to frontend for actual notification display
-    let _ = app_handle.emit("notification:show", json!({
-        "title": title,
-        "body": body
-    }));
+    let _ = app_handle.emit(
+        "notification:show",
+        json!({
+            "title": title,
+            "body": body
+        }),
+    );
 
     // 2. Skip database insertion for test notifications (no account context)
     // Test notifications don't have an associated account, and the notifications table
     // has a foreign key constraint requiring a valid account_id
     let body_str = body.as_deref().unwrap_or("");
-    println!("[Notification] ✅ Sent (test notification, not saved to DB): {} - {}", title, body_str);
+    println!(
+        "[Notification] ✅ Sent (test notification, not saved to DB): {} - {}",
+        title, body_str
+    );
     Ok(())
 }
 

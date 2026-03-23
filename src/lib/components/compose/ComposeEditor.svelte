@@ -3,12 +3,15 @@
 	import { Bold, Italic, Underline, Link2, List, Paperclip, X } from 'lucide-svelte';
 	import type { Attachment } from '$lib/types.js';
 	import RichEditor from './RichEditor.svelte';
+	import EmailRenderer from '$lib/components/mail/EmailRenderer.svelte';
 	import { htmlToPlainText, normalizeEditorHtml, plainTextToHtml } from '$lib/utils/mailContent.js';
 	import type { Editor } from '@tiptap/core';
 
 	interface Props {
 		value: string;
 		htmlValue?: string;
+		referencePlain?: string;
+		referenceHtml?: string;
 		attachments?: Attachment[];
 		onAttach?: () => void;
 		onRemoveAttachment?: (id: string) => void;
@@ -17,6 +20,8 @@
 	let {
 		value = $bindable(),
 		htmlValue = $bindable(''),
+		referencePlain = '',
+		referenceHtml = '',
 		attachments = [],
 		onAttach,
 		onRemoveAttachment
@@ -85,6 +90,7 @@
 	<div class="editor-toolbar" role="toolbar" aria-label={$_('compose.formattingToolbar')}>
 		<button
 			type="button"
+			tabindex="-1"
 			onclick={toggleBold}
 			aria-label={$_('compose.bold')}
 			class:active={editor?.isActive('bold')}
@@ -93,6 +99,7 @@
 		</button>
 		<button
 			type="button"
+			tabindex="-1"
 			onclick={toggleItalic}
 			aria-label={$_('compose.italic')}
 			class:active={editor?.isActive('italic')}
@@ -101,6 +108,7 @@
 		</button>
 		<button
 			type="button"
+			tabindex="-1"
 			onclick={toggleUnderline}
 			aria-label={$_('compose.underline')}
 			class:active={editor?.isActive('underline')}
@@ -110,6 +118,7 @@
 		<div class="toolbar-divider"></div>
 		<button
 			type="button"
+			tabindex="-1"
 			onclick={toggleBulletList}
 			aria-label={$_('compose.list')}
 			class:active={editor?.isActive('bulletList')}
@@ -118,6 +127,7 @@
 		</button>
 		<button
 			type="button"
+			tabindex="-1"
 			onclick={insertLink}
 			aria-label={$_('compose.link')}
 			class:active={editor?.isActive('link')}
@@ -125,7 +135,7 @@
 			<Link2 class="size-3.5" strokeWidth={1.8} />
 		</button>
 		<div class="toolbar-divider"></div>
-		<button type="button" onclick={() => onAttach?.()} aria-label={$_('compose.attachFiles')}>
+		<button type="button" tabindex="-1" onclick={() => onAttach?.()} aria-label={$_('compose.attachFiles')}>
 			<Paperclip class="size-3.5" strokeWidth={1.8} />
 			<span>{$_('compose.attach')}</span>
 		</button>
@@ -135,10 +145,20 @@
 		<RichEditor
 			content={editorContent}
 			placeholder={$_('compose.placeholder')}
+			ariaLabel={$_('compose.placeholder')}
 			onEditorChange={handleEditorChange}
 			onContentChange={handleContentChange}
 		/>
 	</div>
+
+	{#if referencePlain || referenceHtml}
+		<div class="compose-reference">
+			<div class="compose-reference-divider"></div>
+			<div class="compose-reference-content">
+				<EmailRenderer htmlBody={referenceHtml} plainBody={referencePlain} />
+			</div>
+		</div>
+	{/if}
 
 	{#if attachments.length > 0}
 		<div class="attachment-zone" aria-label={$_('compose.attachments')}>
@@ -168,13 +188,15 @@
 		flex: 1;
 		min-height: 0;
 		background: var(--bg-primary);
+		--compose-leading: 1.75rem;
+		--compose-editor-padding: 1.75rem;
 	}
 
 	.editor-toolbar {
 		display: flex;
 		align-items: center;
 		gap: 0.25rem;
-		padding: 0.45rem 1.25rem;
+		padding: 0.8rem var(--compose-leading) 0.72rem;
 		border-bottom: 1px solid var(--border-tertiary);
 		background: var(--bg-primary);
 	}
@@ -218,18 +240,18 @@
 
 	.compose-editor {
 		flex: 1;
-		min-height: 340px;
+		min-height: 0;
 		border: none;
 		outline: none;
 		background: var(--bg-primary);
-		overflow: hidden;
+		overflow: auto;
 	}
 
 	.attachment-zone {
 		display: flex;
 		flex-wrap: wrap;
 		gap: 0.5rem;
-		padding: 0.75rem 1.25rem 0.85rem;
+		padding: 0.85rem var(--compose-leading) 0.95rem;
 		border-top: 1px solid var(--border-tertiary);
 		background: var(--bg-secondary);
 	}
@@ -245,6 +267,37 @@
 		border: 1px solid var(--border-secondary);
 		border-radius: 8px;
 		background: var(--bg-primary);
+	}
+
+	.compose-reference {
+		border-top: 1px solid var(--border-tertiary);
+		background: color-mix(in srgb, var(--bg-secondary) 60%, var(--bg-primary));
+	}
+
+	.compose-reference-divider {
+		height: 1px;
+		background: linear-gradient(
+			90deg,
+			transparent 0%,
+			color-mix(in srgb, var(--border-primary) 70%, transparent) 18%,
+			color-mix(in srgb, var(--border-primary) 86%, transparent) 50%,
+			color-mix(in srgb, var(--border-primary) 70%, transparent) 82%,
+			transparent 100%
+		);
+	}
+
+	.compose-reference-content {
+		max-height: min(34vh, 280px);
+		overflow: auto;
+		background: color-mix(in srgb, var(--bg-secondary) 52%, transparent);
+	}
+
+	.compose-reference-content :global(.mail-renderer__content),
+	.compose-reference-content :global(.mail-renderer-html__content) {
+		min-height: auto;
+		padding-top: 1rem;
+		padding-bottom: 1rem;
+		font-size: 13px;
 	}
 
 	.attachment-chip:hover {
@@ -286,5 +339,10 @@
 	.attachment-chip button:hover {
 		color: var(--text-primary);
 		background: var(--bg-hover);
+	}
+
+	:global(.dark) .editor-toolbar,
+	:global(.dark) .attachment-zone {
+		border-color: color-mix(in srgb, var(--border-primary) 72%, transparent);
 	}
 </style>

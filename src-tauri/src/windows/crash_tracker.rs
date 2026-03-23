@@ -1,8 +1,8 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::{Path, PathBuf};
 use std::io;
+use std::path::{Path, PathBuf};
 use thiserror::Error;
 
 /// Error types for crash tracking operations
@@ -65,9 +65,7 @@ impl CrashTracker {
                     // Check if corresponding .dmp file exists
                     let dmp_path = path.with_extension("dmp");
                     if dmp_path.exists() {
-                        let file_size = fs::metadata(&dmp_path)
-                            .map(|m| m.len())
-                            .unwrap_or(0);
+                        let file_size = fs::metadata(&dmp_path).map(|m| m.len()).unwrap_or(0);
                         let mut info = crash_info;
                         info.file_size_bytes = file_size;
                         crashes.push(info);
@@ -90,7 +88,8 @@ impl CrashTracker {
             .map_err(|e| CrashTrackerError::ParseError(format!("Failed to parse JSON: {}", e)))?;
 
         // Set filename from path
-        info.filename = path.file_stem()
+        info.filename = path
+            .file_stem()
             .and_then(|s| s.to_str())
             .unwrap_or("unknown")
             .to_string();
@@ -141,8 +140,9 @@ impl CrashTracker {
         };
 
         let json_path = self.crash_dir.join(format!("{}.json", filename));
-        let json_content = serde_json::to_string_pretty(&metadata)
-            .map_err(|e| CrashTrackerError::ParseError(format!("Failed to serialize JSON: {}", e)))?;
+        let json_content = serde_json::to_string_pretty(&metadata).map_err(|e| {
+            CrashTrackerError::ParseError(format!("Failed to serialize JSON: {}", e))
+        })?;
 
         fs::write(&json_path, json_content)?;
         Ok(())
@@ -177,12 +177,14 @@ mod tests {
     fn test_write_and_read_crash_metadata() {
         let (tracker, _temp) = create_test_tracker();
 
-        tracker.write_crash_metadata(
-            "test_crash",
-            "0.1.0",
-            "Panic: test error",
-            Some("stack trace here".to_string()),
-        ).unwrap();
+        tracker
+            .write_crash_metadata(
+                "test_crash",
+                "0.1.0",
+                "Panic: test error",
+                Some("stack trace here".to_string()),
+            )
+            .unwrap();
 
         let crashes = tracker.get_crash_dumps().unwrap();
         assert_eq!(crashes.len(), 0); // No .dmp file yet
@@ -204,8 +206,12 @@ mod tests {
         let (tracker, _temp) = create_test_tracker();
 
         // Create test files
-        tracker.write_crash_metadata("crash1", "0.1.0", "error", None).unwrap();
-        tracker.write_crash_metadata("crash2", "0.1.0", "error", None).unwrap();
+        tracker
+            .write_crash_metadata("crash1", "0.1.0", "error", None)
+            .unwrap();
+        tracker
+            .write_crash_metadata("crash2", "0.1.0", "error", None)
+            .unwrap();
 
         let dmp1 = tracker.crash_dir().join("crash1.dmp");
         let dmp2 = tracker.crash_dir().join("crash2.dmp");
@@ -225,9 +231,13 @@ mod tests {
         let (tracker, _temp) = create_test_tracker();
 
         // Create crashes with different timestamps
-        tracker.write_crash_metadata("crash_old", "0.1.0", "error1", None).unwrap();
+        tracker
+            .write_crash_metadata("crash_old", "0.1.0", "error1", None)
+            .unwrap();
         std::thread::sleep(std::time::Duration::from_millis(10));
-        tracker.write_crash_metadata("crash_new", "0.1.0", "error2", None).unwrap();
+        tracker
+            .write_crash_metadata("crash_new", "0.1.0", "error2", None)
+            .unwrap();
 
         // Create .dmp files
         fs::write(tracker.crash_dir().join("crash_old.dmp"), b"dmp1").unwrap();

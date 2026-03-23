@@ -159,13 +159,12 @@ impl SyncManager {
     async fn sync_account_inner(&self, account_id: &str, account: &Account) -> Result<SyncStatus> {
         // Get credentials
         println!("[Sync] Getting credentials for '{}'...", account.email);
-        let password = self
-            .credential_manager
-            .get_password(account_id)
-            .map_err(|e: crate::credentials_legacy::CredentialError| {
+        let password = self.credential_manager.get_password(account_id).map_err(
+            |e: crate::credentials_legacy::CredentialError| {
                 println!("[Sync] Credential error for '{}': {}", account.email, e);
                 SyncError::Credential(e.to_string())
-            })?;
+            },
+        )?;
 
         // Get IMAP config
         let imap_config = self
@@ -193,6 +192,7 @@ impl SyncManager {
 
         let mut total_inserted = 0u32;
         let mut total_updated = 0u32;
+        let mut total_new_inbox_unread = 0u32;
         let mut synced_local_folders = std::collections::HashSet::new();
 
         // Sync each folder — skip folders that fail to SELECT (don't exist on server)
@@ -203,11 +203,8 @@ impl SyncManager {
                 continue;
             }
 
-            let imap_client = ImapClient::new(
-                imap_config.clone(),
-                account.email.clone(),
-                password.clone(),
-            );
+            let imap_client =
+                ImapClient::new(imap_config.clone(), account.email.clone(), password.clone());
 
             let fetch_limit = if *local_folder == "inbox" { 200 } else { 100 };
 
@@ -239,6 +236,9 @@ impl SyncManager {
 
                         if is_new {
                             total_inserted += 1;
+                            if *local_folder == "inbox" && mail.unread {
+                                total_new_inbox_unread += 1;
+                            }
                         } else {
                             total_updated += 1;
                         }
@@ -257,11 +257,12 @@ impl SyncManager {
         }
 
         println!(
-            "[Sync] DB: {} inserted (new), {} updated across {} folders for '{}'",
+            "[Sync] DB: {} inserted (first local sync), {} updated across {} folders for '{}'; inbox new unread={}",
             total_inserted,
             total_updated,
             synced_local_folders.len(),
-            account.email
+            account.email,
+            total_new_inbox_unread
         );
 
         let now = chrono::Utc::now().timestamp_millis();
@@ -273,7 +274,7 @@ impl SyncManager {
             last_sync: Some(now),
             error_message: None,
             retry_count: 0,
-            new_count: total_inserted,
+            new_count: total_new_inbox_unread,
         };
 
         let _ = self.app_handle.emit("sync:completed", json!(status));
@@ -330,10 +331,9 @@ impl SyncManager {
             .map_err(|e| SyncError::Account(e.to_string()))?;
 
         // Get credentials
-        let password = self
-            .credential_manager
-            .get_password(account_id)
-            .map_err(|e: crate::credentials_legacy::CredentialError| SyncError::Credential(e.to_string()))?;
+        let password = self.credential_manager.get_password(account_id).map_err(
+            |e: crate::credentials_legacy::CredentialError| SyncError::Credential(e.to_string()),
+        )?;
 
         // Get IMAP config
         let imap_config = self

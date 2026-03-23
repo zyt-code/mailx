@@ -32,7 +32,7 @@ mod tests {
     fn test_windows_notification_new() {
         let notif = WindowsNotification::new("com.mailx.app".to_string());
         assert!(notif.is_ok());
-        
+
         let notif = notif.unwrap();
         assert_eq!(notif.app_id, "com.mailx.app");
     }
@@ -43,7 +43,9 @@ mod tests {
         let request = crate::notification_manager::NotificationRequest {
             account_id: 1,
             mail_id: None,
-            notification_type: crate::notification_manager::NotificationType::System("Test".to_string()),
+            notification_type: crate::notification_manager::NotificationType::System(
+                "Test".to_string(),
+            ),
             title: "Test Title".to_string(),
             body: "Test Body".to_string(),
             priority: crate::notification_manager::NotificationPriority::Normal,
@@ -53,7 +55,7 @@ mod tests {
 
         let xml = notif.build_toast_xml(&request);
         assert!(xml.is_ok());
-        
+
         let xml_str = xml.unwrap();
         assert!(xml_str.contains("Test Title"));
         assert!(xml_str.contains("Test Body"));
@@ -69,11 +71,13 @@ mod tests {
             label: "Click Me".to_string(),
             payload: serde_json::json!({"key": "value"}),
         };
-        
+
         let request = crate::notification_manager::NotificationRequest {
             account_id: 1,
             mail_id: None,
-            notification_type: crate::notification_manager::NotificationType::System("Test".to_string()),
+            notification_type: crate::notification_manager::NotificationType::System(
+                "Test".to_string(),
+            ),
             title: "Test Title".to_string(),
             body: "Test Body".to_string(),
             priority: crate::notification_manager::NotificationPriority::Normal,
@@ -83,7 +87,7 @@ mod tests {
 
         let xml = notif.build_toast_xml(&request);
         assert!(xml.is_ok());
-        
+
         let xml_str = xml.unwrap();
         assert!(xml_str.contains("<actions>"));
         assert!(xml_str.contains("Click Me"));
@@ -96,7 +100,9 @@ mod tests {
         let request = crate::notification_manager::NotificationRequest {
             account_id: 1,
             mail_id: None,
-            notification_type: crate::notification_manager::NotificationType::System("Test".to_string()),
+            notification_type: crate::notification_manager::NotificationType::System(
+                "Test".to_string(),
+            ),
             title: "Urgent Test".to_string(),
             body: "Urgent Body".to_string(),
             priority: crate::notification_manager::NotificationPriority::Urgent,
@@ -106,7 +112,7 @@ mod tests {
 
         let xml = notif.build_toast_xml(&request);
         assert!(xml.is_ok());
-        
+
         let xml_str = xml.unwrap();
         assert!(xml_str.contains("Notification.Looping.Alarm"));
         assert!(xml_str.contains("loop='true'"));
@@ -118,7 +124,9 @@ mod tests {
         let request = crate::notification_manager::NotificationRequest {
             account_id: 1,
             mail_id: None,
-            notification_type: crate::notification_manager::NotificationType::System("Test".to_string()),
+            notification_type: crate::notification_manager::NotificationType::System(
+                "Test".to_string(),
+            ),
             title: "Title with <tags> & \"quotes\"".to_string(),
             body: "Body with 'apostrophes' & <more>".to_string(),
             priority: crate::notification_manager::NotificationPriority::Normal,
@@ -128,7 +136,7 @@ mod tests {
 
         let xml = notif.build_toast_xml(&request);
         assert!(xml.is_ok());
-        
+
         let xml_str = xml.unwrap();
         // Check that special characters are properly escaped
         assert!(xml_str.contains("&lt;tags&gt;"));

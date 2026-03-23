@@ -52,22 +52,22 @@ describe('EmailRenderer', () => {
 		expect(container.querySelector('.ProseMirror')?.textContent).toContain('Second line');
 	});
 
-	it('falls back to sanitized html rendering for unsupported rich html structures', async () => {
+	it('renders complex html content inside an isolated iframe to preserve layout', async () => {
 		const { container } = render(EmailRenderer, {
 			htmlBody:
-				'<table><tr><td>Cell</td></tr></table><style>body{background:black}</style><script>alert("xss")</script>',
+				'<html><head><style>table{width:600px}td{padding:24px}</style><script>alert("xss")</script></head><body><table><tr><td><a href="https://example.com">Cell</a></td></tr></table></body></html>',
 			plainBody: 'fallback'
 		});
 
 		await waitFor(() => {
-			expect(container.querySelector('.mail-renderer-html')).not.toBeNull();
+			expect(container.querySelector('.mail-renderer-html__frame')).not.toBeNull();
 		});
 
-		const rendered = container.querySelector('.mail-renderer-html__content');
+		const iframe = container.querySelector('.mail-renderer-html__frame') as HTMLIFrameElement | null;
 
-		expect(rendered?.innerHTML).toContain('<table>');
-		expect(rendered?.textContent).toContain('Cell');
-		expect(rendered?.innerHTML).not.toContain('<style>');
-		expect(rendered?.innerHTML).not.toContain('<script>');
+		expect(iframe?.getAttribute('srcdoc')).toContain('<table>');
+		expect(iframe?.getAttribute('srcdoc')).toContain('table{width:600px}');
+		expect(iframe?.getAttribute('srcdoc')).toContain('target="_blank"');
+		expect(iframe?.getAttribute('srcdoc')).not.toContain('<script>');
 	});
 });

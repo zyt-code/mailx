@@ -275,9 +275,10 @@
 	class={cn(
 		'sidebar-shell flex h-full flex-col bg-[var(--bg-secondary)] text-[var(--text-primary)] shrink-0 select-none [-webkit-user-select:none] [user-select:none] dark:bg-[var(--bg-secondary)] dark:text-[var(--text-primary)]',
 		isMobile && 'fixed inset-y-0 left-0 z-40 shadow-lg',
-		isMobile && collapsed && '-translate-x-full',
-		!isMobile && 'border-r border-[var(--border-primary)] dark:border-[var(--border-primary)]'
+		isMobile && collapsed && '-translate-x-full'
 	)}
+	data-testid="app-sidebar"
+	data-collapsed={collapsed && !isMobile}
 	style:width={collapsed && !isMobile ? `${SIDEBAR_COLLAPSED_WIDTH}px` : 'var(--spacing-sidebar)'}
 >
 	<!-- Top controls -->
@@ -311,8 +312,7 @@
 		{/if}
 	</div>
 
-	{#if !collapsed || isMobile}
-		<!-- Compose Button -->
+	<div class="sidebar-main" class:is-collapsed={collapsed && !isMobile}>
 		<ComposeButton
 			isAccountConfigured={isAccountConfigured}
 			collapsed={collapsed}
@@ -320,59 +320,38 @@
 			onOpenCompose={openCompose}
 		/>
 
-		<!-- Account Selector -->
-		<AccountSelector
-			accounts={allAccounts}
-			selectedAccountId={selectedAccountId}
-			hasMultipleAccounts={hasMultipleAccounts}
-			formattedLastSync={formattedLastSync}
-			accountsCollapsed={accountsCollapsed}
-			currentSyncAccountId={currentSyncAccountId}
-			isRefreshing={isRefreshing}
-			isAccountConfigured={isAccountConfigured}
-			currentAccount={currentAccount}
-			onSelectAccount={handleAccountClick}
-			onToggleAccountsCollapse={toggleAccountsCollapse}
-		/>
+		{#if !collapsed || isMobile}
+			<AccountSelector
+				accounts={allAccounts}
+				selectedAccountId={selectedAccountId}
+				hasMultipleAccounts={hasMultipleAccounts}
+				formattedLastSync={formattedLastSync}
+				accountsCollapsed={accountsCollapsed}
+				currentSyncAccountId={currentSyncAccountId}
+				isRefreshing={isRefreshing}
+				isAccountConfigured={isAccountConfigured}
+				currentAccount={currentAccount}
+				onSelectAccount={handleAccountClick}
+				onToggleAccountsCollapse={toggleAccountsCollapse}
+			/>
+		{/if}
 
-		<!-- Disabled feedback tooltip -->
 		{#if showDisabledTooltip}
 			<div class="absolute top-16 left-1/2 -translate-x-1/2 z-50 px-3 py-1.5 bg-[var(--text-primary)] text-[var(--bg-primary)] text-xs rounded-md shadow-lg pointer-events-none animate-scale-in">
 				{$_('account.addFirst')}
 			</div>
 		{/if}
 
-		<!-- Navigation -->
-			<FolderNavigation
-				navItems={navItems}
-				activeFolder={activeFolder}
-				isAccountConfigured={isAccountConfigured}
-				unreadCounts={unreadCounts}
-				collapsed={collapsed}
-				isMobile={isMobile}
-				onSelectFolder={handleFolderClick}
-		/>
-	{:else}
-		<!-- Collapsed state - show compose icon button -->
-		<ComposeButton
+		<FolderNavigation
+			navItems={navItems}
+			activeFolder={activeFolder}
 			isAccountConfigured={isAccountConfigured}
+			unreadCounts={unreadCounts}
 			collapsed={collapsed}
 			isMobile={isMobile}
-			onOpenCompose={openCompose}
+			onSelectFolder={handleFolderClick}
 		/>
-
-		<!-- Collapsed navigation -->
-			<FolderNavigation
-				navItems={navItems}
-				activeFolder={activeFolder}
-				isAccountConfigured={isAccountConfigured}
-				unreadCounts={unreadCounts}
-				collapsed={collapsed}
-				isMobile={isMobile}
-				onSelectFolder={handleFolderClick}
-		/>
-
-	{/if}
+	</div>
 
 	<!-- Spacer to push settings to bottom -->
 	<div class="flex-1"></div>
@@ -401,6 +380,15 @@
 <style>
 	.sidebar-shell {
 		position: relative;
+		overflow: hidden;
+		isolation: isolate;
+		background-color: var(--bg-secondary);
+		backface-visibility: hidden;
+		transform: translateZ(0);
+		transition:
+			width 380ms cubic-bezier(0.22, 1, 0.36, 1),
+			transform 340ms cubic-bezier(0.22, 1, 0.36, 1),
+			box-shadow 320ms cubic-bezier(0.22, 1, 0.36, 1);
 		background:
 			linear-gradient(180deg, color-mix(in srgb, var(--bg-secondary) 96%, transparent), color-mix(in srgb, var(--bg-primary) 92%, transparent));
 	}
@@ -420,6 +408,23 @@
 	.sidebar-shell > :global(*) {
 		position: relative;
 		z-index: 1;
+	}
+
+	.sidebar-main {
+		display: flex;
+		flex: 1;
+		flex-direction: column;
+		min-height: 0;
+		overflow: hidden;
+		contain: paint;
+		transition:
+			padding 320ms cubic-bezier(0.22, 1, 0.36, 1),
+			gap 320ms cubic-bezier(0.22, 1, 0.36, 1),
+			opacity 220ms cubic-bezier(0.22, 1, 0.36, 1);
+	}
+
+	.sidebar-main.is-collapsed {
+		animation: sidebar-content-settle 320ms cubic-bezier(0.22, 1, 0.36, 1);
 	}
 
 	.sidebar-chrome-button {
@@ -458,6 +463,15 @@
 			radial-gradient(circle at 82% 84%, color-mix(in srgb, var(--accent-light) 28%, transparent), transparent 34%);
 	}
 
+	.sidebar-shell[data-collapsed='true']::before {
+		opacity: 0.62;
+		transition: opacity 320ms cubic-bezier(0.22, 1, 0.36, 1);
+	}
+
+	.sidebar-shell[data-collapsed='false']::before {
+		transition: opacity 320ms cubic-bezier(0.22, 1, 0.36, 1);
+	}
+
 	/* CSS grid-based collapse animation — height-aware, smooth */
 	.account-collapse-wrapper {
 		display: grid;
@@ -471,5 +485,17 @@
 
 	.account-collapse-wrapper > div {
 		min-height: 0;
+	}
+
+	@keyframes sidebar-content-settle {
+		from {
+			opacity: 0.88;
+			transform: translate3d(-4px, 0, 0);
+		}
+
+		to {
+			opacity: 1;
+			transform: translate3d(0, 0, 0);
+		}
 	}
 </style>

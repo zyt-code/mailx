@@ -17,7 +17,7 @@ pub enum SmtpError {
     #[error("Authentication failed: {0}")]
     AuthenticationFailed(String),
 
-    #[error("Send failed: {0}")]
+    #[error("{0}")]
     SendFailed(String),
 
     #[error("Invalid email format: {0}")]
@@ -88,7 +88,7 @@ impl SmtpClient {
         })
         .await
         .map_err(|e| SmtpError::SendFailed(format!("Send task failed: {}", e)))?
-        .map_err(|e| SmtpError::SendFailed(format!("Failed to send email: {}", e)))?;
+        .map_err(|e| SmtpError::SendFailed(e.to_string()))?;
 
         Ok(mail.id.clone())
     }
@@ -115,7 +115,7 @@ impl SmtpClient {
         })
         .await
         .map_err(|e| SmtpError::SendFailed(format!("Send task failed: {}", e)))?
-        .map_err(|e| SmtpError::SendFailed(format!("Failed to send email: {}", e)))?;
+        .map_err(|e| SmtpError::SendFailed(e.to_string()))?;
 
         // Generate an ID for the sent email
         let id = Self::generate_message_id(from);
@@ -123,6 +123,11 @@ impl SmtpClient {
     }
 
     /// Build the SMTP transport
+    ///
+    /// Mapping strategy:
+    /// - `use_ssl = true` and port 465: implicit TLS (SMTPS)
+    /// - `use_ssl = true` and non-465 ports: STARTTLS (required)
+    /// - `use_ssl = false`: plain SMTP (no TLS)
     fn build_transport(&self) -> Result<SmtpTransport> {
         let creds = Credentials::new(self.email.clone(), self.password.clone());
 
@@ -130,23 +135,31 @@ impl SmtpClient {
         let port = self.config.port;
 
         let transport = if self.config.use_ssl {
-            // Use TLS/SSL
-            SmtpTransport::relay(relay)
-                .map_err(|e| {
-                    SmtpError::ConnectionFailed(format!("Failed to create transport: {}", e))
-                })?
-                .port(port)
-                .credentials(creds)
-                .build()
+            if port == 465 {
+                SmtpTransport::relay(relay)
+                    .map_err(|e| {
+                        SmtpError::ConnectionFailed(format!(
+                            "Failed to create TLS transport: {}",
+                            e
+                        ))
+                    })?
+                    .port(port)
+                    .credentials(creds)
+                    .build()
+            } else {
+                SmtpTransport::starttls_relay(relay)
+                    .map_err(|e| {
+                        SmtpError::ConnectionFailed(format!(
+                            "Failed to create STARTTLS transport: {}",
+                            e
+                        ))
+                    })?
+                    .port(port)
+                    .credentials(creds)
+                    .build()
+            }
         } else {
-            // Use STARTTLS
-            SmtpTransport::starttls_relay(relay)
-                .map_err(|e| {
-                    SmtpError::ConnectionFailed(format!(
-                        "Failed to create STARTTLS transport: {}",
-                        e
-                    ))
-                })?
+            SmtpTransport::builder_dangerous(relay)
                 .port(port)
                 .credentials(creds)
                 .build()

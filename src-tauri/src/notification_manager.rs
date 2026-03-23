@@ -1,11 +1,11 @@
 #![allow(dead_code)]
 
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::BinaryHeap;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Mutex;
-use chrono::{DateTime, Utc};
 
 /// 通知类型枚举
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -92,8 +92,7 @@ struct PrioritizedNotification {
 
 impl PartialEq for PrioritizedNotification {
     fn eq(&self, other: &Self) -> bool {
-        self.request.priority == other.request.priority
-            && self.timestamp == other.timestamp
+        self.request.priority == other.request.priority && self.timestamp == other.timestamp
     }
 }
 
@@ -120,8 +119,7 @@ impl Ord for PrioritizedNotification {
 #[async_trait::async_trait]
 pub trait NotificationFacade: Send + Sync {
     /// 显示通知
-    async fn show(&self, request: &NotificationRequest)
-        -> Result<(), Box<dyn std::error::Error>>;
+    async fn show(&self, request: &NotificationRequest) -> Result<(), Box<dyn std::error::Error>>;
     /// 关闭指定通知
     async fn close(&self, id: &str) -> Result<(), Box<dyn std::error::Error>>;
     /// 关闭所有通知
@@ -166,10 +164,7 @@ impl Default for MockFacade {
 #[async_trait::async_trait]
 impl NotificationFacade for MockFacade {
     async fn show(&self, request: &NotificationRequest) -> Result<(), Box<dyn std::error::Error>> {
-        println!(
-            "[MOCK Notification] {} - {}",
-            request.title, request.body
-        );
+        println!("[MOCK Notification] {} - {}", request.title, request.body);
         self.notifications.lock().await.push(request.clone());
         Ok(())
     }
@@ -212,8 +207,7 @@ impl RateLimiter {
 
         // 清理过期记录
         history.retain(|&ts| {
-            now.signed_duration_since(ts)
-                < chrono::Duration::from_std(self.window).unwrap()
+            now.signed_duration_since(ts) < chrono::Duration::from_std(self.window).unwrap()
         });
 
         // 检查是否超限
@@ -297,10 +291,7 @@ impl NotificationManager {
         Self {
             facade,
             queue: Arc::new(Mutex::new(BinaryHeap::new())),
-            rate_limiter: Arc::new(Mutex::new(RateLimiter::new(
-                Duration::from_secs(5),
-                3,
-            ))),
+            rate_limiter: Arc::new(Mutex::new(RateLimiter::new(Duration::from_secs(5), 3))),
             preferences: Arc::new(Mutex::new(NotificationPreferences::default())),
         }
     }
@@ -317,7 +308,10 @@ impl NotificationManager {
         match &request.notification_type {
             NotificationType::NewMail { .. } if !prefs.new_mail => return Ok(()),
             NotificationType::SendSuccess { .. } | NotificationType::SendError { .. }
-                if !prefs.send_status => return Ok(()),
+                if !prefs.send_status =>
+            {
+                return Ok(())
+            }
             NotificationType::SyncError { .. } if !prefs.sync_errors => return Ok(()),
             _ => {}
         };

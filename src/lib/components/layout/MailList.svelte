@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { _ } from 'svelte-i18n';
+	import { Spring } from 'svelte/motion';
 	import { VList } from 'virtua/svelte';
 	import { cn } from '$lib/utils.js';
 	import * as ContextMenu from '$lib/components/ui/context-menu/index.js';
@@ -43,6 +44,8 @@
 	};
 
 	const ACCOUNT_COLOR_SWATCHES = ['#3b82f6', '#8b5cf6', '#ec4899', '#f97316', '#10b981', '#06b6d4', '#ef4444', '#6366f1'];
+	const MAIL_LIST_VIEWPORT_STYLE =
+		'height: 100%; overscroll-behavior-y: contain; overscroll-behavior-x: none; -webkit-overflow-scrolling: touch;';
 
 	let { selectedMailId, onSelectMail, onMarkRead, onDelete, onArchive, onMoveTo, width, isAccountConfigured = true, isSyncing = false }: Props = $props();
 
@@ -59,11 +62,86 @@
 	let showPreviewSnippets = $state(true);
 	let showAccountColor = $state(true);
 	let isModalOpen = $state(false);
+	let deletingMailIds = $state<Set<string>>(new Set());
+	let enteringMailIds = $state<Set<string>>(new Set());
+	const edgeBounceY = new Spring(0, { stiffness: 0.16, damping: 0.72 });
+	let edgeBounceResetTimer = $state<number | null>(null);
+	let rowNodes = new Map<string, HTMLElement>();
+	let previousRowRects = new Map<string, DOMRect>();
+	let hasInitializedMailSet = false;
+	let knownMailIds = new Set<string>();
+
+	function cleanAbstract(value: string): string {
+		const trimmed = value.trim();
+		if (!trimmed) return '';
+
+		const withoutComments = trimmed.replace(/<!--[\s\S]*?-->/g, ' ');
+
+		// Guard SSR/non-DOM environments.
+		if (typeof DOMParser === 'undefined') {
+			return withoutComments.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+		}
+
+		try {
+			const doc = new DOMParser().parseFromString(withoutComments, 'text/html');
+			const text = (doc.body.textContent ?? '').replace(/\u00a0/g, ' ');
+			return text
+				.replace(/\r\n/g, '\n')
+				.replace(/[ \t\f\v]+/g, ' ')
+				.replace(/[ \t]*\n[ \t]*/g, '\n')
+				.replace(/\n{3,}/g, '\n\n')
+				.trim();
+		} catch {
+			return withoutComments.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+		}
+	}
+
+	function buildPreviewSource(mail: Mail): string {
+		const candidates = [mail.preview, mail.body, mail.html_body ?? ''];
+		for (const candidate of candidates) {
+			const cleaned = cleanAbstract(candidate ?? '');
+			if (cleaned) {
+				return cleaned;
+			}
+		}
+		return '';
+	}
 
 	// Subscriptions
 	$effect(() => {
 		const unsub = displayedEmails.subscribe((mails) => {
+			const nextMailIds = new Set(mails.map((mail) => mail.id));
+
+			if (hasInitializedMailSet) {
+				const newMailIds: string[] = [];
+				for (const mail of mails) {
+					if (!knownMailIds.has(mail.id)) {
+						newMailIds.push(mail.id);
+					}
+				}
+
+				if (newMailIds.length > 0) {
+					enteringMailIds = new Set([...enteringMailIds, ...newMailIds]);
+					for (const mailId of newMailIds) {
+						window.setTimeout(() => {
+							if (!enteringMailIds.has(mailId)) return;
+							enteringMailIds = new Set(Array.from(enteringMailIds).filter((id) => id !== mailId));
+						}, 260);
+					}
+				}
+			}
+
 			displayedMails = mails;
+			if (deletingMailIds.size > 0) {
+				const nextIds = new Set(mails.map((mail) => mail.id));
+				const activeDeletes = new Set(Array.from(deletingMailIds).filter((id) => nextIds.has(id)));
+				if (activeDeletes.size !== deletingMailIds.size) {
+					deletingMailIds = activeDeletes;
+				}
+			}
+
+			knownMailIds = nextMailIds;
+			hasInitializedMailSet = true;
 		});
 		return unsub;
 	});
@@ -121,7 +199,7 @@
 						m.from_name.toLowerCase().includes(q) ||
 						m.from_email.toLowerCase().includes(q) ||
 						m.subject.toLowerCase().includes(q) ||
-						m.preview.toLowerCase().includes(q)
+						buildPreviewSource(m).toLowerCase().includes(q)
 					);
 				})
 			: displayedMails
@@ -155,6 +233,60 @@
 
 	let vlistRef = $state<{ getScrollOffset: () => number; getScrollSize: () => number; getViewportSize: () => number } | null>(null);
 
+	function getScrollMetrics():
+		| { offset: number; scrollSize: number; viewportSize: number; maxOffset: number }
+		| null {
+		if (
+			!vlistRef ||
+			typeof vlistRef.getScrollOffset !== 'function' ||
+			typeof vlistRef.getScrollSize !== 'function' ||
+			typeof vlistRef.getViewportSize !== 'function'
+		) {
+			return null;
+		}
+
+		const offset = vlistRef.getScrollOffset();
+		const scrollSize = vlistRef.getScrollSize();
+		const viewportSize = vlistRef.getViewportSize();
+		const maxOffset = Math.max(0, scrollSize - viewportSize);
+		return { offset, scrollSize, viewportSize, maxOffset };
+	}
+
+	function scheduleEdgeBounceReset(delay = 120): void {
+		if (edgeBounceResetTimer) {
+			window.clearTimeout(edgeBounceResetTimer);
+		}
+		edgeBounceResetTimer = window.setTimeout(() => {
+			edgeBounceY.set(0);
+			edgeBounceResetTimer = null;
+		}, delay);
+	}
+
+	function triggerEdgeBounce(direction: 'top' | 'bottom', deltaY: number): void {
+		const amplitude = Math.min(14, Math.max(5, Math.abs(deltaY) * 0.07));
+		const signedAmplitude = direction === 'bottom' ? -amplitude : amplitude;
+		edgeBounceY.set(signedAmplitude);
+		scheduleEdgeBounceReset();
+	}
+
+	function handleListWheel(event: WheelEvent): void {
+		if (Math.abs(event.deltaY) < 0.5) return;
+
+		const metrics = getScrollMetrics();
+		if (!metrics) return;
+
+		const atBottom = metrics.offset >= metrics.maxOffset - 0.5;
+		const atTop = metrics.offset <= 0.5;
+
+		if (event.deltaY > 0 && atBottom) {
+			triggerEdgeBounce('bottom', event.deltaY);
+		} else if (event.deltaY < 0 && atTop) {
+			triggerEdgeBounce('top', event.deltaY);
+		} else if (edgeBounceY.current !== 0) {
+			edgeBounceY.set(0);
+		}
+	}
+
 	function handleSelectMail(mailId: string) {
 		onSelectMail(mailId);
 		const mail = displayedMails.find((m) => m.id === mailId);
@@ -170,11 +302,16 @@
 	}
 
 	function handleScroll(offset: number) {
-		if (!canLoadMore || isLoadingMore || searchQuery.trim() || !vlistRef) return;
-		const scrollSize = vlistRef.getScrollSize();
-		const viewportSize = vlistRef.getViewportSize();
+		const metrics = getScrollMetrics();
+		if (!metrics) return;
+
+		if (edgeBounceY.current !== 0 && offset > 0 && offset < metrics.maxOffset) {
+			edgeBounceY.set(0);
+		}
+
+		if (!canLoadMore || isLoadingMore || searchQuery.trim()) return;
 		// Trigger load when within 300px of the bottom
-		if (scrollSize - offset - viewportSize < 300) {
+		if (metrics.scrollSize - offset - metrics.viewportSize < 300) {
 			void loadMoreMails();
 		}
 	}
@@ -201,7 +338,7 @@
 	}
 
 	function buildBodyPreview(mail: Mail): string {
-		const firstLine = getFirstLine(mail.preview || '');
+		const firstLine = getFirstLine(buildPreviewSource(mail));
 		if (!firstLine) return $_('mail.noPreview');
 		return truncate(firstLine, DENSITY_CHAR_LIMITS[mailDensity].preview);
 	}
@@ -221,6 +358,85 @@
 		const index = Math.abs(hashString(key)) % ACCOUNT_COLOR_SWATCHES.length;
 		return ACCOUNT_COLOR_SWATCHES[index];
 	}
+
+	function registerRow(node: HTMLElement, mailId: string): { update: (nextMailId: string) => void; destroy: () => void } {
+		let currentId = mailId;
+		rowNodes.set(currentId, node);
+
+		return {
+			update(nextMailId: string) {
+				if (nextMailId === currentId) return;
+				rowNodes.delete(currentId);
+				currentId = nextMailId;
+				rowNodes.set(currentId, node);
+			},
+			destroy() {
+				rowNodes.delete(currentId);
+			}
+		};
+	}
+
+	function playFlip(node: HTMLElement, fromRect: DOMRect, toRect: DOMRect): void {
+		const dx = fromRect.left - toRect.left;
+		const dy = fromRect.top - toRect.top;
+		if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
+
+		node.style.transition = 'none';
+		node.style.transform = `translate3d(${dx}px, ${dy}px, 0)`;
+		node.style.willChange = 'transform';
+
+		requestAnimationFrame(() => {
+			node.style.transition = 'transform 400ms cubic-bezier(0.22, 1, 0.36, 1)';
+			node.style.transform = 'translate3d(0, 0, 0)';
+		});
+
+		window.setTimeout(() => {
+			if (node.style.transform === 'translate3d(0, 0, 0)') {
+				node.style.transform = '';
+			}
+			node.style.transition = '';
+			node.style.willChange = '';
+		}, 430);
+	}
+
+	function handleDelete(mail: Mail): void {
+		if (!onDelete || deletingMailIds.has(mail.id)) {
+			return;
+		}
+
+		deletingMailIds = new Set([...deletingMailIds, mail.id]);
+		window.setTimeout(() => {
+			onDelete(mail);
+		}, 320);
+	}
+
+	$effect.pre(() => {
+		filteredMails;
+		const next = new Map<string, DOMRect>();
+		for (const [id, node] of rowNodes) {
+			next.set(id, node.getBoundingClientRect());
+		}
+		previousRowRects = next;
+	});
+
+	$effect(() => {
+		filteredMails;
+		queueMicrotask(() => {
+			for (const [id, node] of rowNodes) {
+				const previousRect = previousRowRects.get(id);
+				if (!previousRect) continue;
+				playFlip(node, previousRect, node.getBoundingClientRect());
+			}
+		});
+	});
+
+	$effect(() => {
+		return () => {
+			if (edgeBounceResetTimer) {
+				window.clearTimeout(edgeBounceResetTimer);
+			}
+		};
+	});
 </script>
 
 <div
@@ -268,7 +484,12 @@
 		</div>
 	{/if}
 
-	<div class="flex-1 min-h-0">
+	<div
+		class="mail-list-scroll-shell flex-1 min-h-0"
+		style={`transform: translate3d(0, ${edgeBounceY.current}px, 0);`}
+		onwheel={handleListWheel}
+		data-testid="mail-list-scroll-shell"
+	>
 		{#if filteredMails.length === 0}
 			<div class="flex flex-col items-center justify-center px-6 py-16">
 				<p class="text-[13px] text-[var(--text-tertiary)]">{$_('mail.noEmails')}</p>
@@ -277,7 +498,7 @@
 			<VList
 				bind:this={vlistRef}
 				data={filteredMails}
-				style="height: 100%;"
+				style={MAIL_LIST_VIEWPORT_STYLE}
 				getKey={(mail: Mail) => mail.id}
 				itemSize={ESTIMATED_HEIGHTS[mailDensity]}
 				bufferSize={200}
@@ -289,10 +510,19 @@
 					{@const isUnread = !(mail.is_read ?? false)}
 					{@const subjectPreview = buildSubjectPreview(mail)}
 					{@const bodyPreview = buildBodyPreview(mail)}
-					<div class="px-2 py-1">
+					<div
+						class={cn(
+							'mail-row px-2 py-1',
+							enteringMailIds.has(mail.id) && 'mail-row-entering',
+							deletingMailIds.has(mail.id) && 'mail-row-deleting'
+						)}
+						use:registerRow={mail.id}
+						data-mail-row-id={mail.id}
+					>
 						<ContextMenu.Root>
 							<ContextMenu.Trigger>
 								<button
+									data-testid={`mail-item-${mail.id}`}
 									class={cn(
 										'mail-item relative flex w-full items-stretch overflow-hidden rounded-xl border text-left select-none [-webkit-user-select:none] [user-select:none] cursor-default transition-all duration-120 shadow-[var(--shadow-xs)]',
 										mailDensity === 'compact' && 'h-[68px] py-2',
@@ -303,6 +533,12 @@
 											: 'border-transparent hover:border-[var(--border-secondary)] hover:bg-[var(--bg-hover)]'
 									)}
 									onclick={() => handleSelectMail(mail.id)}
+									onkeydown={(event) => {
+										if (event.key === 'Delete' || event.key === 'Backspace') {
+											event.preventDefault();
+											handleDelete(mail);
+										}
+									}}
 								>
 									<!-- Unread marker (account color aware) -->
 									<div
@@ -420,7 +656,7 @@
 
 								<ContextMenu.Separator />
 
-								<ContextMenu.Item class="text-red-500 data-[highlighted]:text-red-600" onclick={() => onDelete?.(mail)}>
+								<ContextMenu.Item class="text-red-500 data-[highlighted]:text-red-600" onclick={() => handleDelete(mail)}>
 									<Trash2 class="size-4" strokeWidth={1.5} />
 									{$_('mail.delete')}
 								</ContextMenu.Item>
@@ -439,6 +675,25 @@
 </div>
 
 <style>
+	.mail-row {
+		transform-origin: center;
+	}
+
+	.mail-list-scroll-shell {
+		overflow: hidden;
+		will-change: transform;
+		contain: paint;
+	}
+
+	.mail-row.mail-row-entering {
+		animation: mail-row-enter-in 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+	}
+
+	.mail-row.mail-row-deleting {
+		pointer-events: none;
+		animation: mail-row-delete-out 320ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+	}
+
 	.mail-search-header {
 		overflow: visible;
 	}
@@ -492,5 +747,29 @@
 		box-shadow:
 			0 20px 34px rgba(2, 6, 23, 0.34),
 			0 0 0 1px rgba(255, 255, 255, 0.04);
+	}
+
+	@keyframes mail-row-delete-out {
+		from {
+			opacity: 1;
+			transform: translate3d(0, 0, 0) scale(1);
+		}
+
+		to {
+			opacity: 0;
+			transform: translate3d(12px, 0, 0) scale(0.985);
+		}
+	}
+
+	@keyframes mail-row-enter-in {
+		from {
+			opacity: 0;
+			filter: saturate(0.92);
+		}
+
+		to {
+			opacity: 1;
+			filter: saturate(1);
+		}
 	}
 </style>

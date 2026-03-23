@@ -11,6 +11,7 @@
 		content?: string;
 		editable?: boolean;
 		placeholder?: string;
+		ariaLabel?: string;
 		onEditorChange?: (editor: Editor | null) => void;
 		onContentChange?: (html: string) => void;
 		onFocusChange?: (focused: boolean) => void;
@@ -20,6 +21,7 @@
 		content = '',
 		editable = true,
 		placeholder = 'Write your message...',
+		ariaLabel = 'Compose body',
 		onEditorChange,
 		onContentChange,
 		onFocusChange
@@ -48,6 +50,13 @@
 			],
 			content,
 			editable,
+			editorProps: {
+				attributes: {
+					'data-testid': 'compose-rich-editor',
+					'aria-label': ariaLabel,
+					tabindex: '0'
+				}
+			},
 			onUpdate: () => {
 				if (editor && onContentChange) {
 					onContentChange(editor.getHTML());
@@ -123,9 +132,11 @@
 	   ======================================== */
 	.rich-editor-wrapper {
 		position: relative;
+		display: flex;
+		flex-direction: column;
 		width: 100%;
 		height: 100%;
-		min-height: 400px;
+		min-height: clamp(220px, 32vh, 400px);
 		cursor: text;
 		background: var(--bg-primary);
 		color: var(--text-primary);
@@ -135,8 +146,9 @@
 	   EDITOR CONTENT
 	   ======================================== */
 	.rich-editor-content {
-		min-height: 400px;
-		padding: 1.5rem;
+		flex: 1;
+		min-height: clamp(220px, 32vh, 400px);
+		padding: 1.1rem var(--compose-editor-padding, 1.75rem) 1.4rem;
 		outline: none;
 		background: var(--bg-primary);
 		color: var(--text-primary);
@@ -145,7 +157,7 @@
 	/* Ensure the entire editor area is clickable */
 	.rich-editor-content :global(.ProseMirror),
 	.rich-editor-content :global(.tiptap) {
-		min-height: 400px;
+		min-height: clamp(220px, 32vh, 400px);
 		height: 100%;
 		outline: none !important;
 		padding: 0;
@@ -157,7 +169,7 @@
 	.rich-editor-content :global(.ProseMirror p.is-empty:first-child::before) {
 		content: attr(data-placeholder);
 		float: left;
-		color: var(--text-tertiary);
+		color: color-mix(in srgb, var(--text-quaternary) 72%, transparent);
 		font-weight: 400;
 		pointer-events: none;
 		height: 0;

@@ -12,9 +12,7 @@ pub mod windows;
 #[path = "credentials/fallback.rs"]
 pub mod fallback;
 
-pub use platform::{
-    PlatformCredentialError, PlatformCredentialManager, PlatformResult,
-};
+pub use platform::{PlatformCredentialError, PlatformCredentialManager, PlatformResult};
 
 #[cfg(target_os = "windows")]
 pub use windows::WindowsCredentialManager;

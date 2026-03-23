@@ -4,6 +4,7 @@
 	import { onDestroy, onMount } from 'svelte';
 	import { getCurrentWindow, type Theme as TauriTheme } from '@tauri-apps/api/window';
 	import { setSystemTheme } from '$lib/stores/preferencesStore.js';
+	import { hasOpenModal } from '$lib/stores/modalStore.js';
 
 	interface Props {
 		children?: Snippet;
@@ -13,6 +14,7 @@
 	let { children, onContextMenu }: Props = $props();
 
 	let cleanupThemeSync: (() => void) | null = null;
+	let isModalOpen = $state(false);
 
 	function normalizeTheme(theme: TauriTheme | null | undefined): 'light' | 'dark' | null {
 		return theme === 'dark' || theme === 'light' ? theme : null;
@@ -64,12 +66,20 @@
 	onDestroy(() => {
 		cleanupThemeSync?.();
 	});
+
+	$effect(() => {
+		const unsub = hasOpenModal.subscribe((value) => {
+			isModalOpen = value;
+		});
+		return unsub;
+	});
 </script>
 
 <div class="app-root dark:bg-[var(--bg-primary)] dark:text-[var(--text-primary)]">
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
 		class="app-content dark:bg-[var(--bg-primary)]"
+		class:app-content-obscured={isModalOpen}
 		oncontextmenu={(event) => onContextMenu?.(event)}
 	>
 		{@render children?.()}
@@ -92,5 +102,11 @@
 		overflow: hidden;
 		position: relative;
 		background: var(--bg-primary);
+		transition:
+			filter 300ms cubic-bezier(0.22, 1, 0.36, 1);
+	}
+
+	.app-content.app-content-obscured {
+		filter: blur(4px) brightness(0.9);
 	}
 </style>

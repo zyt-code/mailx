@@ -26,7 +26,6 @@ pub struct Attachment {
     pub created_at: i64,
 }
 
-
 /// Notification record for history tracking
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct NotificationRecord {
@@ -303,7 +302,6 @@ impl Database {
             [],
         )?;
 
-
         // Create notifications table for history tracking
         conn.execute(
             "CREATE TABLE IF NOT EXISTS notifications (
@@ -340,6 +338,31 @@ impl Database {
 
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_notifications_account_created ON notifications(account_id, created_at DESC)",
+            [],
+        )?;
+
+        // Clean up orphan rows from earlier versions where account-scoped mail data
+        // could remain after account deletion.
+        conn.execute(
+            "DELETE FROM mails
+             WHERE account_id IS NOT NULL
+               AND account_id != ''
+               AND account_id NOT IN (SELECT id FROM accounts)",
+            [],
+        )?;
+        conn.execute(
+            "DELETE FROM outbox
+             WHERE account_id NOT IN (SELECT id FROM accounts)",
+            [],
+        )?;
+        conn.execute(
+            "DELETE FROM sync_state
+             WHERE account_id NOT IN (SELECT id FROM accounts)",
+            [],
+        )?;
+        conn.execute(
+            "DELETE FROM imap_folders
+             WHERE account_id NOT IN (SELECT id FROM accounts)",
             [],
         )?;
 
@@ -753,7 +776,10 @@ impl Database {
         let attachment_id = format!(
             "att-{}-{}",
             unique_ns,
-            sanitize_filename(file_name).chars().take(12).collect::<String>()
+            sanitize_filename(file_name)
+                .chars()
+                .take(12)
+                .collect::<String>()
         );
         let safe_file_name = sanitize_filename(file_name);
         let mail_dir = self.attachments_root.join(mail_id);
@@ -883,7 +909,10 @@ impl Database {
     /// Delete a mail by ID
     pub fn delete_mail(&self, id: &str) -> SqliteResult<()> {
         let conn = self.conn.lock().unwrap();
-        conn.execute("DELETE FROM mail_attachments WHERE mail_id = ?1", params![id])?;
+        conn.execute(
+            "DELETE FROM mail_attachments WHERE mail_id = ?1",
+            params![id],
+        )?;
         conn.execute("DELETE FROM mails WHERE id = ?1", params![id])?;
         drop(conn);
 
@@ -912,7 +941,10 @@ impl Database {
             }
         }
         if let Err(e) = fs::create_dir_all(&self.attachments_root) {
-            eprintln!("[DB] Failed to recreate attachment storage directory: {}", e);
+            eprintln!(
+                "[DB] Failed to recreate attachment storage directory: {}",
+                e
+            );
         }
         Ok(())
     }
@@ -921,12 +953,18 @@ impl Database {
     pub fn get_database_size(&self) -> SqliteResult<u64> {
         let conn = self.conn.lock().unwrap();
         let path_opt = conn.path();
-        let path_str = path_opt.ok_or_else(|| rusqlite::Error::InvalidPath(PathBuf::from("Database path not available")))?;
+        let path_str = path_opt.ok_or_else(|| {
+            rusqlite::Error::InvalidPath(PathBuf::from("Database path not available"))
+        })?;
         let path = PathBuf::from(path_str);
         drop(conn);
 
-        let metadata = fs::metadata(&path)
-            .map_err(|e| rusqlite::Error::InvalidPath(PathBuf::from(format!("Failed to get database size: {}", e))))?;
+        let metadata = fs::metadata(&path).map_err(|e| {
+            rusqlite::Error::InvalidPath(PathBuf::from(format!(
+                "Failed to get database size: {}",
+                e
+            )))
+        })?;
         Ok(metadata.len())
     }
 
@@ -994,11 +1032,7 @@ impl Database {
     }
 
     /// Get count of unread mails in a folder
-    pub fn get_unread_count(
-        &self,
-        folder: &str,
-        account_id: Option<&str>,
-    ) -> SqliteResult<i64> {
+    pub fn get_unread_count(&self, folder: &str, account_id: Option<&str>) -> SqliteResult<i64> {
         let conn = self.conn.lock().unwrap();
         match account_id {
             Some(account_id) => conn.query_row(

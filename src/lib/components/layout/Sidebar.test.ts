@@ -295,4 +295,29 @@ describe('Sidebar - Internationalization', () => {
 			expect(screen.getByText('2')).toBeInTheDocument();
 		});
 	});
+
+	describe('Collapse animation contract', () => {
+		it('marks collapsed state on the sidebar shell for animated layout transitions', () => {
+			const { rerender } = render(Sidebar, {
+				collapsed: false,
+				isMobile: false,
+				activeFolder: 'inbox',
+				onToggle: () => {},
+				onSelectFolder: () => {}
+			});
+
+			const sidebar = screen.getByTestId('app-sidebar');
+			expect(sidebar).toHaveAttribute('data-collapsed', 'false');
+
+			rerender({
+				collapsed: true,
+				isMobile: false,
+				activeFolder: 'inbox',
+				onToggle: () => {},
+				onSelectFolder: () => {}
+			});
+
+			expect(sidebar).toHaveAttribute('data-collapsed', 'true');
+		});
+	});
 });

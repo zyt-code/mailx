@@ -14,6 +14,9 @@ type ForwardLabels = {
 	fromField: string;
 	dateField: string;
 	subjectField: string;
+	toField?: string;
+	ccField?: string;
+	replyToField?: string;
 };
 
 type DraftContent = {
@@ -168,12 +171,56 @@ export function buildComposerPayload(html: string, fallbackPlainText = ''): {
 	};
 }
 
+export function mergeComposerPayload(
+	content: { body: string; html_body?: string; preview: string },
+	reference?: { body?: string; html_body?: string }
+): {
+	body: string;
+	html_body?: string;
+	preview: string;
+} {
+	if (!reference?.body && !reference?.html_body) {
+		return content;
+	}
+
+	const mergedBody = normalizeWhitespace(
+		[content.body, reference.body ?? ''].filter(Boolean).join('\n\n')
+	);
+	const mergedHtml = normalizeEditorHtml(
+		[
+			content.html_body ?? plainTextToHtml(content.body),
+			reference.html_body ?? plainTextToHtml(reference.body ?? '')
+		]
+			.filter(Boolean)
+			.join('')
+	);
+
+	return {
+		body: mergedBody,
+		html_body: mergedHtml || undefined,
+		preview: extractPreviewText(mergedBody)
+	};
+}
+
 function ensureSubjectPrefix(subject: string, prefix: string): string {
 	return subject.startsWith(prefix) ? subject : `${prefix}${subject}`;
 }
 
 function formatEnvelopeLine(mail: Mail): string {
 	return `${mail.from_name} <${mail.from_email}>`;
+}
+
+function formatAddressList(addresses?: Mail['to']): string {
+	if (!addresses?.length) {
+		return '';
+	}
+
+	return addresses
+		.map((address) => {
+			const name = address.name?.trim();
+			return name ? `${name} <${address.email}>` : address.email;
+		})
+		.join(', ');
 }
 
 function buildQuotedHtml(mail: Mail): string {
@@ -215,12 +262,32 @@ export function buildReplyDraft(mail: Mail, labels: ReplyLabels): DraftContent {
 }
 
 export function buildForwardDraft(mail: Mail, labels: ForwardLabels): DraftContent {
-	return buildReplyLikeDraft(
-		mail,
-		labels.fwdPrefix,
+	const formattedDate = new Date(mail.timestamp).toLocaleString();
+	const plainSource = normalizeWhitespace(mail.body || htmlToPlainText(buildQuotedHtml(mail)));
+	const toLine = formatAddressList(mail.to);
+	const ccLine = formatAddressList(mail.cc);
+	const replyToLine = formatAddressList(mail.reply_to);
+	const bodyLines = [
 		labels.forwardedMessage,
-		labels.fromField,
-		labels.dateField,
-		labels.subjectField
-	);
+		`${labels.fromField}${formatEnvelopeLine(mail)}`,
+		`${labels.dateField}${formattedDate}`,
+		`${labels.subjectField}${mail.subject}`,
+		toLine && labels.toField ? `${labels.toField}${toLine}` : '',
+		ccLine && labels.ccField ? `${labels.ccField}${ccLine}` : '',
+		replyToLine && labels.replyToField ? `${labels.replyToField}${replyToLine}` : '',
+		'',
+		plainSource
+	].filter(Boolean);
+
+	const htmlLines = [
+		`<p><strong>${escapeHtml(labels.forwardedMessage)}</strong></p>`,
+		`<p><strong>${escapeHtml(labels.fromField)}</strong>${escapeHtml(formatEnvelopeLine(mail))}<br><strong>${escapeHtml(labels.dateField)}</strong>${escapeHtml(formattedDate)}<br><strong>${escapeHtml(labels.subjectField)}</strong>${escapeHtml(mail.subject)}${toLine && labels.toField ? `<br><strong>${escapeHtml(labels.toField)}</strong>${escapeHtml(toLine)}` : ''}${ccLine && labels.ccField ? `<br><strong>${escapeHtml(labels.ccField)}</strong>${escapeHtml(ccLine)}` : ''}${replyToLine && labels.replyToField ? `<br><strong>${escapeHtml(labels.replyToField)}</strong>${escapeHtml(replyToLine)}` : ''}</p>`,
+		buildQuotedHtml(mail)
+	];
+
+	return {
+		subject: ensureSubjectPrefix(mail.subject, labels.fwdPrefix),
+		body: bodyLines.join('\n'),
+		html_body: htmlLines.join('')
+	};
 }

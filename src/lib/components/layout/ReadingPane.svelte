@@ -114,7 +114,7 @@
 			</div>
 
 			<!-- Email body - independent scroll, rendered in isolated iframe -->
-			<div class="flex-1 overflow-y-auto min-h-0">
+			<div class="reading-scroll-region flex-1 overflow-y-auto min-h-0">
 				<div class="reading-content select-text cursor-text" data-allow-context-menu>
 					<EmailRenderer htmlBody={mail.html_body} plainBody={mail.body} />
 				</div>
@@ -141,3 +141,11 @@
 	replyTo={composeMode === 'reply' ? (composeMail ?? undefined) : undefined}
 	forward={composeMode === 'forward' ? (composeMail ?? undefined) : undefined}
 />
+
+<style>
+	.reading-scroll-region {
+		overscroll-behavior-y: contain;
+		overscroll-behavior-x: none;
+		-webkit-overflow-scrolling: touch;
+	}
+</style>

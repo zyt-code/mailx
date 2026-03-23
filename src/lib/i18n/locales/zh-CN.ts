@@ -113,6 +113,8 @@ export default {
     draftSavedDate: '草稿保存于 {date}',
     autosaveEnabled: '自动保存已启用',
     discard: '丢弃',
+    discardConfirmTitle: '要丢弃这封邮件吗？',
+    discardConfirmMessage: '未发送的内容会继续保留，除非你确认丢弃。',
     sending: '发送中...',
     send: '发送',
     selectAccountAlert: '请选择发送账户',

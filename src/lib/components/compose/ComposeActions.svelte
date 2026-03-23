@@ -6,11 +6,13 @@
 		lastSaved: Date | null;
 		isSending: boolean;
 		sendWithModEnter: boolean;
+		statusMessage?: string;
+		statusTone?: 'neutral' | 'error';
 		onSend: () => void;
 		onDiscard: () => void;
 	}
 
-	let { lastSaved, isSending, sendWithModEnter, onSend, onDiscard }: Props = $props();
+	let { lastSaved, isSending, sendWithModEnter, statusMessage = '', statusTone = 'neutral', onSend, onDiscard }: Props = $props();
 
 	function formatLastSaved(date: Date): string {
 		const now = new Date();
@@ -29,7 +31,9 @@
 
 <div class="compose-footer border-t border-[var(--border-primary)] px-5 py-3">
 	<div class="footer-status">
-		{#if lastSaved}
+		{#if statusMessage}
+			<span class:status-error={statusTone === 'error'}>{statusMessage}</span>
+		{:else if lastSaved}
 			<span>{formatLastSaved(lastSaved)}</span>
 		{:else}
 			<span>{$_('compose.autosaveEnabled')}</span>
@@ -72,12 +76,18 @@
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
+		flex-shrink: 0;
 		background: var(--bg-secondary);
 	}
 
 	.footer-status {
 		font-size: 12px;
 		color: var(--text-tertiary);
+	}
+
+	.footer-status .status-error {
+		color: var(--error);
+		font-weight: 500;
 	}
 
 	.footer-actions {

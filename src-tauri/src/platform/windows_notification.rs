@@ -1,8 +1,6 @@
 #![allow(dead_code)]
 
-use crate::notification_manager::{
-    NotificationFacade, NotificationPriority, NotificationRequest,
-};
+use crate::notification_manager::{NotificationFacade, NotificationPriority, NotificationRequest};
 use windows::core::*;
 use windows::Data::Xml::Dom::*;
 use windows::UI::Notifications::*;
@@ -14,13 +12,14 @@ pub struct WindowsNotification {
 
 impl WindowsNotification {
     pub fn new(app_id: String) -> std::result::Result<Self, Box<dyn std::error::Error>> {
-        Ok(Self {
-            app_id,
-        })
+        Ok(Self { app_id })
     }
 
     /// 构建Toast XML模板
-    fn build_toast_xml(&self, request: &NotificationRequest) -> std::result::Result<String, Box<dyn std::error::Error>> {
+    fn build_toast_xml(
+        &self,
+        request: &NotificationRequest,
+    ) -> std::result::Result<String, Box<dyn std::error::Error>> {
         // 使用ToastGeneric模板支持自定义布局
         let template = r#"
 <toast>
@@ -40,8 +39,8 @@ impl WindowsNotification {
         } else {
             let mut actions = "<actions>".to_string();
             for action in &request.actions {
-                let payload_str = serde_json::to_string(&action.payload)
-                    .unwrap_or_else(|_| "".to_string());
+                let payload_str =
+                    serde_json::to_string(&action.payload).unwrap_or_else(|_| "".to_string());
                 actions.push_str(&format!(
                     r#"
     <action content='{label}' activationType='protocol' arguments='{payload}'/>"#,
@@ -72,12 +71,21 @@ impl WindowsNotification {
 
 #[async_trait::async_trait]
 impl NotificationFacade for WindowsNotification {
-    async fn show(&self, request: &NotificationRequest) -> std::result::Result<(), Box<dyn std::error::Error>> {
-        println!("[WindowsNotification] 🔔 Preparing to show notification: {}", request.title);
+    async fn show(
+        &self,
+        request: &NotificationRequest,
+    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+        println!(
+            "[WindowsNotification] 🔔 Preparing to show notification: {}",
+            request.title
+        );
 
         // 构建Toast XML
         let xml_str = self.build_toast_xml(request)?;
-        println!("[WindowsNotification] 📄 Toast XML generated (length: {})", xml_str.len());
+        println!(
+            "[WindowsNotification] 📄 Toast XML generated (length: {})",
+            xml_str.len()
+        );
 
         // 创建XML文档
         let xml_doc = XmlDocument::new()?;
@@ -85,9 +93,13 @@ impl NotificationFacade for WindowsNotification {
         println!("[WindowsNotification] ✅ XML document loaded");
 
         // 创建Toast通知管理器
-        let notifier = ToastNotificationManager::CreateToastNotifierWithId(&HSTRING::from(&self.app_id))
-            .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
-        println!("[WindowsNotification] ✅ ToastNotifier created for app_id: {}", self.app_id);
+        let notifier =
+            ToastNotificationManager::CreateToastNotifierWithId(&HSTRING::from(&self.app_id))
+                .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+        println!(
+            "[WindowsNotification] ✅ ToastNotifier created for app_id: {}",
+            self.app_id
+        );
 
         // 创建ToastNotification
         let toast = ToastNotification::CreateToastNotification(&xml_doc)
@@ -96,9 +108,12 @@ impl NotificationFacade for WindowsNotification {
 
         // 显示通知
         println!("[WindowsNotification] 📢 Calling Show() on toast...");
-        notifier.Show(&toast)
+        notifier
+            .Show(&toast)
             .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
-        println!("[WindowsNotification] ✅ Toast shown successfully! Check Windows notification center.");
+        println!(
+            "[WindowsNotification] ✅ Toast shown successfully! Check Windows notification center."
+        );
 
         Ok(())
     }
@@ -108,7 +123,8 @@ impl NotificationFacade for WindowsNotification {
         let history = ToastNotificationManager::History()
             .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
         let tag = HSTRING::from(id);
-        history.Remove(&tag)
+        history
+            .Remove(&tag)
             .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
         Ok(())
     }
@@ -116,7 +132,8 @@ impl NotificationFacade for WindowsNotification {
     async fn close_all(&self) -> std::result::Result<(), Box<dyn std::error::Error>> {
         let history = ToastNotificationManager::History()
             .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
-        history.Clear()
+        history
+            .Clear()
             .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
         Ok(())
     }

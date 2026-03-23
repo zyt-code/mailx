@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import { _ } from 'svelte-i18n';
 	import * as db from '$lib/db/index.js';
 	import * as accounts from '$lib/accounts/index.js';
@@ -11,7 +12,9 @@
 	import ComposeActions from './ComposeActions.svelte';
 	import type { Account, Attachment, EmailAddress, Folder, Mail } from '$lib/types.js';
 	import { preferences } from '$lib/stores/preferencesStore.js';
-	import { buildComposerPayload, buildForwardDraft, buildReplyDraft } from '$lib/utils/mailContent.js';
+	import { buildComposerPayload, buildForwardDraft, buildReplyDraft, mergeComposerPayload } from '$lib/utils/mailContent.js';
+	import { showToast } from '$lib/utils/toast.js';
+	import { extractErrorMessage } from '$lib/utils/errorMessage.js';
 
 	interface Props {
 		isOpen: boolean;
@@ -34,7 +37,13 @@
 	let fileInputRef = $state<HTMLInputElement | null>(null);
 	let draftAttachments = $state<Attachment[]>([]);
 	let sendWithModEnter = $state(true);
+	let showDiscardConfirm = $state(false);
+	let isCloseBlocked = $state(false);
+	let sendStatusMessage = $state('');
+	let sendStatusTone = $state<'neutral' | 'error'>('neutral');
 	let releaseModalLayer: (() => void) | null = null;
+	let referenceBody = $state('');
+	let referenceHtml = $state('');
 
 	let draft = $state({
 		to: [] as EmailAddress[],
@@ -68,13 +77,28 @@
 	});
 
 	$effect(() => {
+		if (!isOpen) return;
+
+		function handleWindowKeydown(event: KeyboardEvent): void {
+			handleModalKeydown(event);
+		}
+
+		window.addEventListener('keydown', handleWindowKeydown);
+		return () => window.removeEventListener('keydown', handleWindowKeydown);
+	});
+
+	$effect(() => {
 		if (!isOpen) {
 			releaseModalLayer?.();
 			releaseModalLayer = null;
 			draftId = null;
 			lastSaved = null;
+			showDiscardConfirm = false;
+			isCloseBlocked = false;
 			closeAccountDropdown();
 			draftAttachments = [];
+			referenceBody = '';
+			referenceHtml = '';
 			return;
 		}
 
@@ -108,14 +132,19 @@
 				forwardedMessage: $_('compose.forwardedMessage'),
 				fromField: $_('compose.fromField'),
 				dateField: $_('compose.dateField'),
-				subjectField: $_('compose.subjectField')
+				subjectField: $_('compose.subjectField'),
+				toField: `${$_('mail.to')}：`,
+				ccField: `${$_('mail.cc')}：`,
+				replyToField: `${$_('mail.replyTo')}：`
 			});
 			draft.to = [];
 			draft.cc = [];
 			draft.bcc = [];
 			draft.subject = forwardDraft.subject;
-			draft.body = forwardDraft.body;
-			draft.html_body = forwardDraft.html_body;
+			draft.body = '';
+			draft.html_body = '';
+			referenceBody = forwardDraft.body;
+			referenceHtml = forwardDraft.html_body;
 		} else {
 			draft.to = [];
 			draft.cc = [];
@@ -123,17 +152,33 @@
 			draft.subject = '';
 			draft.body = '';
 			draft.html_body = '';
+			referenceBody = '';
+			referenceHtml = '';
 		}
 
-		const timer = setInterval(() => {
-			void saveDraft();
-		}, 30000);
-
 		return () => {
-			clearInterval(timer);
 			releaseModalLayer?.();
 			releaseModalLayer = null;
 		};
+	});
+
+	$effect(() => {
+		if (!isOpen || !hasDraftContent()) return;
+
+		selectedAccountId;
+		draft.subject;
+		draft.body;
+		draft.html_body;
+		draft.to.length;
+		draft.cc.length;
+		draft.bcc.length;
+		draftAttachments.length;
+
+		const timeout = window.setTimeout(() => {
+			void saveDraft();
+		}, 500);
+
+		return () => clearTimeout(timeout);
 	});
 
 	async function loadAccounts(): Promise<void> {
@@ -154,7 +199,15 @@
 		const selectedAccount = availableAccounts.find((account) => account.id === selectedAccountId);
 		if (!selectedAccount) return;
 
-		const content = buildComposerPayload(draft.html_body, draft.body);
+		const content = mergeComposerPayload(
+			buildComposerPayload(draft.html_body, draft.body),
+			referenceBody || referenceHtml
+				? {
+						body: referenceBody,
+						html_body: referenceHtml
+					}
+				: undefined
+		);
 
 		const mailId = draftId ?? crypto.randomUUID();
 		const mail: Mail = {
@@ -186,6 +239,47 @@
 		} catch (error) {
 			console.error('Failed to save draft:', error);
 		}
+	}
+
+	function hasDraftContent(): boolean {
+		return (
+			draft.to.length > 0 ||
+			draft.cc.length > 0 ||
+			draft.bcc.length > 0 ||
+			draftAttachments.length > 0 ||
+			draft.subject.trim().length > 0 ||
+			draft.body.trim().length > 0 ||
+			draft.html_body.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').trim().length > 0
+		);
+	}
+
+	function pulseCloseGuard(): void {
+		isCloseBlocked = false;
+		window.requestAnimationFrame(() => {
+			isCloseBlocked = true;
+			window.setTimeout(() => {
+				isCloseBlocked = false;
+			}, 420);
+		});
+	}
+
+	async function requestClose(): Promise<void> {
+		closeAccountDropdown();
+
+		if (!hasDraftContent()) {
+			showDiscardConfirm = false;
+			onClose();
+			return;
+		}
+
+		showDiscardConfirm = true;
+		pulseCloseGuard();
+		await saveDraft();
+	}
+
+	function keepEditing(): void {
+		showDiscardConfirm = false;
+		isCloseBlocked = false;
 	}
 
 	function getSelectedAccount(): Account | undefined {
@@ -308,13 +402,39 @@
 	}
 
 	async function sendMail(): Promise<void> {
+		const activeElement = document.activeElement as HTMLElement | null;
+		if (activeElement && activeElement !== document.body) {
+			activeElement.blur();
+			await tick();
+		}
+
+		sendStatusMessage = '';
+		sendStatusTone = 'neutral';
+
+		if (!selectedAccountId && availableAccounts.length === 0) {
+			await loadAccounts();
+		}
+		if (!selectedAccountId && availableAccounts.length > 0) {
+			selectedAccountId = availableAccounts.find((account) => account.is_active)?.id || availableAccounts[0].id;
+		}
+
 		if (!selectedAccountId) {
-			alert($_('compose.selectAccountAlert'));
+			sendStatusMessage = $_('compose.selectAccountAlert');
+			sendStatusTone = 'error';
+			showToast({
+				type: 'error',
+				title: $_('compose.selectAccountAlert')
+			});
 			return;
 		}
 
 		if (draft.to.length === 0 && draft.cc.length === 0 && draft.bcc.length === 0) {
-			alert($_('compose.addRecipientAlert'));
+			sendStatusMessage = $_('compose.addRecipientAlert');
+			sendStatusTone = 'error';
+			showToast({
+				type: 'error',
+				title: $_('compose.addRecipientAlert')
+			});
 			return;
 		}
 
@@ -326,18 +446,31 @@
 				await accounts.sendMail(draftId, selectedAccountId);
 			} catch (error) {
 				console.error('Failed to send mail:', error);
-				alert($_('compose.sendFailedAlert', { values: { error: error instanceof Error ? error.message : 'Unknown error' } }));
+				const errorMessage = extractErrorMessage(error);
+				sendStatusMessage = $_('compose.sendFailedAlert', { values: { error: errorMessage } });
+				sendStatusTone = 'error';
+				showToast({
+					type: 'error',
+					title: $_('compose.sendFailedAlert', {
+						values: { error: errorMessage }
+					})
+				});
 				isSending = false;
 				return;
 			}
 		}
 
 		isSending = false;
+		sendStatusMessage = '';
+		sendStatusTone = 'neutral';
 		onSent();
 		onClose();
 	}
 
 	async function discardDraft(): Promise<void> {
+		showDiscardConfirm = false;
+		isCloseBlocked = false;
+
 		if (draftId) {
 			try {
 				await db.moveToTrash(draftId, 'drafts');
@@ -348,8 +481,43 @@
 		onClose();
 	}
 
-	function closeModal(): void {
-		onClose();
+	function handleModalKeydown(event: KeyboardEvent): void {
+		if (event.key === 'Escape') {
+			event.preventDefault();
+			if (showDiscardConfirm) {
+				keepEditing();
+				return;
+			}
+			void requestClose();
+			return;
+		}
+
+		if (sendWithModEnter && (event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+			event.preventDefault();
+			void sendMail();
+		}
+	}
+
+	function handleBackdropAttempt(): void {
+		if (hasDraftContent()) {
+			pulseCloseGuard();
+		}
+	}
+
+	function backdropClose(node: HTMLElement): { destroy: () => void } {
+		function handleClick(event: MouseEvent): void {
+			if (event.target === node) {
+				handleBackdropAttempt();
+			}
+		}
+
+		node.addEventListener('click', handleClick);
+
+		return {
+			destroy() {
+				node.removeEventListener('click', handleClick);
+			}
+		};
 	}
 
 	function portal(node: HTMLElement) {
@@ -374,18 +542,9 @@
 {#if isOpen}
 	<div
 		use:portal
+		use:backdropClose
 		class="compose-modal-layer fixed inset-0 z-[70] flex items-center justify-center px-0 sm:px-6 py-0 sm:py-8"
 		data-testid="compose-modal-backdrop"
-		onclick={(event) => {
-			if (event.target === event.currentTarget) closeModal();
-		}}
-		onkeydown={(event) => {
-			if (event.key === 'Escape') closeModal();
-			if (sendWithModEnter && (event.metaKey || event.ctrlKey) && event.key === 'Enter') {
-				event.preventDefault();
-				void sendMail();
-			}
-		}}
 		role="dialog"
 		aria-modal="true"
 		aria-labelledby="compose-title"
@@ -395,6 +554,7 @@
 	>
 		<div
 			class="compose-modal-shell flex flex-col w-full h-full sm:h-auto sm:min-h-[60vh] sm:max-h-[88vh] sm:max-w-[780px] overflow-hidden rounded-none sm:rounded-[22px] border border-[var(--border-secondary)] bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-2xl dark:border-[var(--border-primary)] dark:bg-[var(--bg-primary)] dark:text-[var(--text-primary)]"
+			class:close-guarded={isCloseBlocked}
 			role="document"
 			in:scale={{ duration: 220, start: 0.95, opacity: 0.16, easing: cubicOut }}
 			out:scale={{ duration: 150, start: 1, opacity: 0.12, easing: cubicOut }}
@@ -445,7 +605,7 @@
 
 				<button
 					type="button"
-					onclick={closeModal}
+					onclick={() => void requestClose()}
 					class="flex size-8 items-center justify-center rounded-md text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] dark:text-[var(--text-tertiary)] dark:hover:text-[var(--text-primary)] dark:hover:bg-[var(--bg-hover)]"
 					aria-label={$_('compose.closeCompose')}
 				>
@@ -465,6 +625,8 @@
 			<ComposeEditor
 				bind:value={draft.body}
 				bind:htmlValue={draft.html_body}
+				referencePlain={referenceBody}
+				referenceHtml={referenceHtml}
 				attachments={draftAttachments}
 				onAttach={openAttachmentPicker}
 				onRemoveAttachment={removeAttachment}
@@ -473,10 +635,39 @@
 				lastSaved={lastSaved}
 				{isSending}
 				{sendWithModEnter}
+				statusMessage={sendStatusMessage}
+				statusTone={sendStatusTone}
 				onSend={sendMail}
-				onDiscard={discardDraft}
+				onDiscard={() => void requestClose()}
 			/>
 		</div>
+
+		{#if showDiscardConfirm}
+			<div class="compose-confirm-layer">
+				<div
+					class="compose-confirm-card"
+					role="alertdialog"
+					aria-modal="true"
+					aria-labelledby="compose-discard-title"
+					aria-describedby="compose-discard-copy"
+					tabindex="-1"
+				>
+					<div class="compose-confirm-copy">
+						<h3 id="compose-discard-title">{$_('compose.discardConfirmTitle')}</h3>
+						<p id="compose-discard-copy">{$_('compose.discardConfirmMessage')}</p>
+					</div>
+
+					<div class="compose-confirm-actions">
+						<button type="button" class="confirm-secondary" onclick={keepEditing}>
+							{$_('common.cancel')}
+						</button>
+						<button type="button" class="confirm-danger" onclick={() => void discardDraft()}>
+							{$_('compose.discard')}
+						</button>
+					</div>
+				</div>
+			</div>
+		{/if}
 	</div>
 {/if}
 
@@ -484,6 +675,22 @@
 	.compose-modal-layer {
 		background: color-mix(in srgb, rgba(15, 23, 42, 0.18) 68%, transparent);
 		backdrop-filter: blur(14px) saturate(118%);
+	}
+
+	.compose-modal-shell {
+		height: 100%;
+		min-height: 0;
+		transition:
+			border-color 180ms cubic-bezier(0.22, 1, 0.36, 1),
+			box-shadow 180ms cubic-bezier(0.22, 1, 0.36, 1);
+	}
+
+	.compose-modal-shell.close-guarded {
+		animation: compose-close-guard 420ms cubic-bezier(0.22, 1, 0.36, 1);
+		border-color: color-mix(in srgb, var(--accent-primary) 38%, var(--border-secondary));
+		box-shadow:
+			0 24px 70px rgba(15, 23, 42, 0.22),
+			0 0 0 1px color-mix(in srgb, var(--accent-primary) 22%, transparent);
 	}
 
 	.from-switcher {
@@ -576,13 +783,120 @@
 		color: var(--text-tertiary);
 	}
 
+	.compose-confirm-layer {
+		position: absolute;
+		inset: 0;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 1.5rem;
+		background: color-mix(in srgb, rgba(15, 23, 42, 0.12) 72%, transparent);
+		backdrop-filter: blur(10px);
+		animation: compose-confirm-enter 140ms cubic-bezier(0.22, 1, 0.36, 1);
+	}
+
+	.compose-confirm-card {
+		width: min(420px, calc(100vw - 2rem));
+		padding: 1.15rem;
+		border: 1px solid color-mix(in srgb, var(--border-primary) 82%, transparent);
+		border-radius: 18px;
+		background: color-mix(in srgb, var(--bg-primary) 94%, transparent);
+		box-shadow: var(--shadow-lg);
+	}
+
+	.compose-confirm-copy h3 {
+		font-size: 15px;
+		font-weight: 650;
+		color: var(--text-primary);
+	}
+
+	.compose-confirm-copy p {
+		margin-top: 0.45rem;
+		font-size: 13px;
+		line-height: 1.5;
+		color: var(--text-secondary);
+	}
+
+	.compose-confirm-actions {
+		display: flex;
+		justify-content: flex-end;
+		gap: 0.55rem;
+		margin-top: 1rem;
+	}
+
+	.confirm-secondary,
+	.confirm-danger {
+		height: 34px;
+		padding: 0 0.9rem;
+		border-radius: 10px;
+		font-size: 13px;
+		font-weight: 600;
+		border: 1px solid transparent;
+		cursor: pointer;
+	}
+
+	.confirm-secondary {
+		background: var(--bg-secondary);
+		color: var(--text-secondary);
+		border-color: var(--border-secondary);
+	}
+
+	.confirm-secondary:hover {
+		background: var(--bg-hover);
+		color: var(--text-primary);
+	}
+
+	.confirm-danger {
+		background: color-mix(in srgb, var(--error) 90%, #fff 10%);
+		color: #fff;
+	}
+
+	.confirm-danger:hover {
+		background: var(--error);
+	}
+
 	@media (max-width: 640px) {
 		.compose-modal-shell {
 			border-radius: 0;
 		}
 	}
 
+	@media (min-width: 640px) {
+		.compose-modal-shell {
+			height: min(88vh, 860px);
+		}
+	}
+
 	:global(.dark) .compose-modal-layer {
 		background: color-mix(in srgb, rgba(2, 6, 23, 0.54) 78%, transparent);
+	}
+
+	@keyframes compose-close-guard {
+		0%,
+		100% {
+			transform: translate3d(0, 0, 0);
+		}
+
+		24% {
+			transform: translate3d(-7px, 0, 0);
+		}
+
+		52% {
+			transform: translate3d(6px, 0, 0);
+		}
+
+		76% {
+			transform: translate3d(-3px, 0, 0);
+		}
+	}
+
+	@keyframes compose-confirm-enter {
+		from {
+			opacity: 0;
+		}
+
+		to {
+			opacity: 1;
+		}
 	}
 </style>

@@ -93,7 +93,7 @@
 </script>
 
 {#if !collapsed || isMobile}
-	<nav class="folder-nav folder-nav-expanded" bind:this={navContainer}>
+	<nav class="folder-nav folder-nav-expanded folder-nav-stage" data-mode="expanded" bind:this={navContainer}>
 		<div
 			class="folder-nav-indicator"
 			class:ready={indicatorReady}
@@ -148,7 +148,7 @@
 		</div>
 	</nav>
 {:else}
-	<nav class="folder-nav folder-nav-collapsed">
+	<nav class="folder-nav folder-nav-collapsed folder-nav-stage" data-mode="collapsed">
 		<div class="folder-nav-collapsed-stack">
 			{#each navItems as item}
 				<button
@@ -190,6 +190,16 @@
 		flex: 1;
 		margin-top: 0.25rem;
 		overflow-y: auto;
+		overscroll-behavior-y: contain;
+		overscroll-behavior-x: none;
+	}
+
+	.folder-nav-stage {
+		animation: folder-nav-enter 300ms cubic-bezier(0.22, 1, 0.36, 1);
+	}
+
+	.folder-nav-stage[data-mode='collapsed'] {
+		animation-duration: 240ms;
 	}
 
 	.folder-nav-expanded {
@@ -277,6 +287,9 @@
 		text-align: center;
 		font-variant-numeric: tabular-nums;
 		pointer-events: none;
+		transition:
+			transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+			opacity 220ms cubic-bezier(0.22, 1, 0.36, 1);
 	}
 
 	.folder-nav-collapsed {
@@ -315,5 +328,17 @@
 		box-shadow:
 			0 12px 20px rgba(0, 0, 0, 0.24),
 			inset 0 1px 0 rgba(255, 255, 255, 0.05);
+	}
+
+	@keyframes folder-nav-enter {
+		from {
+			opacity: 0;
+			transform: translate3d(-8px, 0, 0);
+		}
+
+		to {
+			opacity: 1;
+			transform: translate3d(0, 0, 0);
+		}
 	}
 </style>

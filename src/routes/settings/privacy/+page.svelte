@@ -4,6 +4,7 @@
 	import { invoke } from '@tauri-apps/api/core';
 	import { preferences, type PrivacyPreferences } from '$lib/stores/preferencesStore.js';
 	import * as db from '$lib/db/index.js';
+	import { showToast } from '$lib/utils/toast.js';
 
 	let privacy = $derived($preferences.privacy);
 	let dbSize = $state<{ size: number; unit: string } | null>(null);
@@ -51,7 +52,10 @@
 		error = null;
 		try {
 			await db.clearDatabase();
-			alert($_('privacy.clearSuccess'));
+			showToast({
+				type: 'success',
+				title: $_('privacy.clearSuccess')
+			});
 		} catch (e) {
 			error = e instanceof Error ? e.message : $_('accountForm.failedToClearData');
 		} finally {

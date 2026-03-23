@@ -15,7 +15,7 @@
 
 {#if !collapsed || isMobile}
 	<!-- Expanded compose button -->
-	<div class="px-2.5 mt-2.5">
+	<div class="compose-button-shell compose-button-shell-expanded px-2.5 mt-2.5">
 		<button
 			type="button"
 			onclick={onOpenCompose}
@@ -39,7 +39,7 @@
 	</div>
 {:else}
 	<!-- Collapsed compose button -->
-	<div class="flex flex-col items-center gap-1 px-2 mt-2">
+	<div class="compose-button-shell compose-button-shell-collapsed flex flex-col items-center gap-1 px-2 mt-2">
 		<button
 			type="button"
 			onclick={onOpenCompose}
@@ -60,3 +60,30 @@
 		</button>
 	</div>
 {/if}
+
+<style>
+	.compose-button-shell {
+		animation: compose-button-enter 280ms cubic-bezier(0.22, 1, 0.36, 1);
+		transform-origin: top left;
+	}
+
+	.compose-button-shell-expanded {
+		animation-duration: 320ms;
+	}
+
+	.compose-button-shell-collapsed {
+		animation-duration: 240ms;
+	}
+
+	@keyframes compose-button-enter {
+		from {
+			opacity: 0;
+			transform: translate3d(-6px, 0, 0) scale(0.98);
+		}
+
+		to {
+			opacity: 1;
+			transform: translate3d(0, 0, 0) scale(1);
+		}
+	}
+</style>

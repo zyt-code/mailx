@@ -1,7 +1,10 @@
 import { render, screen } from '@testing-library/svelte';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import userEvent from '@testing-library/user-event';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { init, register } from 'svelte-i18n';
 import type { UserPreferences } from '$lib/stores/preferencesStore';
+import * as db from '$lib/db/index.js';
+import * as accounts from '$lib/accounts/index.js';
 import ComposeModal from './ComposeModal.svelte';
 import MailList from '$lib/components/layout/MailList.svelte';
 
@@ -15,6 +18,7 @@ let mockFolder = 'inbox';
 let mockSelectedAccountId: string | null = null;
 let mockIsLoadingMore = false;
 let mockHasMore = true;
+const showToastMock = vi.fn();
 let mockPreferences: UserPreferences = {
 	appearance: {
 		accentTone: 'blue',
@@ -95,11 +99,26 @@ vi.mock('$lib/accounts/index.js', () => ({
 
 beforeEach(() => {
 	document.body.className = '';
+	document.documentElement.className = '';
+	vi.clearAllMocks();
+	vi.useRealTimers();
+	(window as any).notification = {
+		show: showToastMock,
+		dismiss: vi.fn()
+	};
+});
+
+afterEach(() => {
+	vi.useRealTimers();
+	delete (window as any).notification;
 });
 
 describe('ComposeModal', () => {
 	beforeEach(() => {
 		register('en', () => Promise.resolve({
+			common: {
+				cancel: 'Cancel'
+			},
 			compose: {
 				newMessage: 'New Message',
 				fromLabel: 'From {email}',
@@ -111,6 +130,9 @@ describe('ComposeModal', () => {
 				bccLabel: 'Bcc',
 				subjectLabel: 'Subject',
 				subjectPlaceholder: 'Subject',
+				removeRecipient: 'Remove recipient',
+				removeCcRecipient: 'Remove cc recipient',
+				removeBccRecipient: 'Remove bcc recipient',
 				formattingToolbar: 'Formatting toolbar',
 				bold: 'Bold',
 				italic: 'Italic',
@@ -124,6 +146,8 @@ describe('ComposeModal', () => {
 				removeFile: 'Remove {filename}',
 				autosaveEnabled: 'Autosave enabled',
 				discard: 'Discard',
+				discardConfirmTitle: 'Discard this draft?',
+				discardConfirmMessage: 'Unsaved changes are protected until you confirm discard.',
 				send: 'Send',
 				sending: 'Sending',
 				draftSavedJustNow: 'Saved just now',
@@ -172,5 +196,170 @@ describe('ComposeModal', () => {
 		expect(searchBar).toHaveClass('pointer-events-none');
 		expect(searchInput).toBeDisabled();
 		expect(document.body).toHaveClass('compose-modal-open');
+	});
+
+	it('focuses recipient fields from labels and expands Cc/Bcc rows smoothly', async () => {
+		const user = userEvent.setup();
+
+		render(ComposeModal, {
+			isOpen: true,
+			onClose: vi.fn(),
+			onSent: vi.fn()
+		});
+
+		const toInput = screen.getByLabelText('To');
+		await user.click(screen.getByText('To'));
+		expect(toInput).toHaveFocus();
+
+		await user.click(screen.getByRole('button', { name: 'Cc' }));
+		expect(await screen.findByLabelText('Cc')).toHaveFocus();
+
+		await user.click(screen.getByRole('button', { name: 'Bcc' }));
+		expect(await screen.findByLabelText('Bcc')).toHaveFocus();
+	});
+
+	it('keeps tab order smooth from To to Subject to editor', async () => {
+		const user = userEvent.setup();
+
+		render(ComposeModal, {
+			isOpen: true,
+			onClose: vi.fn(),
+			onSent: vi.fn()
+		});
+
+		const toInput = screen.getByLabelText('To');
+		const subjectInput = screen.getByLabelText('Subject');
+
+		await user.click(toInput);
+		expect(toInput).toHaveFocus();
+
+		await user.tab();
+		expect(subjectInput).toHaveFocus();
+
+		await user.tab();
+		const editor = await screen.findByTestId('compose-rich-editor');
+		expect(editor).toHaveFocus();
+	});
+
+	it('keeps compose separators dark-aware and placeholders subdued', async () => {
+		document.documentElement.classList.add('dark');
+
+		render(ComposeModal, {
+			isOpen: true,
+			onClose: vi.fn(),
+			onSent: vi.fn()
+		});
+
+		const subjectInput = screen.getByLabelText('Subject');
+		const toolbar = screen.getByRole('toolbar', { name: 'Formatting toolbar' });
+
+		expect(subjectInput).toHaveAttribute('placeholder', 'Subject');
+		expect(toolbar.className).toContain('editor-toolbar');
+		expect(screen.getByText('To').closest('.compose-line')).toBeInTheDocument();
+	});
+
+	it('ignores backdrop clicks and still guards escape when draft has content', async () => {
+		const user = userEvent.setup();
+		const onClose = vi.fn();
+
+		render(ComposeModal, {
+			isOpen: true,
+			onClose,
+			onSent: vi.fn()
+		});
+
+		const subjectInput = screen.getByLabelText('Subject');
+		await user.type(subjectInput, 'Quarterly planning');
+
+		await user.click(await screen.findByTestId('compose-modal-backdrop'));
+		expect(onClose).not.toHaveBeenCalled();
+		expect(screen.queryByRole('alertdialog', { name: 'Discard this draft?' })).not.toBeInTheDocument();
+		expect(screen.getByTestId('compose-modal-backdrop')).toBeInTheDocument();
+
+		await user.keyboard('{Escape}');
+		expect(onClose).not.toHaveBeenCalled();
+		expect(await screen.findByRole('alertdialog', { name: 'Discard this draft?' })).toBeInTheDocument();
+		expect(screen.getByTestId('compose-modal-backdrop')).toBeInTheDocument();
+	});
+
+	it('autosaves drafts after 500ms of idle input', async () => {
+		vi.useFakeTimers();
+		const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTimeAsync });
+
+		render(ComposeModal, {
+			isOpen: true,
+			onClose: vi.fn(),
+			onSent: vi.fn()
+		});
+
+		await screen.findByRole('button', { name: /From/i });
+
+		await user.type(screen.getByLabelText('Subject'), 'Autosave me');
+		await vi.advanceTimersByTimeAsync(550);
+
+		expect(db.createMail).toHaveBeenCalledTimes(1);
+	});
+
+	it('sends after typing recipient and clicking send', async () => {
+		const user = userEvent.setup();
+		const onSent = vi.fn();
+		const onClose = vi.fn();
+
+		render(ComposeModal, {
+			isOpen: true,
+			onClose,
+			onSent
+		});
+
+		await screen.findByRole('button', { name: /From/i });
+		await user.type(screen.getByLabelText('To'), 'dest@example.com');
+		await user.click(screen.getByRole('button', { name: 'Send' }));
+
+		expect(db.createMail).toHaveBeenCalled();
+		expect(accounts.sendMail).toHaveBeenCalledWith('draft-1', 'acc-1');
+		expect(onSent).toHaveBeenCalledTimes(1);
+		expect(onClose).toHaveBeenCalledTimes(1);
+	});
+
+	it('shows real error message when send fails with non-Error payload', async () => {
+		const user = userEvent.setup();
+		const onSent = vi.fn();
+		const onClose = vi.fn();
+		vi.mocked(accounts.sendMail).mockRejectedValueOnce({ message: 'SMTP AUTH failed' });
+
+		render(ComposeModal, {
+			isOpen: true,
+			onClose,
+			onSent
+		});
+
+		await screen.findByRole('button', { name: /From/i });
+		await user.type(screen.getByLabelText('To'), 'dest@example.com');
+		await user.click(screen.getByRole('button', { name: 'Send' }));
+
+		expect(onSent).not.toHaveBeenCalled();
+		expect(onClose).not.toHaveBeenCalled();
+		expect(await screen.findByText('Send failed: SMTP AUTH failed')).toBeInTheDocument();
+		expect(showToastMock).toHaveBeenCalledWith({
+			type: 'error',
+			title: 'Send failed: SMTP AUTH failed'
+		});
+	});
+
+	it('shows toast + inline validation when send is attempted without recipients', async () => {
+		const user = userEvent.setup();
+
+		render(ComposeModal, {
+			isOpen: true,
+			onClose: vi.fn(),
+			onSent: vi.fn()
+		});
+
+		await user.click(screen.getByRole('button', { name: 'Send' }));
+		expect(await screen.findByText('Add recipient')).toBeInTheDocument();
+		expect(showToastMock).toHaveBeenCalledWith({
+			type: 'error',
+			title: 'Add recipient'
+		});
 	});
 });

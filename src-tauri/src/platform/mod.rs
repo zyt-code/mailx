@@ -3,7 +3,7 @@
 #[cfg(windows)]
 pub mod windows_notification;
 
-use crate::notification_manager::{NotificationFacade, MockFacade};
+use crate::notification_manager::{MockFacade, NotificationFacade};
 use std::sync::Arc;
 
 /// 创建平台特定的通知实现
@@ -17,11 +17,16 @@ pub fn create_notification_facade(_app_id: String) -> Arc<dyn NotificationFacade
 
         match windows_notification::WindowsNotification::new(_app_id) {
             Ok(notif) => {
-                println!("[Notification] ✅ Successfully created Windows native notification facade");
+                println!(
+                    "[Notification] ✅ Successfully created Windows native notification facade"
+                );
                 return Arc::new(notif);
             }
             Err(e) => {
-                eprintln!("[Notification] ❌ Failed to create Windows notification: {:?}", e);
+                eprintln!(
+                    "[Notification] ❌ Failed to create Windows notification: {:?}",
+                    e
+                );
                 eprintln!("[Notification] Falling back to Mock facade");
                 // 降级到fallback
             }

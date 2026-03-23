@@ -1,8 +1,8 @@
 use crate::windows::crash_tracker::CrashTracker;
 use crate::windows::crash_tracker::CrashTrackerError;
 use chrono::Utc;
-use std::panic;
 use std::backtrace::Backtrace;
+use std::panic;
 use tauri::AppHandle;
 use tauri::Manager;
 
@@ -38,9 +38,9 @@ pub fn install_panic_handler(app_handle: &AppHandle) -> Result<(), CrashTrackerE
         };
 
         // Get location if available
-        let location = panic_info.location().map(|loc| {
-            format!("{}:{}:{}", loc.file(), loc.line(), loc.column())
-        });
+        let location = panic_info
+            .location()
+            .map(|loc| format!("{}:{}:{}", loc.file(), loc.line(), loc.column()));
 
         let reason = if let Some(loc) = location {
             format!("Panic at {}: {}", loc, message)
@@ -52,12 +52,9 @@ pub fn install_panic_handler(app_handle: &AppHandle) -> Result<(), CrashTrackerE
         let backtrace = format!("{:?}", Backtrace::capture());
 
         // Write crash metadata
-        if let Err(e) = tracker.write_crash_metadata(
-            &filename,
-            app_version,
-            &reason,
-            Some(backtrace),
-        ) {
+        if let Err(e) =
+            tracker.write_crash_metadata(&filename, app_version, &reason, Some(backtrace))
+        {
             eprintln!("Failed to write crash metadata: {}", e);
         }
 
@@ -78,7 +75,10 @@ pub fn install_panic_handler(app_handle: &AppHandle) -> Result<(), CrashTrackerE
 
 /// Write Windows minidump using Windows API
 #[cfg(target_os = "windows")]
-fn write_windows_minidump(crash_dir: &std::path::Path, filename: &str) -> Result<(), CrashTrackerError> {
+fn write_windows_minidump(
+    crash_dir: &std::path::Path,
+    filename: &str,
+) -> Result<(), CrashTrackerError> {
     use std::fs::File;
     use std::io::Write;
     use std::process::Command;
@@ -110,10 +110,7 @@ fn write_windows_minidump(crash_dir: &std::path::Path, filename: &str) -> Result
         .map_err(|e| CrashTrackerError::ParseError(format!("Failed to write dmp: {}", e)))?;
 
     // Try to get some Windows version info
-    if let Ok(output) = Command::new("cmd")
-        .args(&["/C", "ver"])
-        .output()
-    {
+    if let Ok(output) = Command::new("cmd").args(&["/C", "ver"]).output() {
         let version_info = String::from_utf8_lossy(&output.stdout);
         let _ = file.write_all(b"\nWindows Version:\n");
         let _ = file.write_all(version_info.as_bytes());

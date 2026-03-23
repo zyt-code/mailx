@@ -114,6 +114,7 @@ pub fn run() {
             app.manage(db);
             app.manage(account_manager);
             app.manage(credential_manager);
+            app.manage(sync_manager);
 
             // Create application menu
             #[cfg(target_os = "macos")]
@@ -137,12 +138,7 @@ pub fn run() {
                 let paste_item = PredefinedMenuItem::paste(app, None)?;
                 let select_all_item = PredefinedMenuItem::select_all(app, None)?;
 
-                let app_menu = Submenu::with_items(
-                    app,
-                    "Mailx",
-                    true,
-                    &[&about_item],
-                )?;
+                let app_menu = Submenu::with_items(app, "Mailx", true, &[&about_item])?;
                 let file_menu = Submenu::with_items(app, "File", true, &[&close_item])?;
                 let edit_menu = Submenu::with_items(
                     app,

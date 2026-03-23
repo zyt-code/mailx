@@ -36,10 +36,7 @@ fn get_windows_version() -> String {
     #[cfg(windows)]
     {
         use std::process::Command;
-        if let Ok(output) = Command::new("cmd")
-            .args(&["/C", "ver"])
-            .output()
-        {
+        if let Ok(output) = Command::new("cmd").args(&["/C", "ver"]).output() {
             String::from_utf8_lossy(&output.stdout).trim().to_string()
         } else {
             "Unknown".to_string()
@@ -96,11 +93,9 @@ pub fn collect_diagnostics(app_version: &str, crash_dumps_count: usize) -> Windo
     let mut sys = System::new_all();
     sys.refresh_all();
 
-    let os_version = std::env::var("OS_VERSION")
-        .unwrap_or_else(|_| get_windows_version());
+    let os_version = std::env::var("OS_VERSION").unwrap_or_else(|_| get_windows_version());
 
-    let os_build = std::env::var("OS_BUILD")
-        .unwrap_or_else(|_| get_windows_build());
+    let os_build = std::env::var("OS_BUILD").unwrap_or_else(|_| get_windows_build());
 
     let architecture = get_architecture();
 

@@ -1,6 +1,5 @@
 /// Encrypted file fallback storage for credentials
 /// Provides secure credential storage when OS keychain is unavailable
-
 use super::platform::PlatformCredentialError;
 use aes_gcm::{
     aead::{Aead, AeadCore, KeyInit, OsRng},
@@ -42,7 +41,11 @@ impl EncryptedFileStore {
     }
 
     /// Store a credential encrypted in a file
-    pub fn store_credential(&self, account_id: &str, password: &str) -> Result<(), PlatformCredentialError> {
+    pub fn store_credential(
+        &self,
+        account_id: &str,
+        password: &str,
+    ) -> Result<(), PlatformCredentialError> {
         let credential_path = self.get_credential_path(account_id);
 
         // Create credential data
@@ -128,10 +131,9 @@ impl EncryptedFileStore {
 
     /// Get the storage directory path
     fn get_storage_dir() -> Result<PathBuf, PlatformCredentialError> {
-        let mut path = dirs::config_dir()
-            .ok_or_else(|| {
-                PlatformCredentialError::StorageFailed("Failed to get config directory".to_string())
-            })?;
+        let mut path = dirs::config_dir().ok_or_else(|| {
+            PlatformCredentialError::StorageFailed("Failed to get config directory".to_string())
+        })?;
 
         path.push("mailx");
         path.push("credentials");
@@ -178,7 +180,10 @@ impl EncryptedFileStore {
                 use std::os::unix::fs::PermissionsExt;
                 let mut perms = fs::metadata(&key_path)
                     .map_err(|e| {
-                        PlatformCredentialError::Encryption(format!("Failed to get metadata: {}", e))
+                        PlatformCredentialError::Encryption(format!(
+                            "Failed to get metadata: {}",
+                            e
+                        ))
                     })?
                     .permissions();
                 perms.set_mode(0o600);
@@ -198,9 +203,9 @@ impl EncryptedFileStore {
         })?;
 
         let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
-        let ciphertext = cipher.encrypt(&nonce, data).map_err(|_| {
-            PlatformCredentialError::Encryption("Encryption failed".to_string())
-        })?;
+        let ciphertext = cipher
+            .encrypt(&nonce, data)
+            .map_err(|_| PlatformCredentialError::Encryption("Encryption failed".to_string()))?;
 
         // Combine nonce + ciphertext for storage
         let mut result = nonce.to_vec();

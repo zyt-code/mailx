@@ -30,14 +30,14 @@ fn test_notification_preferences_default() {
 async fn test_priority_queue_ordering() {
     let mock = Arc::new(MockFacade::new());
     let manager = NotificationManager::new(mock);
-    
+
     let priorities = vec![
         (NotificationPriority::Low, "Low"),
         (NotificationPriority::Urgent, "Urgent"),
         (NotificationPriority::Normal, "Normal"),
         (NotificationPriority::High, "High"),
     ];
-    
+
     for (priority, title) in priorities {
         manager.reset_rate_limiter().await;
         let req = NotificationRequest {
@@ -52,7 +52,7 @@ async fn test_priority_queue_ordering() {
         };
         manager.show(req).await.unwrap();
     }
-    
+
     assert!(true);
 }
 
@@ -60,9 +60,9 @@ async fn test_priority_queue_ordering() {
 async fn test_rate_limiting() {
     let mock = Arc::new(MockFacade::new());
     let manager = NotificationManager::new(mock);
-    
+
     let mut success_count = 0;
-    
+
     for i in 0..10 {
         let req = NotificationRequest {
             account_id: 1,
@@ -77,13 +77,13 @@ async fn test_rate_limiting() {
             actions: vec![],
             timeout: None,
         };
-        
+
         match manager.show(req).await {
             Ok(_) => success_count += 1,
-            Err(_) => {},
+            Err(_) => {}
         }
     }
-    
+
     assert!(success_count < 10);
     assert!(success_count > 0);
 }
@@ -92,7 +92,7 @@ async fn test_rate_limiting() {
 async fn test_concurrent_notifications() {
     let mock = Arc::new(MockFacade::new());
     let manager = Arc::new(NotificationManager::new(mock));
-    
+
     let handles: Vec<_> = (0..100)
         .map(|i| {
             let manager = Arc::clone(&manager);
@@ -114,11 +114,11 @@ async fn test_concurrent_notifications() {
             })
         })
         .collect();
-    
+
     for handle in handles {
         let _ = handle.await.unwrap();
     }
-    
+
     assert!(true);
 }
 
@@ -126,11 +126,11 @@ async fn test_concurrent_notifications() {
 async fn test_preferences_control() {
     let mock = Arc::new(MockFacade::new());
     let manager = NotificationManager::new(mock);
-    
+
     let mut prefs = NotificationPreferences::default();
     prefs.new_mail = false;
     manager.set_preferences(prefs.clone()).await;
-    
+
     let req = NotificationRequest {
         account_id: 1,
         mail_id: Some(1),
@@ -144,9 +144,9 @@ async fn test_preferences_control() {
         actions: vec![],
         timeout: None,
     };
-    
+
     manager.show(req).await.unwrap();
-    
+
     let retrieved = manager.get_preferences().await;
     assert_eq!(retrieved.new_mail, false);
 }
@@ -155,11 +155,11 @@ async fn test_preferences_control() {
 async fn test_global_toggle() {
     let mock = Arc::new(MockFacade::new());
     let manager = NotificationManager::new(mock);
-    
+
     let mut prefs = NotificationPreferences::default();
     prefs.enabled = false;
     manager.set_preferences(prefs).await;
-    
+
     let req = NotificationRequest {
         account_id: 1,
         mail_id: None,
@@ -170,9 +170,9 @@ async fn test_global_toggle() {
         actions: vec![],
         timeout: None,
     };
-    
+
     manager.show(req).await.unwrap();
-    
+
     manager.reset_rate_limiter().await;
 }
 
@@ -197,18 +197,18 @@ fn test_all_notification_types_serialization() {
         },
         NotificationType::System("System message".to_string()),
     ];
-    
+
     for nt in types {
         let json = serde_json::to_string(&nt).unwrap();
         let deserialized: NotificationType = serde_json::from_str(&json).unwrap();
-        
+
         match (&nt, &deserialized) {
-            (NotificationType::NewMail { .. }, NotificationType::NewMail { .. }) => {},
-            (NotificationType::SendSuccess { .. }, NotificationType::SendSuccess { .. }) => {},
-            (NotificationType::SendError { .. }, NotificationType::SendError { .. }) => {},
-            (NotificationType::SyncProgress { .. }, NotificationType::SyncProgress { .. }) => {},
-            (NotificationType::SyncError { .. }, NotificationType::SyncError { .. }) => {},
-            (NotificationType::System(_), NotificationType::System(_)) => {},
+            (NotificationType::NewMail { .. }, NotificationType::NewMail { .. }) => {}
+            (NotificationType::SendSuccess { .. }, NotificationType::SendSuccess { .. }) => {}
+            (NotificationType::SendError { .. }, NotificationType::SendError { .. }) => {}
+            (NotificationType::SyncProgress { .. }, NotificationType::SyncProgress { .. }) => {}
+            (NotificationType::SyncError { .. }, NotificationType::SyncError { .. }) => {}
+            (NotificationType::System(_), NotificationType::System(_)) => {}
             _ => panic!("Serialization mismatch for {:?}", nt),
         }
     }
@@ -221,7 +221,7 @@ fn test_quiet_hours_default() {
         start: "22:00".to_string(),
         end: "08:00".to_string(),
     };
-    
+
     assert!(!quiet.enabled);
     assert_eq!(quiet.start, "22:00");
     assert_eq!(quiet.end, "08:00");
@@ -230,7 +230,7 @@ fn test_quiet_hours_default() {
 #[test]
 fn test_notification_preferences_complete_default() {
     let prefs = NotificationPreferences::default();
-    
+
     assert_eq!(prefs.enabled, true);
     assert_eq!(prefs.new_mail, true);
     assert_eq!(prefs.send_status, true);

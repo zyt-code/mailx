@@ -72,6 +72,9 @@ unsafe impl Sync for AccountManager {}
 impl AccountManager {
     /// Create a new account manager with database connection
     pub fn new(conn: Connection) -> Self {
+        // Ensure this connection enforces FK actions (CASCADE, RESTRICT, etc).
+        // This is connection-scoped in SQLite and defaults to OFF.
+        let _ = conn.execute_batch("PRAGMA foreign_keys=ON;");
         Self {
             conn: Mutex::new(conn),
         }
@@ -300,12 +303,56 @@ impl AccountManager {
 
     /// Delete an account by ID
     pub fn delete(&self, id: &str) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
-        let rows_affected = conn.execute("DELETE FROM accounts WHERE id = ?1", params![id])?;
+        let mut conn = self.conn.lock().unwrap();
+        let tx = conn.transaction()?;
 
-        if rows_affected == 0 {
+        let exists: bool = tx.query_row(
+            "SELECT EXISTS(SELECT 1 FROM accounts WHERE id = ?1)",
+            params![id],
+            |row| row.get(0),
+        )?;
+        if !exists {
             return Err(AccountError::NotFound(id.to_string()));
         }
+
+        let has_mails_table: bool = tx.query_row(
+            "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'mails')",
+            [],
+            |row| row.get(0),
+        )?;
+        if has_mails_table {
+            tx.execute("DELETE FROM mails WHERE account_id = ?1", params![id])?;
+        }
+
+        let has_outbox_table: bool = tx.query_row(
+            "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'outbox')",
+            [],
+            |row| row.get(0),
+        )?;
+        if has_outbox_table {
+            tx.execute("DELETE FROM outbox WHERE account_id = ?1", params![id])?;
+        }
+
+        let has_sync_state_table: bool = tx.query_row(
+            "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'sync_state')",
+            [],
+            |row| row.get(0),
+        )?;
+        if has_sync_state_table {
+            tx.execute("DELETE FROM sync_state WHERE account_id = ?1", params![id])?;
+        }
+
+        let has_imap_folders_table: bool = tx.query_row(
+            "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'imap_folders')",
+            [],
+            |row| row.get(0),
+        )?;
+        if has_imap_folders_table {
+            tx.execute("DELETE FROM imap_folders WHERE account_id = ?1", params![id])?;
+        }
+
+        tx.execute("DELETE FROM accounts WHERE id = ?1", params![id])?;
+        tx.commit()?;
 
         Ok(())
     }

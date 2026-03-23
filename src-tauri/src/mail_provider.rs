@@ -101,9 +101,9 @@ impl MailProvider {
             // then English fallback. Fewer attempts = fewer connections.
             MailProvider::Netease163 => vec![
                 ("INBOX", "inbox"),
-                ("&XfJT0ZAB-", "sent"),          // 已发送 (UTF-7)
-                ("&g0l6P3ux-", "drafts"),         // 草稿箱 (UTF-7)
-                ("&XfJSIJZk-", "trash"),          // 已删除 (UTF-7)
+                ("&XfJT0ZAB-", "sent"),   // 已发送 (UTF-7)
+                ("&g0l6P3ux-", "drafts"), // 草稿箱 (UTF-7)
+                ("&XfJSIJZk-", "trash"),  // 已删除 (UTF-7)
             ],
             // iCloud uses standard names
             MailProvider::ICloud => vec![

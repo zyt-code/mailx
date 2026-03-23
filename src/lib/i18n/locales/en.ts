@@ -119,6 +119,8 @@ export default {
     draftSavedDate: 'Draft saved {date}',
     autosaveEnabled: 'Autosave enabled',
     discard: 'Discard',
+    discardConfirmTitle: 'Discard this draft?',
+    discardConfirmMessage: 'Unsaved changes are protected until you confirm discard.',
     sending: 'Sending...',
     send: 'Send',
     // Alerts

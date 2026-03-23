@@ -1,5 +1,8 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
+	import { page } from '$app/stores';
+	import { cubicOut } from 'svelte/easing';
+	import { fly } from 'svelte/transition';
 	import App from '../App.svelte';
 	import { ensureInitialized } from '$lib/stores/i18nStore.svelte.js';
 	import { locale } from 'svelte-i18n';
@@ -8,12 +11,20 @@
 	import { listen } from '@tauri-apps/api/event';
 	import { onMount, onDestroy } from 'svelte';
 	import { goto } from '$app/navigation';
+	import { showToast } from '$lib/utils/toast.js';
 
 	interface Props {
 		children: Snippet;
 	}
 
 	let { children }: Props = $props();
+
+	function resolveRouteStage(pathname: string): 'mail' | 'settings' | 'other' {
+		if (pathname === '/') return 'mail';
+		if (pathname.startsWith('/settings')) return 'settings';
+		return 'other';
+	}
+	let routeStage = $derived(resolveRouteStage($page.url.pathname));
 
 	function handleContextMenu(e: MouseEvent) {
 		// Allow native context menu on elements with data-allow-context-menu or their children
@@ -83,26 +94,15 @@
 
 		// Listen for notification events from backend
 		listen('notification:show', (event) => {
-			console.log('[Layout] Received notification:show event:', event.payload);
 			const payload = event.payload as { title: string; body?: string };
-
-			// Check if notification API is available
-			if (!(window as any).notification?.show) {
-				console.error('[Layout] window.notification.show not available!');
-				return;
-			}
-
-			console.log('[Layout] Calling notification.show with:', payload);
-			(window as any).notification.show({
+			showToast({
 				type: 'info',
 				title: payload.title,
 				message: payload.body,
 				duration: 5000
 			});
-			console.log('[Layout] notification.show called successfully');
 		}).then((unlisten) => {
 			unlistenNotification = unlisten;
-			console.log('[Layout] notification:show listener registered');
 		});
 
 		window.addEventListener('keydown', handleKeyDownCapture, { capture: true });
@@ -121,9 +121,43 @@
 
 {#if $locale}
 	<App onContextMenu={handleContextMenu}>
-		{@render children()}
+		<div class="route-stage-stack">
+			{#key routeStage}
+				<div
+					class="route-stage"
+					data-stage={routeStage}
+					in:fly={{
+						x: routeStage === 'settings' ? 12 : routeStage === 'mail' ? -12 : 0,
+						duration: 170,
+						opacity: 1,
+						easing: cubicOut
+					}}
+				>
+					{@render children()}
+				</div>
+			{/key}
+		</div>
 	</App>
 
 	<!-- Global notification component (always rendered) -->
 	<Notification />
 {/if}
+
+<style>
+	.route-stage-stack {
+		position: relative;
+		height: 100%;
+		width: 100%;
+		overflow: hidden;
+		background: var(--bg-primary);
+	}
+
+	.route-stage {
+		height: 100%;
+		width: 100%;
+		will-change: transform;
+		background: var(--bg-primary);
+		backface-visibility: hidden;
+		transform: translateZ(0);
+	}
+</style>

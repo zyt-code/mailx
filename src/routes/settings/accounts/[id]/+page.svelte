@@ -2,7 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { invoke } from '@tauri-apps/api/core';
-	import { ArrowLeft, Check, Loader2, Mail, Lock, Server, Trash2, Eye, EyeOff, ShieldCheck, RefreshCw } from 'lucide-svelte';
+	import { ArrowLeft, Check, Loader2, Mail, Lock, Server, Eye, EyeOff, ShieldCheck, RefreshCw } from 'lucide-svelte';
 	import * as accounts from '$lib/accounts/index.js';
 	import { syncAccount } from '$lib/sync/index.js';
 	import type { Account } from '$lib/types.js';
@@ -18,6 +18,7 @@
 	let showDeleteConfirm = $state(false);
 	let showPassword = $state(false);
 	let testResult = $state<string | null>(null);
+	let deleteConfirmationValue = $state('');
 
 	let email = $state('');
 	let name = $state('');
@@ -111,7 +112,18 @@
 			error = e instanceof Error ? e.message : $_('account.failedToDelete');
 			isDeleting = false;
 			showDeleteConfirm = false;
+			deleteConfirmationValue = '';
 		}
+	}
+
+	function openDeleteConfirmation() {
+		showDeleteConfirm = true;
+		deleteConfirmationValue = '';
+	}
+
+	function closeDeleteConfirmation() {
+		showDeleteConfirm = false;
+		deleteConfirmationValue = '';
 	}
 
 	async function testConnection() {
@@ -168,15 +180,6 @@
 				<ArrowLeft class="size-4" />
 				<span>{$_('account.backToAccounts')}</span>
 			</button>
-			<div class="header-actions">
-				<button
-					onclick={() => showDeleteConfirm = true}
-					class="delete-button"
-				>
-					<Trash2 class="size-4" />
-					<span>{$_('account.delete')}</span>
-				</button>
-			</div>
 			<div>
 				<h2 class="page-title">{$_('account.edit')}</h2>
 				<p class="page-subtitle">{account.email}</p>
@@ -199,16 +202,31 @@
 					<p class="delete-confirm-text">
 						{$_('accountForm.deleteConfirmDetail', { values: { email: account.email } })}
 					</p>
+					<div class="field-group">
+						<label for="delete-confirm-email" class="field-label">输入当前邮箱地址以确认删除</label>
+						<div class="input-wrapper">
+							<input
+								id="delete-confirm-email"
+								type="text"
+								bind:value={deleteConfirmationValue}
+								placeholder={account.email}
+								autocomplete="off"
+								spellcheck="false"
+								class="field-input delete-confirm-input"
+							/>
+						</div>
+						<p class="field-hint">仅当输入内容与当前账户邮箱完全一致时，才会执行删除。</p>
+					</div>
 					<div class="delete-confirm-actions">
 						<button
-							onclick={() => showDeleteConfirm = false}
+							onclick={closeDeleteConfirmation}
 							class="cancel-delete-button"
 						>
 							{$_('common.cancel')}
 						</button>
 						<button
 							onclick={handleDelete}
-							disabled={isDeleting}
+							disabled={isDeleting || deleteConfirmationValue.trim() !== account.email}
 							class="confirm-delete-button"
 						>
 							{#if isDeleting}
@@ -506,6 +524,22 @@
 			</form>
 		</div>
 
+		<div class="danger-card">
+			<div class="danger-copy">
+				<h3 class="danger-title">{$_('account.delete')}</h3>
+				<p class="danger-text">
+					删除账户会移除这个邮箱配置，并清理当前设备上的本地邮件缓存。这个操作不可撤销。
+				</p>
+			</div>
+			<button
+				type="button"
+				onclick={openDeleteConfirmation}
+				class="delete-button"
+			>
+				<span>{$_('account.delete')}</span>
+			</button>
+		</div>
+
 		<!-- Security Note -->
 		<p class="security-hint">{$_('accountForm.credentialsEncrypted')}</p>
 	</div>
@@ -563,11 +597,6 @@
 	.back-button:hover {
 		color: var(--text-primary);
 		background: color-mix(in srgb, var(--text-primary) 4%, transparent);
-	}
-
-	.header-actions {
-		display: flex;
-		gap: 0.5rem;
 	}
 
 	.delete-button {
@@ -656,6 +685,10 @@
 		line-height: 1.5;
 	}
 
+	.delete-confirm-input {
+		background: color-mix(in srgb, var(--bg-primary) 92%, transparent);
+	}
+
 	.delete-confirm-actions {
 		display: flex;
 		gap: 0.75rem;
@@ -710,6 +743,37 @@
 		padding: 2rem;
 		box-shadow: 0 4px 24px -4px color-mix(in srgb, var(--text-primary) 6%, transparent);
 		margin-bottom: 1.5rem;
+	}
+
+	.danger-card {
+		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: 1rem;
+		padding: 1.25rem 1.4rem;
+		margin-bottom: 1rem;
+		border: 1px solid color-mix(in srgb, var(--error) 20%, var(--border-primary));
+		border-radius: 18px;
+		background: color-mix(in srgb, var(--error) 5%, var(--bg-primary));
+	}
+
+	.danger-copy {
+		display: grid;
+		gap: 0.35rem;
+	}
+
+	.danger-title {
+		margin: 0;
+		font-size: 0.95rem;
+		font-weight: 620;
+		color: var(--text-primary);
+	}
+
+	.danger-text {
+		margin: 0;
+		font-size: 0.85rem;
+		line-height: 1.55;
+		color: var(--text-secondary);
 	}
 
 	.form-section {

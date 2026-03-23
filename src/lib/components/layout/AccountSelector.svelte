@@ -161,7 +161,7 @@
 	<!-- Single account display (original layout) -->
 	<div
 		class={cn(
-			"flex items-center gap-2.5 px-2.5 py-2 rounded-lg mx-2 mt-3 relative",
+			"single-account-row flex items-center gap-2.5 px-2.5 py-2 rounded-lg mx-2 mt-3 relative overflow-hidden",
 			isAccountConfigured ? "hover:bg-[var(--bg-hover)]" : "opacity-60"
 		)}
 	>
@@ -212,5 +212,9 @@
 
 	button {
 		will-change: transform;
+	}
+
+	.single-account-row {
+		contain: paint;
 	}
 </style>

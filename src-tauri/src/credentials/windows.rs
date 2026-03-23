@@ -1,6 +1,5 @@
 /// Windows-specific credential management with Credential Manager and encrypted file fallback
 /// Implements P8-1: Windows Credential Backend
-
 use super::fallback::EncryptedFileStore;
 
 /// Platform-specific credential error
@@ -192,7 +191,11 @@ impl CredentialManagerPrimary {
     }
 
     /// Store a credential in Windows Credential Manager
-    pub fn store_credential(&self, target_name: &str, password: &str) -> Result<(), WindowsCredentialError> {
+    pub fn store_credential(
+        &self,
+        target_name: &str,
+        password: &str,
+    ) -> Result<(), WindowsCredentialError> {
         let entry = keyring::Entry::new("mailx", target_name)
             .map_err(|e| WindowsCredentialError::Unavailable(e.to_string()))?;
 

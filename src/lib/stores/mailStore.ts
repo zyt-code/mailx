@@ -1,6 +1,7 @@
 import { derived, writable, get, type Readable } from 'svelte/store';
 import * as db from '$lib/db/index.js';
 import { eventBus } from '$lib/events/index.js';
+import { accounts as accountListStore } from '$lib/stores/accountStore.js';
 import type { Mail, Folder } from '$lib/types.js';
 
 const PAGE_SIZE = 50;
@@ -92,13 +93,48 @@ let _initialized = false;
 export function initMailStore(): void {
   if (_initialized) return;
   _initialized = true;
-  eventBus.onTauri('mails:updated', async () => {
+  void eventBus.onTauri('mails:updated', async () => {
     await loadMails();
   });
 
   eventBus.on('folder:change', async ({ folder }: { folder: Folder }) => {
     _activeFolder.set(folder);
     await loadMails(folder);
+  });
+
+  void eventBus.onTauri<{ id: string }>('account:deleted', async ({ id }) => {
+    // Immediately remove deleted-account mails from in-memory list to avoid stale UI.
+    _mails.update((current) => current.filter((mail) => mail.account_id !== id));
+
+    // If current account filter points to a deleted account, fallback to "All Inboxes".
+    if (get(_selectedAccountId) === id) {
+      _selectedAccountId.set(null);
+    }
+
+    await loadMails(get(_activeFolder));
+  });
+
+  void eventBus.onTauri<{ id: string }>('account:created', async () => {
+    await loadMails(get(_activeFolder));
+  });
+
+  void eventBus.onTauri<{ id: string }>('account:updated', async () => {
+    await loadMails(get(_activeFolder));
+  });
+
+  accountListStore.subscribe((accountList) => {
+    const selected = get(_selectedAccountId);
+    if (!selected) return;
+    const selectedStillExists = accountList.some((account) => account.id === selected);
+    if (selectedStillExists) return;
+
+    const fallbackAccountId =
+      accountList.find((account) => account.is_active)?.id ??
+      accountList[0]?.id ??
+      null;
+
+    _selectedAccountId.set(fallbackAccountId);
+    void loadMails(get(_activeFolder));
   });
 
   // Prime the list on first app load so Inbox has data before any folder click.
