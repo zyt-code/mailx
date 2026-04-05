@@ -44,9 +44,6 @@
 	});
 
 	function handleFolderClick(folder: Folder) {
-		if (!isAccountConfigured) {
-			return;
-		}
 		onSelectFolder(folder);
 	}
 
@@ -121,7 +118,7 @@
 					onpointerleave={() => releaseButton(item.folder)}
 					onpointercancel={() => releaseButton(item.folder)}
 					onblur={() => releaseButton(item.folder)}
-					disabled={!isAccountConfigured}
+					aria-disabled={!isAccountConfigured}
 					>
 						<item.icon
 							class={cn(
@@ -169,7 +166,7 @@
 					onpointerleave={() => releaseButton(item.folder)}
 					onpointercancel={() => releaseButton(item.folder)}
 					onblur={() => releaseButton(item.folder)}
-					disabled={!isAccountConfigured}
+					aria-disabled={!isAccountConfigured}
 					aria-label={$_(item.labelKey)}
 				>
 					<div class="relative">

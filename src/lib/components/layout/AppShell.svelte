@@ -7,11 +7,20 @@
 	import type { Mail, Folder } from '$lib/types.js';
 	import * as db from '$lib/db/index.js';
 	import { hasAccounts, activeAccount } from '$lib/stores/accountStore.js';
-	import { initSyncStore, isSyncing } from '$lib/stores/syncStore.js';
-	import { initMailStore, switchFolder, setSelectedAccount, markMailReadLocally, markMailUnreadLocally, displayedEmails, loadMails } from '$lib/stores/mailStore.js';
-	import { initSyncHandlers, eventBus } from '$lib/events/index.js';
-	import { initUnreadStore } from '$lib/stores/unreadStore.js';
-	import { syncAccount, syncAllAccounts } from '$lib/sync/index.js';
+	import { isSyncing } from '$lib/stores/syncStore.js';
+	import { switchFolder, setSelectedAccount, markMailReadLocally, markMailUnreadLocally, displayedEmails, loadMails } from '$lib/stores/mailStore.js';
+	import { eventBus } from '$lib/events/index.js';
+	import { createMailboxContextActions } from '$lib/mailbox/mailboxContextActions.js';
+	import { bindAutoSyncLifecycle } from '$lib/sync/autoSyncLifecycle.js';
+	import { createAppShellLayoutController } from './appShellLayout.js';
+	import { createAppShellMailSelection } from './appShellMailSelection.js';
+	import { createAppShellMailboxNavigation } from './appShellMailboxNavigation.js';
+	import { createAppShellReadState } from './appShellReadState.js';
+	import { createAppShellSelectedMailLifecycle } from './appShellSelectedMailLifecycle.js';
+	import { resolveSelectedMail } from './appShellSelectedMail.js';
+	import { bindAppShellShortcuts } from './appShellShortcuts.js';
+	import { initAppShellRuntime } from './appShellRuntime.js';
+	import { bindAppShellStoreMirrors } from './appShellStoreMirrors.js';
 	import { goto } from '$app/navigation';
 	import { browser } from '$app/environment';
 	import { get } from 'svelte/store';
@@ -51,169 +60,120 @@ const DEFAULTS = { sidebarCollapsed: false, mailListWidth: DEFAULT_MAIL_LIST_WID
 
 	// Data state - subscribe to mailStore's displayedEmails for selectedMail lookup
 	let storeMails: Mail[] = $state([]);
-	$effect(() => {
-		const unsub = displayedEmails.subscribe((emails) => {
-			storeMails = emails;
-		});
-		return unsub;
-	});
 
 	// Account state - subscribe to store
 	let isAccountConfigured = $state(false);
 
-	// Subscribe to hasAccounts store
-	$effect(() => {
-		const unsub = hasAccounts.subscribe((value) => {
-			isAccountConfigured = value;
-		});
-		return unsub;
-	});
-
-	// Initialize event-driven stores
-	initSyncStore();
-	initMailStore();
-	initSyncHandlers();
-	initUnreadStore();
+	// Initialize event-driven runtime
+	initAppShellRuntime();
 
 	// Sync state
 	let syncing = $state(false);
 	$effect(() => {
-		const unsub = isSyncing.subscribe((value) => {
-			syncing = value;
+		return bindAppShellStoreMirrors({
+			displayedEmailsStore: displayedEmails,
+			hasAccountsStore: hasAccounts,
+			isSyncingStore: isSyncing,
+			setStoreMails: (value) => {
+				storeMails = value;
+			},
+			setIsAccountConfigured: (value) => {
+				isAccountConfigured = value;
+			},
+			setSyncing: (value) => {
+				syncing = value;
+			}
 		});
-		return unsub;
 	});
 
-	// Auto-sync when active account changes
-	let currentAccount = $state<string | null>(null);
-	let syncIntervalId: ReturnType<typeof setInterval> | null = null;
-
 	$effect(() => {
-		const unsub = activeAccount.subscribe(async (acc) => {
-			if (acc && acc.id !== currentAccount) {
-				currentAccount = acc.id;
-				if (isAccountConfigured && !get(isSyncing)) {
-					try {
-						// Initial sync when account changes
-						await syncAccount(acc.id);
-
-						// Start auto-sync interval (15 minutes)
-						if (syncIntervalId) clearInterval(syncIntervalId);
-						syncIntervalId = setInterval(() => {
-							// Only sync if not already syncing
-							if (!get(isSyncing)) {
-								syncAllAccounts().catch((e) => {
-									console.error('[AppShell] Auto-sync failed:', e);
-								});
-							}
-						}, 15 * 60 * 1000); // 15 minutes
-					} catch (e) {
-						console.error('Auto-sync failed:', e);
-					}
-				}
-			}
+		return bindAutoSyncLifecycle({
+			activeAccountStore: activeAccount,
+			hasAccountsStore: hasAccounts,
+			isSyncingStore: isSyncing,
+			triggerSync: (payload) => eventBus.emitAsync('sync:trigger', payload)
 		});
-
-		// Cleanup interval when effect is disposed
-		return () => {
-			unsub();
-			if (syncIntervalId) {
-				clearInterval(syncIntervalId);
-				syncIntervalId = null;
-			}
-		};
 	});
 
 	let sidebarWidth = $derived(sidebarCollapsed ? SIDEBAR_COLLAPSED : SIDEBAR_EXPANDED);
-	let selectedMail = $derived(storeMails.find((m) => m.id === selectedMailId) ?? null);
+	let selectedMail = $derived(resolveSelectedMail(storeMails, selectedMailId));
 
-	$effect(() => {
-		try {
-			const stored = localStorage.getItem(STORAGE_KEY);
-			if (stored) {
-				const parsed = JSON.parse(stored);
-				if (typeof parsed.sidebarCollapsed === 'boolean') sidebarCollapsed = parsed.sidebarCollapsed;
-				if (typeof parsed.mailListWidth === 'number') mailListWidth = parsed.mailListWidth;
+	const layoutStorage = {
+		getItem: (key: string) => (browser ? localStorage.getItem(key) : null),
+		setItem: (key: string, value: string) => {
+			if (browser) {
+				localStorage.setItem(key, value);
 			}
-		} catch {
-			// Ignore
 		}
+	};
 
-		const mq = window.matchMedia('(max-width: 768px)');
-		isMobile = mq.matches;
+	const createMediaQueryList = (query: string) =>
+		browser
+			? window.matchMedia(query)
+			: {
+					matches: false,
+					addEventListener: () => {},
+					removeEventListener: () => {}
+				};
 
-		function onMediaChange(e: MediaQueryListEvent) {
-			isMobile = e.matches;
-		}
-		mq.addEventListener('change', onMediaChange);
-		return () => mq.removeEventListener('change', onMediaChange);
+	const layoutController = createAppShellLayoutController({
+		storageKey: STORAGE_KEY,
+		storage: layoutStorage,
+		matchMedia: createMediaQueryList,
+		getWindowWidth: () => (browser ? window.innerWidth : 0),
+		getSidebarWidth: () => sidebarWidth,
+		getSidebarCollapsed: () => sidebarCollapsed,
+		getMailListWidth: () => mailListWidth,
+		getIsMobile: () => isMobile,
+		setSidebarCollapsed: (value) => {
+			sidebarCollapsed = value;
+		},
+		setMailListWidth: (value) => {
+			mailListWidth = value;
+		},
+		setIsMobile: (value) => {
+			isMobile = value;
+		},
+		minMailWidth: MIN_MAIL_WIDTH,
+		minReadingWidth: MIN_READING_WIDTH
 	});
 
-	function persistLayout() {
-		try {
-			localStorage.setItem(STORAGE_KEY, JSON.stringify({ sidebarCollapsed, mailListWidth }));
-		} catch {
-			// Ignore
+	$effect(() => {
+		return layoutController.initialize();
+	});
+
+	const mailboxNavigation = createAppShellMailboxNavigation({
+		isMobile: () => isMobile,
+		setSelectedMailId: (mailId) => {
+			selectedMailId = mailId;
+		},
+		setMobileView: (view) => {
+			mobileView = view;
+		},
+		setActiveFolder: (folder) => {
+			activeFolder = folder;
+		},
+		switchFolder,
+		setSelectedAccount
+	});
+
+	const mailSelection = createAppShellMailSelection({
+		getVisibleMails: () => get(displayedEmails),
+		getSelectedMailId: () => selectedMailId,
+		selectMail: mailboxNavigation.selectMail
+	});
+
+	const selectedMailLifecycle = createAppShellSelectedMailLifecycle({
+		getVisibleMails: () => storeMails,
+		getSelectedMailId: () => selectedMailId,
+		getMobileView: () => mobileView,
+		clearSelectedMail: () => {
+			selectedMailId = null;
+		},
+		setMobileView: (view) => {
+			mobileView = view;
 		}
-	}
-
-	function toggleSidebar() {
-		sidebarCollapsed = !sidebarCollapsed;
-		persistLayout();
-	}
-
-	function onResize(deltaX: number) {
-		const maxWidth = window.innerWidth - (isMobile ? 0 : sidebarWidth) - MIN_READING_WIDTH;
-		mailListWidth = Math.max(MIN_MAIL_WIDTH, Math.min(maxWidth, mailListWidth + deltaX));
-	}
-
-	function onResizeEnd() {
-		persistLayout();
-	}
-
-	async function selectMail(id: string) {
-		selectedMailId = id;
-		if (isMobile) mobileView = 'reading';
-	}
-
-	function selectFolder(folder: Folder) {
-		activeFolder = folder;
-		selectedMailId = null;
-		mobileView = 'list';
-		switchFolder(folder);
-	}
-
-	function goBackToList() {
-		mobileView = 'list';
-	}
-
-	function isTypingTarget(target: EventTarget | null): boolean {
-		const element = target as HTMLElement | null;
-		if (!element) return false;
-		const tagName = element.tagName;
-		return (
-			element.isContentEditable ||
-			tagName === 'INPUT' ||
-			tagName === 'TEXTAREA' ||
-			tagName === 'SELECT' ||
-			Boolean(element.closest('[contenteditable="true"]'))
-		);
-	}
-
-	function stepMailSelection(delta: number) {
-		const visibleMails = get(displayedEmails);
-		if (visibleMails.length === 0) return;
-
-		const currentIndex = visibleMails.findIndex((mail) => mail.id === selectedMailId);
-		const nextIndex =
-			currentIndex === -1
-				? delta > 0
-					? 0
-					: visibleMails.length - 1
-				: Math.max(0, Math.min(visibleMails.length - 1, currentIndex + delta));
-
-		void selectMail(visibleMails[nextIndex].id);
-	}
+	});
 
 	function openSettings() {
 		// If no accounts configured, go directly to add account page
@@ -224,101 +184,50 @@ const DEFAULTS = { sidebarCollapsed: false, mailListWidth: DEFAULT_MAIL_LIST_WID
 		}
 	}
 
-	async function handleMarkRead(mail: Mail, read: boolean) {
-		try {
-			// First update local state for immediate UI feedback
-			if (read) {
-				markMailReadLocally(mail.id);
-			} else {
-				markMailUnreadLocally(mail.id);
+	const mailboxContextActions = createMailboxContextActions({
+		db,
+		reload: loadMails,
+		clearSelectedMail: (mailId) => {
+			if (selectedMailId === mailId) {
+				selectedMailId = null;
 			}
-			// markMailReadLocally/UnreadLocally now handles DB persistence in background
-		} catch (e) {
-			console.error('Failed to mark mail:', e);
 		}
-	}
+	});
+
+	const readState = createAppShellReadState({
+		markMailReadLocally,
+		markMailUnreadLocally
+	});
+
+	$effect(() => {
+		storeMails;
+		selectedMailId;
+		mobileView;
+		selectedMailLifecycle.reconcile();
+	});
 
 	async function handleContextDelete(mail: Mail) {
-		try {
-			await db.moveToTrash(mail.id, mail.folder);
-			if (selectedMailId === mail.id) selectedMailId = null;
-			await loadMails();
-		} catch (e) {
-			console.error('Failed to delete mail:', e);
-		}
+		await mailboxContextActions.deleteMail(mail);
 	}
 
 	async function handleContextArchive(mail: Mail) {
-		try {
-			if (mail.folder === 'archive') {
-				await db.updateMail({ ...mail, folder: 'inbox' });
-			} else {
-				await db.moveToArchive(mail.id);
-			}
-			if (selectedMailId === mail.id) selectedMailId = null;
-			await loadMails();
-		} catch (e) {
-			console.error('Failed to archive mail:', e);
-		}
+		await mailboxContextActions.archiveMail(mail);
 	}
 
 	async function handleMoveTo(mail: Mail, folder: Folder) {
-		try {
-			await db.updateMail({ ...mail, folder });
-			if (selectedMailId === mail.id) selectedMailId = null;
-			await loadMails();
-		} catch (e) {
-			console.error('Failed to move mail:', e);
-		}
-	}
-
-	// Handle account selection from sidebar
-	function handleSelectAccount(accountId: string | null) {
-		setSelectedAccount(accountId);
-		// Reset to inbox when switching accounts
-		activeFolder = 'inbox';
-		selectedMailId = null;
-		switchFolder('inbox');
-		// Trigger reload for the new account
-		loadMails();
+		await mailboxContextActions.moveToFolder(mail, folder);
 	}
 
 	onMount(() => {
-		const handleSingleKeyShortcuts = (event: KeyboardEvent) => {
-			const keyboardPreferences = get(preferences).keyboard;
-
-			if (!keyboardPreferences.singleKeyShortcuts) return;
-			if (event.defaultPrevented) return;
-			if (event.metaKey || event.ctrlKey || event.altKey) return;
-			if (isTypingTarget(event.target)) return;
-			if (document.querySelector('[aria-modal="true"]')) return;
-
-			switch (event.key.toLowerCase()) {
-				case 'j':
-					event.preventDefault();
-					stepMailSelection(1);
-					break;
-				case 'k':
-					event.preventDefault();
-					stepMailSelection(-1);
-					break;
-				case 'c':
-					event.preventDefault();
-					eventBus.emit('compose:open');
-					break;
-				case 'r':
-					event.preventDefault();
-					void syncAllAccounts().catch((error) => {
-						console.error('[AppShell] Shortcut sync failed:', error);
-					});
-					break;
-			}
-		};
-
-		window.addEventListener('keydown', handleSingleKeyShortcuts);
-		return () => {
-			window.removeEventListener('keydown', handleSingleKeyShortcuts);
-		};
+		return bindAppShellShortcuts({
+			getKeyboardPreferences: () => get(preferences).keyboard,
+			isModalOpen: () => Boolean(document.querySelector('[aria-modal="true"]')),
+			stepMailSelection: (delta) => {
+				void mailSelection.stepSelection(delta);
+			},
+			openCompose: () => eventBus.emit('compose:open'),
+			triggerSync: () => eventBus.emitAsync('sync:trigger')
+		});
 	});
 </script>
 
@@ -327,24 +236,24 @@ const DEFAULTS = { sidebarCollapsed: false, mailListWidth: DEFAULT_MAIL_LIST_WID
 		collapsed={sidebarCollapsed}
 		{isMobile}
 		{activeFolder}
-		onToggle={toggleSidebar}
-		onSelectFolder={selectFolder}
+		onToggle={layoutController.toggleSidebar}
+		onSelectFolder={mailboxNavigation.selectFolder}
 		onRefresh={loadMails}
-		onSelectAccount={handleSelectAccount}
+		onSelectAccount={mailboxNavigation.selectAccount}
 		onOpenSettings={openSettings}
 	/>
 
 	{#if isMobile}
 		{#if mobileView === 'list'}
-			<MailList {selectedMailId} onSelectMail={selectMail} onMarkRead={handleMarkRead} onDelete={handleContextDelete} onArchive={handleContextArchive} onMoveTo={handleMoveTo} width={undefined} {isAccountConfigured} isSyncing={syncing} />
+			<MailList {selectedMailId} onSelectMail={mailboxNavigation.selectMail} onMarkRead={readState.setReadState} onDelete={handleContextDelete} onArchive={handleContextArchive} onMoveTo={handleMoveTo} width={undefined} {isAccountConfigured} isSyncing={syncing} />
 		{:else}
-			<ReadingPane mail={selectedMail} {isMobile} onBack={goBackToList} onRefresh={loadMails} />
+			<ReadingPane mail={selectedMail} {isMobile} onBack={mailboxNavigation.goBackToList} onRefresh={loadMails} />
 		{/if}
 	{:else}
 		{#if isAccountConfigured}
-			<MailList {selectedMailId} onSelectMail={selectMail} onMarkRead={handleMarkRead} onDelete={handleContextDelete} onArchive={handleContextArchive} onMoveTo={handleMoveTo} width={mailListWidth} {isAccountConfigured} isSyncing={syncing} />
-			<Resizer {onResize} {onResizeEnd} />
-			<ReadingPane mail={selectedMail} {isMobile} onBack={goBackToList} onRefresh={loadMails} />
+			<MailList {selectedMailId} onSelectMail={mailboxNavigation.selectMail} onMarkRead={readState.setReadState} onDelete={handleContextDelete} onArchive={handleContextArchive} onMoveTo={handleMoveTo} width={mailListWidth} {isAccountConfigured} isSyncing={syncing} />
+			<Resizer onResize={layoutController.resizeMailList} onResizeEnd={layoutController.finishResize} />
+			<ReadingPane mail={selectedMail} {isMobile} onBack={mailboxNavigation.goBackToList} onRefresh={loadMails} />
 		{:else}
 			<!-- Get Started View -->
 			<div class="flex-1 pointer-events-auto relative z-10">

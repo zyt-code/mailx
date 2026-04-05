@@ -1,12 +1,12 @@
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 
-type EventCallback<T = any> = (payload: T) => void;
+type EventCallback<T = any> = (payload: T) => void | Promise<void>;
 
 /**
  * Central event bus for coordinating app state
  * Handles both Tauri backend events and internal frontend events
  */
-class EventBus {
+export class EventBus {
   private listeners: Map<string, Set<EventCallback>> = new Map();
   private tauriUnlisteners: UnlistenFn[] = [];
 
@@ -43,7 +43,16 @@ class EventBus {
   emit(event: string, payload?: any): void {
     const callbacks = this.listeners.get(event);
     if (callbacks) {
-      callbacks.forEach(cb => cb(payload));
+      [...callbacks].forEach(cb => cb(payload));
+    }
+  }
+
+  async emitAsync(event: string, payload?: any): Promise<void> {
+    const callbacks = this.listeners.get(event);
+    if (!callbacks) return;
+
+    for (const callback of [...callbacks]) {
+      await callback(payload);
     }
   }
 

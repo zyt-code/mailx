@@ -1,5 +1,7 @@
 # Event-Driven Mail Sync System Implementation Plan
 
+> **Status note (2026-04-05):** This plan reflects the first event-driven sync rollout. It is no longer the authoritative implementation path for receive-side architecture. Use `2026-04-05-receive-sync-baseline-refactor-design.md` and the matching implementation plan for current refactor work.
+
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
 **Goal:** Transform mailx from static demo to dynamic app by implementing event-driven email synchronization with real-time updates and non-blocking UI.

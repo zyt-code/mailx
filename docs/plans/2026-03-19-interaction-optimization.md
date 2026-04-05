@@ -1,5 +1,7 @@
 # Interaction Optimization Implementation Plan
 
+> **Status note (2026-04-05):** This plan captured the interaction-optimization rollout, but it no longer defines the active refactor path for mailbox scope, refresh orchestration, or read-state correctness. Use the 2026-04-05 receive/sync baseline refactor docs for current work.
+
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
 **Goal:** Optimize four key interaction pain points: read status sync, collapsible account list, eliminate switching delay, and refine active item styling.

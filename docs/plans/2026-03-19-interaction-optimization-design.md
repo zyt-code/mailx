@@ -1,5 +1,7 @@
 # Interaction Optimization Design
 
+> **Status note (2026-04-05):** Portions of this design were implemented, but mailbox selection, read-state sync, and refresh behavior are now being folded into `2026-04-05-receive-sync-baseline-refactor-design.md`. Treat this file as historical design context.
+
 **Date:** 2026-03-19
 **Status:** Approved
 **Priority:** High

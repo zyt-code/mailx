@@ -5,6 +5,11 @@
 	import { MailHeader, MailActions, EmailRenderer } from '$lib/components/mail/index.js';
 	import { ComposeModal } from '$lib/components/compose/index.js';
 	import * as db from '$lib/db/index.js';
+	import { createReadingPaneMailActions } from './readingPaneMailActions.js';
+	import {
+		createReadingPaneComposeState,
+		type ReadingPaneComposeMode
+	} from './readingPaneComposeState.js';
 
 	interface Props {
 		mail: Mail | null;
@@ -16,71 +21,26 @@
 	let { mail, isMobile, onBack, onRefresh }: Props = $props();
 
 	let showCompose = $state(false);
-	let composeMode = $state<'reply' | 'forward' | null>(null);
+	let composeMode = $state<ReadingPaneComposeMode>(null);
 	let composeMail = $state<Mail | null>(null);
 
-	function handleReply() {
-		composeMode = 'reply';
-		composeMail = mail;
-		showCompose = true;
-	}
-
-	function handleReplyAll() {
-		composeMode = 'reply';
-		composeMail = mail;
-		showCompose = true;
-	}
-
-	function handleForward() {
-		composeMode = 'forward';
-		composeMail = mail;
-		showCompose = true;
-	}
-
-	async function handleArchive(mailToArchive: Mail) {
-		try {
-			if (mailToArchive.folder === 'archive') {
-				await db.updateMail({
-					...mailToArchive,
-					folder: 'inbox'
-				});
-			} else {
-				await db.moveToArchive(mailToArchive.id);
-			}
-			onRefresh?.();
-		} catch (error) {
-			console.error('Failed to archive mail:', error);
-		}
-	}
-
-	async function handleDelete(mailToDelete: Mail) {
-		try {
-			await db.moveToTrash(mailToDelete.id, mailToDelete.folder);
-			onRefresh?.();
-		} catch (error) {
-			console.error('Failed to delete mail:', error);
-		}
-	}
-
-	async function handleToggleStar(mailToStar: Mail) {
-		try {
-			await db.toggleStar(mailToStar.id, !mailToStar.starred);
-			onRefresh?.();
-		} catch (error) {
-			console.error('Failed to toggle star:', error);
-		}
-	}
-
-	function closeCompose() {
-		showCompose = false;
-		composeMode = null;
-		composeMail = null;
-	}
-
-	function onComposeSent() {
-		closeCompose();
-		onRefresh?.();
-	}
+	const mailActions = createReadingPaneMailActions({
+		db,
+		onRefresh: () => onRefresh?.()
+	});
+	const composeState = createReadingPaneComposeState({
+		getMail: () => mail,
+		setShowCompose: (value) => {
+			showCompose = value;
+		},
+		setComposeMode: (value) => {
+			composeMode = value;
+		},
+		setComposeMail: (value) => {
+			composeMail = value;
+		},
+		onRefresh: () => onRefresh?.()
+	});
 </script>
 
 <div class="reading-pane flex flex-1 min-w-0 h-full bg-[var(--bg-primary)] overflow-hidden">
@@ -103,13 +63,13 @@
 			<div class="shrink-0 border-b border-[var(--border-primary)]">
 				<MailActions
 					{mail}
-					onReply={handleReply}
-					onReplyAll={handleReplyAll}
-					onForward={handleForward}
-					onArchive={handleArchive}
-					onUnarchive={handleArchive}
-					onDelete={handleDelete}
-					onToggleStar={handleToggleStar}
+					onReply={composeState.openReply}
+					onReplyAll={composeState.openReplyAll}
+					onForward={composeState.openForward}
+					onArchive={mailActions.archiveMail}
+					onUnarchive={mailActions.archiveMail}
+					onDelete={mailActions.deleteMail}
+					onToggleStar={mailActions.toggleStar}
 				/>
 			</div>
 
@@ -136,8 +96,8 @@
 <!-- Compose Modal -->
 <ComposeModal
 	isOpen={showCompose}
-	onClose={closeCompose}
-	onSent={onComposeSent}
+	onClose={composeState.closeCompose}
+	onSent={composeState.onComposeSent}
 	replyTo={composeMode === 'reply' ? (composeMail ?? undefined) : undefined}
 	forward={composeMode === 'forward' ? (composeMail ?? undefined) : undefined}
 />

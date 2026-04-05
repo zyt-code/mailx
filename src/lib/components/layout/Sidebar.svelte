@@ -1,12 +1,10 @@
 <script lang="ts">
 	import { cn } from '$lib/utils.js';
-	import { Avatar } from '$lib/components/ui/avatar/index.js';
 	import type { Folder, Account } from '$lib/types.js';
 	import { hasAccounts, activeAccount, accounts } from '$lib/stores/accountStore.js';
 	import { isSyncing, lastSyncTime, syncingAccountId } from '$lib/stores/syncStore.js';
 	import { folderUnreadCounts } from '$lib/stores/unreadStore.js';
 	import { selectedAccountId as storeSelectedAccountId } from '$lib/stores/mailStore.js';
-	import { syncAllAccounts, syncAccount } from '$lib/sync/index.js';
 	import { eventBus } from '$lib/events/index.js';
 	import { preferences } from '$lib/stores/preferencesStore.js';
 	import { _ } from 'svelte-i18n';
@@ -18,18 +16,25 @@
 		Trash2,
 		PanelLeftClose,
 		PanelLeftOpen,
-		SquarePen,
 		Archive,
 		RefreshCw,
-		Lock,
-		Layers,
-		ChevronDown,
 		Settings
 	} from 'lucide-svelte';
 	import { ComposeModal } from '$lib/components/compose/index.js';
 	import ComposeButton from './ComposeButton.svelte';
 	import AccountSelector from './AccountSelector.svelte';
 	import FolderNavigation from './FolderNavigation.svelte';
+	import { bindSidebarStoreMirrors } from './sidebarStoreMirrors.js';
+	import { createSidebarRefresh } from './sidebarRefresh.js';
+	import { createSidebarComposeState } from './sidebarComposeState.js';
+	import { createSidebarNavigation } from './sidebarNavigation.js';
+	import { createSidebarDisabledFeedback } from './sidebarDisabledFeedback.js';
+	import {
+		createSidebarAccountsCollapse,
+		readSidebarAccountsCollapsed
+	} from './sidebarAccountsCollapse.js';
+	import { bindSidebarComposeEvents } from './sidebarComposeEvents.js';
+	import { onDestroy } from 'svelte';
 
 	interface Props {
 		collapsed: boolean;
@@ -38,12 +43,11 @@
 		onToggle: () => void;
 		onSelectFolder: (folder: Folder) => void;
 		onRefresh?: () => void;
-		currentRoute?: string;
 		onSelectAccount?: (accountId: string | null) => void;
 		onOpenSettings?: () => void;
 	}
 
-	let { collapsed, isMobile, activeFolder, onToggle, onSelectFolder, onRefresh, currentRoute = '/', onSelectAccount, onOpenSettings }: Props = $props();
+	let { collapsed, isMobile, activeFolder, onToggle, onSelectFolder, onRefresh, onSelectAccount, onOpenSettings }: Props = $props();
 
 	const navItems = [
 		{ icon: Inbox, labelKey: 'nav.inbox', folder: 'inbox' as const },
@@ -59,7 +63,6 @@
 	let isRefreshing = $state(false);
 	let isRefreshPending = $state(false);
 	let showDisabledTooltip = $state(false);
-	let tooltipTimer = $state<number | null>(null);
 
 	// Account state from store - subscribe to stores
 	let currentAccount = $state<Account | null>(null);
@@ -76,65 +79,64 @@
 	let selectedAccountId = $state<string | null>(null); // null = All Inboxes
 	let currentSyncAccountId = $state<string | null>(null); // which account is currently syncing
 	let accountsCollapsed = $state(
-		typeof window !== 'undefined' && localStorage.getItem('sidebar-accounts-collapsed') === 'true'
+		readSidebarAccountsCollapsed(typeof window !== 'undefined' ? localStorage : undefined)
 	);
 	let showShortcutHints = $state(true);
 
-	function toggleAccountsCollapse() {
-		accountsCollapsed = !accountsCollapsed;
-	}
+	const accountsCollapse = createSidebarAccountsCollapse({
+		getCollapsed: () => accountsCollapsed,
+		setCollapsed: (value) => {
+			accountsCollapsed = value;
+		},
+		storage: typeof window !== 'undefined' ? localStorage : undefined
+	});
 
 	// Subscribe to store changes
 	$effect(() => {
-		const unsubActive = activeAccount.subscribe((value) => {
-			currentAccount = value;
+		return bindSidebarStoreMirrors({
+			activeAccountStore: activeAccount,
+			hasAccountsStore: hasAccounts,
+			isSyncingStore: isSyncing,
+			lastSyncStore: lastSyncTime,
+			unreadCountsStore: folderUnreadCounts,
+			accountsStore: accounts,
+			selectedAccountIdStore: storeSelectedAccountId,
+			syncingAccountIdStore: syncingAccountId,
+			preferencesStore: preferences,
+			setCurrentAccount: (value) => {
+				currentAccount = value;
+			},
+			setIsAccountConfigured: (value) => {
+				isAccountConfigured = value;
+			},
+			setIsRefreshing: (value) => {
+				isRefreshing = value;
+			},
+			setLastSync: (value) => {
+				lastSync = value;
+			},
+			setUnreadCounts: (value) => {
+				unreadCounts = value;
+			},
+			setAllAccounts: (value) => {
+				allAccounts = value;
+			},
+			setSelectedAccountId: (value) => {
+				selectedAccountId = value;
+			},
+			setCurrentSyncAccountId: (value) => {
+				currentSyncAccountId = value;
+			},
+			setShowShortcutHints: (value) => {
+				showShortcutHints = value;
+			}
 		});
-		const unsubHas = hasAccounts.subscribe((value) => {
-			isAccountConfigured = value;
-		});
-		const unsubSync = isSyncing.subscribe((value) => {
-			isRefreshing = value;
-		});
-		const unsubLastSync = lastSyncTime.subscribe((value) => {
-			lastSync = value;
-		});
-		const unsubUnread = folderUnreadCounts.subscribe((value) => {
-			unreadCounts = value;
-		});
-		const unsubAccounts = accounts.subscribe((value) => {
-			allAccounts = value;
-		});
-		const unsubSelectedAccount = storeSelectedAccountId.subscribe((value) => {
-			selectedAccountId = value;
-		});
-		const unsubSyncAccount = syncingAccountId.subscribe((value) => {
-			currentSyncAccountId = value;
-		});
-		const unsubPreferences = preferences.subscribe((value) => {
-			showShortcutHints = value.keyboard.showShortcutHints;
-		});
-
-		return () => {
-			unsubActive();
-			unsubHas();
-			unsubSync();
-			unsubLastSync();
-			unsubUnread();
-			unsubAccounts();
-			unsubSelectedAccount();
-			unsubSyncAccount();
-			unsubPreferences();
-		};
 	});
 
 	// Save collapse state to localStorage when it changes
 	$effect(() => {
-		try {
-			localStorage.setItem('sidebar-accounts-collapsed', String(accountsCollapsed));
-		} catch (e) {
-			// Silently fail if localStorage is not available (e.g., in incognito mode)
-			console.warn('Failed to save sidebar collapse state:', e);
-		}
+		accountsCollapsed;
+		accountsCollapse.persist();
 	});
 
 	// Format last sync time as HH:MM (must be declared after lastSync)
@@ -152,113 +154,62 @@
 	// Check if multiple accounts exist
 	let hasMultipleAccounts = $derived(allAccounts.length > 1);
 
-	// Get account color for avatar — vivid gradient pairs for clear differentiation
-	function getAccountColor(email: string): { bg: string; text: string } {
-		const palettes = [
-			{ bg: '#3B82F6', text: '#FFFFFF' }, // Blue
-			{ bg: '#8B5CF6', text: '#FFFFFF' }, // Violet
-			{ bg: '#EC4899', text: '#FFFFFF' }, // Pink
-			{ bg: '#F97316', text: '#FFFFFF' }, // Orange
-			{ bg: '#10B981', text: '#FFFFFF' }, // Emerald
-			{ bg: '#06B6D4', text: '#FFFFFF' }, // Cyan
-			{ bg: '#EF4444', text: '#FFFFFF' }, // Red
-			{ bg: '#6366F1', text: '#FFFFFF' }, // Indigo
-		];
-		let hash = 0;
-		for (let i = 0; i < email.length; i++) {
-			hash = email.charCodeAt(i) + ((hash << 5) - hash);
+	const disabledFeedback = createSidebarDisabledFeedback({
+		setVisible: (value) => {
+			showDisabledTooltip = value;
 		}
-		return palettes[Math.abs(hash) % palettes.length];
-	}
-
-	// Get initials for avatar
-	function getInitials(name: string): string {
-		return name
-			.split(' ')
-			.map((n) => n.charAt(0).toUpperCase())
-			.slice(0, 2)
-			.join('');
-	}
-
-	// Handle account selection
-	function handleAccountClick(accountId: string | null) {
-		selectedAccountId = accountId;
-		onSelectAccount?.(accountId);
-	}
-
-	async function handleFolderClick(folder: Folder) {
-		console.log('[Sidebar] Folder clicked:', folder, 'configured:', isAccountConfigured);
-		if (!isAccountConfigured) {
-			showDisabledFeedback();
-			return;
-		}
-		onSelectFolder(folder);
-		if (isMobile) onToggle();
-	}
-
-	function openCompose() {
-		if (!isAccountConfigured) {
-			showDisabledFeedback();
-			return;
-		}
-		showCompose = true;
-	}
-
-	function closeCompose() {
-		showCompose = false;
-	}
-
-	async function onComposeSent() {
-		showCompose = false;
-		if (onRefresh) {
-			onRefresh();
-		}
-	}
-
-	async function handleRefresh() {
-		if (isRefreshing || isRefreshPending) return;
-		if (!isAccountConfigured) {
-			showDisabledFeedback();
-			return;
-		}
-
-		isRefreshPending = true;
-		try {
-			if (selectedAccountId) {
-				await syncAccount(selectedAccountId);
-			} else if (currentAccount?.id) {
-				await syncAccount(currentAccount.id);
-			} else {
-				await syncAllAccounts();
-			}
-			await onRefresh?.();
-		} catch (e) {
-			console.error('Refresh failed:', e);
-			// Toast is already shown via sync:failed event in syncHandlers
-		} finally {
-			isRefreshPending = false;
-		}
-	}
-
-	function showDisabledFeedback() {
-		// Show brief feedback
-		showDisabledTooltip = true;
-		if (tooltipTimer) clearTimeout(tooltipTimer);
-		tooltipTimer = window.setTimeout(() => {
-			showDisabledTooltip = false;
-		}, 2000);
-	}
-
-	$effect(() => {
-		const handleComposeOpen = () => {
-			openCompose();
-		};
-
-		eventBus.on('compose:open', handleComposeOpen);
-		return () => {
-			eventBus.off('compose:open', handleComposeOpen);
-		};
 	});
+
+	onDestroy(() => {
+		disabledFeedback.cleanup();
+	});
+
+	const navigation = createSidebarNavigation({
+		getIsAccountConfigured: () => isAccountConfigured,
+		getIsMobile: () => isMobile,
+		setSelectedAccountId: (value) => {
+			selectedAccountId = value;
+		},
+		onSelectAccount: (accountId) => {
+			onSelectAccount?.(accountId);
+		},
+		onSelectFolder: (folder) => {
+			onSelectFolder(folder);
+		},
+		onToggle: () => {
+			onToggle();
+		},
+		showDisabledFeedback: disabledFeedback.show
+	});
+
+	const composeState = createSidebarComposeState({
+		getIsAccountConfigured: () => isAccountConfigured,
+		setShowCompose: (value) => {
+			showCompose = value;
+		},
+		showDisabledFeedback: disabledFeedback.show,
+		onRefresh: () => onRefresh?.()
+	});
+
+	const refreshController = createSidebarRefresh({
+		getSelectedAccountId: () => selectedAccountId,
+		getIsRefreshing: () => isRefreshing,
+		getIsRefreshPending: () => isRefreshPending,
+		getIsAccountConfigured: () => isAccountConfigured,
+		setIsRefreshPending: (value) => {
+			isRefreshPending = value;
+		},
+		triggerSync: (payload) =>
+			payload
+				? eventBus.emitAsync('sync:trigger', payload)
+				: eventBus.emitAsync('sync:trigger'),
+		showDisabledFeedback: disabledFeedback.show
+	});
+
+	$effect(() => bindSidebarComposeEvents({
+		eventBus,
+		openCompose: composeState.openCompose
+	}));
 </script>
 
 {#if !i18nStore.isLoading}
@@ -298,7 +249,7 @@
 		{#if !collapsed && onRefresh}
 			<button
 				type="button"
-				onclick={() => void handleRefresh()}
+				onclick={() => void refreshController.refresh()}
 				disabled={isRefreshing || isRefreshPending}
 				class={cn(
 					'sidebar-chrome-button sidebar-sync-button flex size-auto min-w-8 items-center justify-center gap-1 rounded-xl px-2.5 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-all',
@@ -313,12 +264,12 @@
 	</div>
 
 	<div class="sidebar-main" class:is-collapsed={collapsed && !isMobile}>
-		<ComposeButton
-			isAccountConfigured={isAccountConfigured}
-			collapsed={collapsed}
-			isMobile={isMobile}
-			onOpenCompose={openCompose}
-		/>
+			<ComposeButton
+				isAccountConfigured={isAccountConfigured}
+				collapsed={collapsed}
+				isMobile={isMobile}
+				onOpenCompose={composeState.openCompose}
+			/>
 
 		{#if !collapsed || isMobile}
 			<AccountSelector
@@ -331,8 +282,8 @@
 				isRefreshing={isRefreshing}
 				isAccountConfigured={isAccountConfigured}
 				currentAccount={currentAccount}
-				onSelectAccount={handleAccountClick}
-				onToggleAccountsCollapse={toggleAccountsCollapse}
+				onSelectAccount={navigation.selectAccount}
+				onToggleAccountsCollapse={accountsCollapse.toggle}
 			/>
 		{/if}
 
@@ -349,7 +300,7 @@
 			unreadCounts={unreadCounts}
 			collapsed={collapsed}
 			isMobile={isMobile}
-			onSelectFolder={handleFolderClick}
+			onSelectFolder={navigation.selectFolder}
 		/>
 	</div>
 
@@ -371,8 +322,8 @@
 	<!-- Compose Modal -->
 	<ComposeModal
 		isOpen={showCompose}
-		onClose={closeCompose}
-		onSent={onComposeSent}
+		onClose={composeState.closeCompose}
+		onSent={composeState.onComposeSent}
 	/>
 </aside>
 {/if}

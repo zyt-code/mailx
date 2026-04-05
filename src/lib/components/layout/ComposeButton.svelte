@@ -19,7 +19,7 @@
 		<button
 			type="button"
 			onclick={onOpenCompose}
-			disabled={!isAccountConfigured}
+			aria-disabled={!isAccountConfigured}
 			class={cn(
 				"flex items-center justify-center gap-2 w-full px-3 py-2 rounded-xl transition-all duration-200 font-semibold text-[13px] will-change-transform",
 				isAccountConfigured
@@ -43,7 +43,7 @@
 		<button
 			type="button"
 			onclick={onOpenCompose}
-			disabled={!isAccountConfigured}
+			aria-disabled={!isAccountConfigured}
 			class={cn(
 				"flex size-9 items-center justify-center rounded-xl relative z-10 transition-all duration-200 will-change-transform",
 				isAccountConfigured

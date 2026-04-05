@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/svelte';
+import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { i18nStore } from '$lib/stores/i18nStore.svelte';
@@ -318,6 +318,40 @@ describe('Sidebar - Internationalization', () => {
 			});
 
 			expect(sidebar).toHaveAttribute('data-collapsed', 'true');
+		});
+	});
+
+	describe('Disabled feedback', () => {
+		it('shows onboarding feedback when compose is clicked before any account is configured', async () => {
+			mockState.hasAccounts = false;
+
+			render(Sidebar, {
+				collapsed: false,
+				isMobile: false,
+				activeFolder: 'inbox',
+				onToggle: () => {},
+				onSelectFolder: () => {}
+			});
+
+			await fireEvent.click(screen.getByLabelText('New Message'));
+
+			expect(await screen.findByText('Add your first account to get started')).toBeInTheDocument();
+		});
+
+		it('shows onboarding feedback when folders are clicked before any account is configured', async () => {
+			mockState.hasAccounts = false;
+
+			render(Sidebar, {
+				collapsed: false,
+				isMobile: false,
+				activeFolder: 'inbox',
+				onToggle: () => {},
+				onSelectFolder: () => {}
+			});
+
+			await fireEvent.click(screen.getByText('Sent'));
+
+			expect(await screen.findByText('Add your first account to get started')).toBeInTheDocument();
 		});
 	});
 });

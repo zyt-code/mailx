@@ -1,5 +1,7 @@
 # Event-Driven Mail Sync System Design
 
+> **Status note (2026-04-05):** This file is historical context. Receive/sync state boundaries are being superseded by `2026-04-05-receive-sync-baseline-refactor-design.md`. Do not treat this file as the current source of truth for mailbox scope or sync orchestration.
+
 **Date:** 2026-03-17
 **Status:** Design Approved
 **Author:** Claude + User Collaboration

@@ -1,6 +1,4 @@
 import { eventBus } from './index.js';
-import { syncAccount, syncAllAccounts } from '$lib/sync/index.js';
-import { activeAccount } from '$lib/stores/accountStore.js';
 import { get } from 'svelte/store';
 import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification';
 import { getCurrentWindow } from '@tauri-apps/api/window';
@@ -9,33 +7,12 @@ import { preferences, isQuietHoursActive } from '$lib/stores/preferencesStore.js
 let _initialized = false;
 
 /**
- * Initialize sync event handlers for notifications and trigger wiring.
+ * Initialize sync event handlers for user-facing notification behavior.
  * Call once at app startup. Safe to call multiple times (idempotent).
  */
 export function initSyncHandlers(): void {
   if (_initialized) return;
   _initialized = true;
-  // Wire sync:trigger to actual Tauri invocations
-  // This bridges the gap: stores emit 'sync:trigger', this handler calls the backend
-  eventBus.on('sync:trigger', async (payload?: { accountId?: string }) => {
-    try {
-      if (payload?.accountId) {
-        await syncAccount(payload.accountId);
-      } else {
-        // Try to sync the active account, fall back to sync all
-        const acc = get(activeAccount);
-        if (acc) {
-          await syncAccount(acc.id);
-        } else {
-          await syncAllAccounts();
-        }
-      }
-    } catch (e) {
-      // sync:failed is already emitted by the Rust backend,
-      // so we only log here to avoid double-notification
-      console.error('[syncHandlers] sync:trigger invoke failed:', e);
-    }
-  });
 
   // Show toast on sync failure
   eventBus.onTauri<{ account_id: string; error: string }>('sync:failed', ({ error }) => {

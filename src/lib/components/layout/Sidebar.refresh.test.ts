@@ -4,12 +4,10 @@ import { i18nStore } from '$lib/stores/i18nStore.svelte';
 import Sidebar from './Sidebar.svelte';
 
 const {
-	syncAccountMock,
-	syncAllAccountsMock,
+	eventBusEmitAsyncMock,
 	mockState
 } = vi.hoisted(() => ({
-	syncAccountMock: vi.fn(),
-	syncAllAccountsMock: vi.fn(),
+	eventBusEmitAsyncMock: vi.fn(),
 	mockState: {
 		hasAccounts: true,
 		activeAccount: {
@@ -112,25 +110,20 @@ vi.mock('$lib/stores/preferencesStore.js', () => ({
 	}
 }));
 
-vi.mock('$lib/sync/index.js', () => ({
-	syncAccount: syncAccountMock,
-	syncAllAccounts: syncAllAccountsMock
-}));
-
 vi.mock('$lib/events/index.js', () => ({
 	eventBus: {
 		on: vi.fn(),
-		off: vi.fn()
+		off: vi.fn(),
+		emit: vi.fn(),
+		emitAsync: eventBusEmitAsyncMock
 	}
 }));
 
 describe('Sidebar refresh interactions', () => {
 	beforeEach(async () => {
 		await i18nStore.waitForReady();
-		syncAccountMock.mockReset();
-		syncAllAccountsMock.mockReset();
-		syncAccountMock.mockResolvedValue({});
-		syncAllAccountsMock.mockResolvedValue([]);
+		eventBusEmitAsyncMock.mockReset();
+		eventBusEmitAsyncMock.mockResolvedValue(undefined);
 		mockState.hasAccounts = true;
 		mockState.selectedAccountId = null;
 		mockState.activeAccount = {
@@ -142,7 +135,7 @@ describe('Sidebar refresh interactions', () => {
 		mockState.isSyncing = false;
 	});
 
-	it('triggers account sync when clicking refresh', async () => {
+	it('emits sync intent when clicking refresh', async () => {
 		const onRefresh = vi.fn().mockResolvedValue(undefined);
 
 		render(Sidebar, {
@@ -158,8 +151,71 @@ describe('Sidebar refresh interactions', () => {
 		await fireEvent.click(screen.getByLabelText('Refresh'));
 
 		await waitFor(() => {
-			expect(syncAccountMock).toHaveBeenCalledWith('acc-1');
+			expect(eventBusEmitAsyncMock).toHaveBeenCalledWith('sync:trigger');
 		});
-		expect(onRefresh).toHaveBeenCalled();
+		expect(onRefresh).not.toHaveBeenCalled();
+	});
+
+	it('emits a scoped sync intent when an explicit mailbox account is selected', async () => {
+		mockState.selectedAccountId = 'acc-2';
+		mockState.accounts = [
+			{
+				id: 'acc-1',
+				name: 'Primary',
+				email: 'primary@example.com',
+				is_active: true
+			},
+			{
+				id: 'acc-2',
+				name: 'Secondary',
+				email: 'secondary@example.com',
+				is_active: false
+			}
+		];
+
+		render(Sidebar, {
+			collapsed: false,
+			isMobile: false,
+			activeFolder: 'inbox',
+			onToggle: vi.fn(),
+			onSelectFolder: vi.fn(),
+			onRefresh: vi.fn(),
+			onOpenSettings: vi.fn()
+		});
+
+		await fireEvent.click(screen.getByLabelText('Refresh'));
+
+		await waitFor(() => {
+			expect(eventBusEmitAsyncMock).toHaveBeenCalledWith('sync:trigger', { accountId: 'acc-2' });
+		});
+	});
+
+	it('does not emit a second refresh intent while the first one is still pending', async () => {
+		let resolveRefresh: (() => void) | undefined;
+		eventBusEmitAsyncMock.mockImplementation(
+			() =>
+				new Promise<void>((resolve) => {
+					resolveRefresh = resolve;
+				})
+		);
+
+		render(Sidebar, {
+			collapsed: false,
+			isMobile: false,
+			activeFolder: 'inbox',
+			onToggle: vi.fn(),
+			onSelectFolder: vi.fn(),
+			onRefresh: vi.fn(),
+			onOpenSettings: vi.fn()
+		});
+
+		const refreshButton = screen.getByLabelText('Refresh');
+		await fireEvent.click(refreshButton);
+		await fireEvent.click(refreshButton);
+
+		expect(eventBusEmitAsyncMock).toHaveBeenCalledTimes(1);
+
+		resolveRefresh?.();
+		await Promise.resolve();
 	});
 });
