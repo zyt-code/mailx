@@ -175,6 +175,22 @@ const DEFAULTS = { sidebarCollapsed: false, mailListWidth: DEFAULT_MAIL_LIST_WID
 		}
 	});
 
+	function handleRemovedSelectedMail(mailId: string) {
+		if (selectedMailId !== mailId) {
+			return;
+		}
+
+		if (isMobile) {
+			selectedMailId = null;
+			if (mobileView === 'reading') {
+				mobileView = 'list';
+			}
+			return;
+		}
+
+		selectedMailId = resolveNextSelectedMailId(storeMails, mailId);
+	}
+
 	function openSettings() {
 		// If no accounts configured, go directly to add account page
 		if (!isAccountConfigured) {
@@ -188,17 +204,7 @@ const DEFAULTS = { sidebarCollapsed: false, mailListWidth: DEFAULT_MAIL_LIST_WID
 		db,
 		reload: loadMails,
 		clearSelectedMail: (mailId) => {
-			if (selectedMailId === mailId) {
-				if (isMobile) {
-					selectedMailId = null;
-					if (mobileView === 'reading') {
-						mobileView = 'list';
-					}
-					return;
-				}
-
-				selectedMailId = resolveNextSelectedMailId(storeMails, mailId);
-			}
+			handleRemovedSelectedMail(mailId);
 		}
 	});
 
@@ -255,13 +261,13 @@ const DEFAULTS = { sidebarCollapsed: false, mailListWidth: DEFAULT_MAIL_LIST_WID
 		{#if mobileView === 'list'}
 			<MailList {selectedMailId} onSelectMail={mailboxNavigation.selectMail} onMarkRead={readState.setReadState} onDelete={handleContextDelete} onArchive={handleContextArchive} onMoveTo={handleMoveTo} width={undefined} {isAccountConfigured} isSyncing={syncing} />
 		{:else}
-			<ReadingPane mail={selectedMail} {isMobile} onBack={mailboxNavigation.goBackToList} onRefresh={loadMails} />
+			<ReadingPane mail={selectedMail} {isMobile} onBack={mailboxNavigation.goBackToList} onRefresh={loadMails} onRemoveMail={(mail) => handleRemovedSelectedMail(mail.id)} />
 		{/if}
 	{:else}
 		{#if isAccountConfigured}
 			<MailList {selectedMailId} onSelectMail={mailboxNavigation.selectMail} onMarkRead={readState.setReadState} onDelete={handleContextDelete} onArchive={handleContextArchive} onMoveTo={handleMoveTo} width={mailListWidth} {isAccountConfigured} isSyncing={syncing} />
 			<Resizer onResize={layoutController.resizeMailList} onResizeEnd={layoutController.finishResize} />
-			<ReadingPane mail={selectedMail} {isMobile} onBack={mailboxNavigation.goBackToList} onRefresh={loadMails} />
+			<ReadingPane mail={selectedMail} {isMobile} onBack={mailboxNavigation.goBackToList} onRefresh={loadMails} onRemoveMail={(mail) => handleRemovedSelectedMail(mail.id)} />
 		{:else}
 			<!-- Get Started View -->
 			<div class="flex-1 pointer-events-auto relative z-10">

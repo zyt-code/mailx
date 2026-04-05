@@ -66,6 +66,7 @@ describe('createReadingPaneMailActions', () => {
 	it('deletes mail and refreshes', async () => {
 		const moveToTrash = vi.fn().mockResolvedValue(undefined);
 		const onRefresh = vi.fn();
+		const onMailRemoved = vi.fn();
 		const actions = createReadingPaneMailActions({
 			db: {
 				moveToArchive: vi.fn(),
@@ -73,12 +74,19 @@ describe('createReadingPaneMailActions', () => {
 				toggleStar: vi.fn(),
 				updateMail: vi.fn()
 			},
-			onRefresh
+			onRefresh,
+			onMailRemoved
 		});
 
 		await actions.deleteMail(createMail({ folder: 'sent' }));
 
 		expect(moveToTrash).toHaveBeenCalledWith('mail-1', 'sent');
+		expect(onMailRemoved).toHaveBeenCalledWith(
+			expect.objectContaining({
+				id: 'mail-1',
+				folder: 'sent'
+			})
+		);
 		expect(onRefresh).toHaveBeenCalledTimes(1);
 	});
 

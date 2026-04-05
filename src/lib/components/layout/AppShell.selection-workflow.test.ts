@@ -234,4 +234,23 @@ describe('AppShell selection workflow', () => {
 			expect(screen.getByTestId('mock-reading-pane')).toHaveAttribute('data-mail-id', 'mail-2');
 		});
 	});
+
+	it('moves desktop reading selection to the next visible mail after deleting from the reading pane', async () => {
+		render(AppShell);
+
+		await fireEvent.click(screen.getByRole('button', { name: 'mock-select-mail-1' }));
+
+		await waitFor(() => {
+			expect(screen.getByTestId('mock-reading-pane')).toHaveAttribute('data-mail-id', 'mail-1');
+		});
+
+		await fireEvent.click(screen.getByRole('button', { name: 'mock-reading-pane-delete' }));
+
+		await waitFor(() => {
+			expect(loadMailsMock).toHaveBeenCalledTimes(1);
+		});
+		await waitFor(() => {
+			expect(screen.getByTestId('mock-reading-pane')).toHaveAttribute('data-mail-id', 'mail-2');
+		});
+	});
 });

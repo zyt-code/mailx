@@ -10,12 +10,14 @@ type ReadingPaneMailDb = {
 type ReadingPaneMailActionsDeps = {
 	db: ReadingPaneMailDb;
 	onRefresh?: () => void;
+	onMailRemoved?: (mail: Mail) => void;
 	logError?: (message: string, error: unknown) => void;
 };
 
 export function createReadingPaneMailActions({
 	db,
 	onRefresh,
+	onMailRemoved,
 	logError = (message, error) => console.error(message, error)
 }: ReadingPaneMailActionsDeps) {
 	async function archiveMail(mail: Mail): Promise<void> {
@@ -28,6 +30,7 @@ export function createReadingPaneMailActions({
 			} else {
 				await db.moveToArchive(mail.id);
 			}
+			onMailRemoved?.(mail);
 			onRefresh?.();
 		} catch (error) {
 			logError('Failed to archive mail:', error);
@@ -37,6 +40,7 @@ export function createReadingPaneMailActions({
 	async function deleteMail(mail: Mail): Promise<void> {
 		try {
 			await db.moveToTrash(mail.id, mail.folder);
+			onMailRemoved?.(mail);
 			onRefresh?.();
 		} catch (error) {
 			logError('Failed to delete mail:', error);

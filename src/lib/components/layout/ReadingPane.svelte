@@ -16,9 +16,10 @@
 		isMobile: boolean;
 		onBack: () => void;
 		onRefresh?: () => void;
+		onRemoveMail?: (mail: Mail) => void;
 	}
 
-	let { mail, isMobile, onBack, onRefresh }: Props = $props();
+	let { mail, isMobile, onBack, onRefresh, onRemoveMail }: Props = $props();
 
 	let showCompose = $state(false);
 	let composeMode = $state<ReadingPaneComposeMode>(null);
@@ -26,6 +27,7 @@
 
 	const mailActions = createReadingPaneMailActions({
 		db,
+		onMailRemoved: (mail) => onRemoveMail?.(mail),
 		onRefresh: () => onRefresh?.()
 	});
 	const composeState = createReadingPaneComposeState({
