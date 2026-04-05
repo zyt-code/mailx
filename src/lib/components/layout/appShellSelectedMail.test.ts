@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Mail } from '$lib/types.js';
-import { resolveSelectedMail } from './appShellSelectedMail.js';
+import { resolveNextSelectedMailId, resolveSelectedMail } from './appShellSelectedMail.js';
 
 function createMail(id: string): Mail {
 	return {
@@ -30,5 +30,26 @@ describe('resolveSelectedMail', () => {
 
 	it('returns null when the selected mail is no longer visible', () => {
 		expect(resolveSelectedMail([createMail('mail-1')], 'mail-9')).toBeNull();
+	});
+});
+
+describe('resolveNextSelectedMailId', () => {
+	it('selects the next visible mail when removing a selected mail from the middle of the list', () => {
+		expect(
+			resolveNextSelectedMailId(
+				[createMail('mail-1'), createMail('mail-2'), createMail('mail-3')],
+				'mail-2'
+			)
+		).toBe('mail-3');
+	});
+
+	it('falls back to the previous visible mail when removing the last selected mail', () => {
+		expect(resolveNextSelectedMailId([createMail('mail-1'), createMail('mail-2')], 'mail-2')).toBe(
+			'mail-1'
+		);
+	});
+
+	it('returns null when no visible mail remains after removal', () => {
+		expect(resolveNextSelectedMailId([createMail('mail-1')], 'mail-1')).toBeNull();
 	});
 });

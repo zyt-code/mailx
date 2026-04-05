@@ -17,7 +17,7 @@
 	import { createAppShellMailboxNavigation } from './appShellMailboxNavigation.js';
 	import { createAppShellReadState } from './appShellReadState.js';
 	import { createAppShellSelectedMailLifecycle } from './appShellSelectedMailLifecycle.js';
-	import { resolveSelectedMail } from './appShellSelectedMail.js';
+	import { resolveNextSelectedMailId, resolveSelectedMail } from './appShellSelectedMail.js';
 	import { bindAppShellShortcuts } from './appShellShortcuts.js';
 	import { initAppShellRuntime } from './appShellRuntime.js';
 	import { bindAppShellStoreMirrors } from './appShellStoreMirrors.js';
@@ -189,7 +189,15 @@ const DEFAULTS = { sidebarCollapsed: false, mailListWidth: DEFAULT_MAIL_LIST_WID
 		reload: loadMails,
 		clearSelectedMail: (mailId) => {
 			if (selectedMailId === mailId) {
-				selectedMailId = null;
+				if (isMobile) {
+					selectedMailId = null;
+					if (mobileView === 'reading') {
+						mobileView = 'list';
+					}
+					return;
+				}
+
+				selectedMailId = resolveNextSelectedMailId(storeMails, mailId);
 			}
 		}
 	});
