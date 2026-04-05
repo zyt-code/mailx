@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Mail } from '$lib/types.js';
 import AppShell from './AppShell.svelte';
 
 const {
@@ -62,7 +63,7 @@ const {
 			autoDetect: true
 		}
 	}),
-	displayedEmailsStore: createMockStore([]),
+	displayedEmailsStore: createMockStore<Mail[]>([]),
 	switchFolderMock: vi.fn(),
 	setSelectedAccountMock: vi.fn(),
 	loadMailsMock: vi.fn(),
@@ -94,13 +95,30 @@ function createMockStore<T>(initialValue: T) {
 	};
 }
 
+function createMail(): Mail {
+	return {
+		id: 'mail-1',
+		account_id: 'acc-1',
+		folder: 'inbox',
+		is_read: false,
+		unread: true,
+		subject: 'Hello',
+		body: 'Body',
+		html_body: '<p>Body</p>',
+		from_name: 'Sender',
+		from_email: 'sender@example.com',
+		preview: 'Preview',
+		timestamp: 1
+	};
+}
+
 vi.mock('./Sidebar.svelte', async () => {
 	const { default: SidebarMock } = await import('$lib/test/AppShellSidebarMock.svelte');
 	return { default: SidebarMock };
 });
 
 vi.mock('./MailList.svelte', async () => {
-	const { default: Mock } = await import('$lib/test/EmptyComponentMock.svelte');
+	const { default: Mock } = await import('$lib/test/AppShellMailListMock.svelte');
 	return { default: Mock };
 });
 
@@ -110,7 +128,7 @@ vi.mock('./Resizer.svelte', async () => {
 });
 
 vi.mock('./ReadingPane.svelte', async () => {
-	const { default: Mock } = await import('$lib/test/EmptyComponentMock.svelte');
+	const { default: Mock } = await import('$lib/test/AppShellReadingPaneMock.svelte');
 	return { default: Mock };
 });
 
@@ -187,6 +205,7 @@ describe('AppShell mailbox workflow', () => {
 			is_active: true
 		});
 		isSyncingStore.set(false);
+		displayedEmailsStore.set([createMail()]);
 		switchFolderMock.mockReset();
 		setSelectedAccountMock.mockReset();
 		loadMailsMock.mockReset();
@@ -206,6 +225,35 @@ describe('AppShell mailbox workflow', () => {
 		expect(setSelectedAccountMock).toHaveBeenCalledWith('acc-1');
 		expect(switchFolderMock).toHaveBeenCalledWith('inbox');
 		expect(loadMailsMock).not.toHaveBeenCalled();
+	});
+
+	it('clears the desktop reading selection when the mailbox folder changes', async () => {
+		render(AppShell);
+
+		await fireEvent.click(screen.getByRole('button', { name: 'mock-select-mail' }));
+
+		expect(screen.getByTestId('mock-reading-pane')).toHaveAttribute('data-mail-id', 'mail-1');
+
+		await fireEvent.click(screen.getByRole('button', { name: 'mock-select-folder' }));
+
+		expect(switchFolderMock).toHaveBeenCalledWith('sent');
+		expect(screen.getByTestId('mock-mail-list')).toHaveAttribute('data-selected-mail-id', '');
+		expect(screen.getByTestId('mock-reading-pane')).toHaveAttribute('data-mail-id', '');
+	});
+
+	it('clears the desktop reading selection when the mailbox account changes', async () => {
+		render(AppShell);
+
+		await fireEvent.click(screen.getByRole('button', { name: 'mock-select-mail' }));
+
+		expect(screen.getByTestId('mock-reading-pane')).toHaveAttribute('data-mail-id', 'mail-1');
+
+		await fireEvent.click(screen.getByRole('button', { name: 'mock-select-account' }));
+
+		expect(setSelectedAccountMock).toHaveBeenCalledWith('acc-1');
+		expect(switchFolderMock).toHaveBeenCalledWith('inbox');
+		expect(screen.getByTestId('mock-mail-list')).toHaveAttribute('data-selected-mail-id', '');
+		expect(screen.getByTestId('mock-reading-pane')).toHaveAttribute('data-mail-id', '');
 	});
 
 	it('routes the refresh shortcut through sync intent instead of direct sync commands', async () => {
