@@ -55,12 +55,12 @@ const {
 	}
 
 	const hasAccountsStore = createMockStore(true);
-	const activeAccountStore = createMockStore({
-		id: 'acc-1',
-		name: 'Primary',
-		email: 'primary@example.com',
-		is_active: true
-	});
+	const activeAccountStore = createMockStore<{
+		id: string;
+		name: string;
+		email: string;
+		is_active: boolean;
+	} | null>(null);
 	const isSyncingStore = createMockStore(false);
 	const preferencesStore = createMockStore({
 		appearance: {
@@ -217,10 +217,6 @@ vi.mock('./appShellRuntime.js', () => ({
 	initAppShellRuntime: vi.fn()
 }));
 
-vi.mock('$lib/sync/autoSyncLifecycle.js', () => ({
-	bindAutoSyncLifecycle: vi.fn(() => () => {})
-}));
-
 vi.mock('$lib/stores/accountStore.js', () => ({
 	hasAccounts: hasAccountsStore,
 	activeAccount: activeAccountStore,
@@ -281,12 +277,7 @@ vi.mock('$lib/db/index.js', () => ({
 describe('AppShell sync workflow', () => {
 	beforeEach(() => {
 		hasAccountsStore.set(true);
-		activeAccountStore.set({
-			id: 'acc-1',
-			name: 'Primary',
-			email: 'primary@example.com',
-			is_active: true
-		});
+		activeAccountStore.set(null);
 		isSyncingStore.set(false);
 		internalHandlers.clear();
 		tauriHandlers.clear();
@@ -313,6 +304,54 @@ describe('AppShell sync workflow', () => {
 		currentMailStore.markMailReadLocally = vi.fn();
 		currentMailStore.markMailUnreadLocally = vi.fn();
 		currentMailStore.initMailStore = vi.fn();
+	});
+
+	it('routes initial auto-sync through sync orchestration and reloads the mailbox when mails are updated', async () => {
+		const getMails = vi.fn().mockResolvedValue([]);
+		const getMailsCount = vi.fn().mockResolvedValue(0);
+		const markMailRead = vi.fn().mockResolvedValue(undefined);
+		const syncAccount = vi.fn(async () => {
+			await fakeEventBus.emitTauri('mails:updated');
+		});
+		const syncAllAccounts = vi.fn().mockResolvedValue(undefined);
+		const accountsStore = writable([{ id: 'acc-1', is_active: true }]);
+		const mailboxStore = createMailboxStore({
+			db: { getMails, getMailsCount, markMailRead },
+			accountsStore,
+			eventBus: fakeEventBus
+		});
+
+		connectMailStoreBridge(mailboxStore);
+		mailboxStore.init();
+		await waitFor(() => {
+			expect(getMails).toHaveBeenCalledWith('inbox', null, 50, 0);
+		});
+		getMails.mockClear();
+		getMailsCount.mockClear();
+
+		initSyncOrchestrator({
+			eventBus: createSyncOrchestratorEventBus(),
+			syncAccount,
+			syncAllAccounts,
+			getActiveAccount: () => ({ id: 'acc-1' })
+		});
+
+		activeAccountStore.set({
+			id: 'acc-1',
+			name: 'Primary',
+			email: 'primary@example.com',
+			is_active: true
+		});
+
+		render(AppShell);
+
+		await waitFor(() => {
+			expect(syncAccount).toHaveBeenCalledWith('acc-1');
+		});
+		await waitFor(() => {
+			expect(getMails).toHaveBeenCalledWith('inbox', null, 50, 0);
+		});
+		expect(syncAllAccounts).not.toHaveBeenCalled();
 	});
 
 	it('routes the keyboard refresh shortcut through sync orchestration and reloads the aggregate inbox on mails:updated', async () => {
