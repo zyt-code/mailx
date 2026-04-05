@@ -284,4 +284,36 @@ describe('AppShell mobile workflow', () => {
 		expect(setSelectedAccountMock).toHaveBeenCalledWith('acc-1');
 		expect(switchFolderMock).toHaveBeenCalledWith('inbox');
 	});
+
+	it('returns to the list when deleting from the mobile reading pane', async () => {
+		render(AppShell);
+
+		await fireEvent.click(screen.getByRole('button', { name: 'mock-select-mail' }));
+
+		await waitFor(() => {
+			expect(screen.getByTestId('mock-reading-pane')).toBeTruthy();
+		});
+
+		await fireEvent.click(screen.getByRole('button', { name: 'mock-reading-pane-delete' }));
+
+		await waitFor(() => {
+			expect(screen.getByTestId('mock-mail-list')).toBeTruthy();
+		});
+	});
+
+	it('returns to the list when archiving from the mobile reading pane', async () => {
+		render(AppShell);
+
+		await fireEvent.click(screen.getByRole('button', { name: 'mock-select-mail' }));
+
+		await waitFor(() => {
+			expect(screen.getByTestId('mock-reading-pane')).toBeTruthy();
+		});
+
+		await fireEvent.click(screen.getByRole('button', { name: 'mock-reading-pane-archive' }));
+
+		await waitFor(() => {
+			expect(screen.getByTestId('mock-mail-list')).toBeTruthy();
+		});
+	});
 });
