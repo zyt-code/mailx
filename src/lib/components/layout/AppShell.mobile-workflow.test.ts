@@ -8,6 +8,8 @@ const {
 	isSyncingStore,
 	preferencesStore,
 	displayedEmailsStore,
+	switchFolderMock,
+	setSelectedAccountMock,
 	eventBusEmitMock,
 	eventBusEmitAsyncMock
 } = vi.hoisted(() => ({
@@ -68,6 +70,8 @@ const {
 			html_body: '<p>Body</p>'
 		}
 	]),
+	switchFolderMock: vi.fn(),
+	setSelectedAccountMock: vi.fn(),
 	eventBusEmitMock: vi.fn(),
 	eventBusEmitAsyncMock: vi.fn().mockResolvedValue(undefined)
 }));
@@ -94,7 +98,7 @@ function createMockStore<T>(initialValue: T) {
 }
 
 vi.mock('./Sidebar.svelte', async () => {
-	const { default: Mock } = await import('$lib/test/EmptyComponentMock.svelte');
+	const { default: Mock } = await import('$lib/test/AppShellSidebarMock.svelte');
 	return { default: Mock };
 });
 
@@ -150,8 +154,8 @@ vi.mock('$lib/stores/preferencesStore.js', () => ({
 
 vi.mock('$lib/stores/mailStore.js', () => ({
 	initMailStore: vi.fn(),
-	switchFolder: vi.fn(),
-	setSelectedAccount: vi.fn(),
+	switchFolder: switchFolderMock,
+	setSelectedAccount: setSelectedAccountMock,
 	markMailReadLocally: vi.fn(),
 	markMailUnreadLocally: vi.fn(),
 	displayedEmails: displayedEmailsStore,
@@ -205,6 +209,8 @@ describe('AppShell mobile workflow', () => {
 				html_body: '<p>Body</p>'
 			}
 		]);
+		switchFolderMock.mockReset();
+		setSelectedAccountMock.mockReset();
 		eventBusEmitMock.mockReset();
 		eventBusEmitAsyncMock.mockReset();
 		eventBusEmitAsyncMock.mockResolvedValue(undefined);
@@ -240,5 +246,42 @@ describe('AppShell mobile workflow', () => {
 		await waitFor(() => {
 			expect(screen.getByTestId('mock-mail-list')).toBeTruthy();
 		});
+	});
+
+	it('returns to the list and switches folders when mobile navigation changes while reading', async () => {
+		render(AppShell);
+
+		await fireEvent.click(screen.getByRole('button', { name: 'mock-select-mail' }));
+
+		await waitFor(() => {
+			expect(screen.getByTestId('mock-reading-pane')).toBeTruthy();
+		});
+
+		await fireEvent.click(screen.getByRole('button', { name: 'mock-select-folder' }));
+
+		await waitFor(() => {
+			expect(screen.getByTestId('mock-mail-list')).toBeTruthy();
+		});
+
+		expect(switchFolderMock).toHaveBeenCalledWith('sent');
+	});
+
+	it('returns to the inbox list when the account changes while mobile reading is open', async () => {
+		render(AppShell);
+
+		await fireEvent.click(screen.getByRole('button', { name: 'mock-select-mail' }));
+
+		await waitFor(() => {
+			expect(screen.getByTestId('mock-reading-pane')).toBeTruthy();
+		});
+
+		await fireEvent.click(screen.getByRole('button', { name: 'mock-select-account' }));
+
+		await waitFor(() => {
+			expect(screen.getByTestId('mock-mail-list')).toBeTruthy();
+		});
+
+		expect(setSelectedAccountMock).toHaveBeenCalledWith('acc-1');
+		expect(switchFolderMock).toHaveBeenCalledWith('inbox');
 	});
 });
