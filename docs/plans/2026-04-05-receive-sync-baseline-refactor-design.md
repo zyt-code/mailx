@@ -351,7 +351,8 @@ Completed in the first refactor pass:
 - Sidebar compose-open event binding now goes through a dedicated `sidebarComposeEvents` helper
 - AppShell workflow integration coverage now verifies both settings-entry routes: `GetStarted -> /settings/accounts/new` when no accounts exist and `Sidebar -> /settings` when accounts are configured
 - AppShell mobile workflow integration coverage now verifies `list -> reading -> back`, stale-selected-mail recovery, and mobile folder/account navigation back into the mailbox list
-- focused frontend regression coverage now verifies 31 Vitest files / 113 tests plus `npm run check`
+- Sidebar refresh workflow integration coverage now verifies `refresh -> sync:trigger -> sync orchestrator -> mails:updated -> mailbox reload` for both aggregate and explicit-account mailbox scopes
+- focused frontend regression coverage now verifies 32 Vitest files / 115 tests plus `npm run check`
 
 Still pending in a follow-up pass:
 
