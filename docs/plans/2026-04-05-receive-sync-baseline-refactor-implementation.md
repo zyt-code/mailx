@@ -8,7 +8,7 @@
 
 **Tech Stack:** Svelte 5, Svelte stores, Vitest, Testing Library, Tauri v2, TypeScript, Rust IMAP commands
 
-> **Status update (2026-04-05):** Core mailbox/sync extraction is in place, `AppShell`, `ReadingPane`, and `Sidebar` have been thinned further through dedicated helpers, `npm run check` is green, and the focused frontend regression suite currently passes at 34 files / 132 tests. Workflow integration coverage now includes settings entry, primary mobile mailbox flows, mobile ReadingPane delete/archive return-to-list behavior, sidebar-driven mailbox transitions, the refresh-to-reload receive path, desktop mailbox-context selection clearing on folder/account switches, and desktop continuous-reading selection after list-side delete, ReadingPane delete, ReadingPane archive, and last-visible fallback mutations, with remaining work focused on broader workflow-level coverage and any hardening that emerges from it.
+> **Status update (2026-04-05):** Core mailbox/sync extraction is in place, `AppShell`, `ReadingPane`, and `Sidebar` have been thinned further through dedicated helpers, `npm run check` is green, and the focused frontend regression suite currently passes at 35 files / 134 tests. Workflow integration coverage now includes settings entry, primary mobile mailbox flows, mobile ReadingPane delete/archive return-to-list behavior, sidebar-driven mailbox transitions, the refresh-to-reload receive path, keyboard-refresh sync/reload coverage for aggregate and explicit mailbox scopes, desktop mailbox-context selection clearing on folder/account switches, and desktop continuous-reading selection after list-side delete, ReadingPane delete, ReadingPane archive, and last-visible fallback mutations, with remaining work focused on broader workflow-level coverage and any hardening that emerges from it.
 
 ---
 
@@ -720,7 +720,7 @@ Completed so far:
 - `src/lib/stores/mailStore.ts` is now a facade over `src/lib/mailbox/mailboxStore.ts`
 - `AppShell.svelte` account selection no longer forces an extra direct `loadMails()` call
 - `Sidebar` refresh now emits `sync:trigger` intent, including explicit account-scoped refresh
-- `AppShell.svelte` keyboard refresh shortcut now emits `sync:trigger` instead of directly calling `syncAllAccounts()`
+- `AppShell.svelte` keyboard refresh shortcut now emits `sync:trigger` instead of directly calling `syncAllAccounts()`, and it scopes explicit-mailbox refreshes to the selected account instead of always falling back to the active account
 - `AppShell` runtime bootstrap extracted into `src/lib/components/layout/appShellRuntime.ts`
 - `AppShell` single-key shortcut binding extracted into `src/lib/components/layout/appShellShortcuts.ts` with focused Vitest coverage
 - `AppShell` mailbox navigation handlers extracted into `src/lib/components/layout/appShellMailboxNavigation.ts`
@@ -744,9 +744,10 @@ Completed so far:
 - `AppShell.mailbox.test.ts` now also covers desktop mailbox-context switching clearing stale list selection and ReadingPane state when the user changes folders or accounts
 - `AppShell.mobile-workflow.test.ts` now covers `list -> reading -> back`, the stale-selected-mail return-to-list flow on mobile, mobile sidebar folder/account transitions back into the mailbox list, and ReadingPane delete/archive actions returning mobile users to the list
 - `Sidebar.sync-workflow.test.ts` now covers `refresh -> sync:trigger -> sync orchestrator -> mails:updated -> mailbox reload` for aggregate and explicit-account mailbox scopes
+- `AppShell.sync-workflow.test.ts` now covers `keyboard refresh -> sync:trigger -> sync orchestrator -> mails:updated -> mailbox reload` for aggregate inbox and explicit-account mailbox scopes
 - `AppShell.selection-workflow.test.ts` now covers desktop continuous-reading selection for list-side delete, ReadingPane delete, ReadingPane archive, and the fallback-to-previous path when the removed selection was the last visible mail
 - `ReadingPane` delete and archive actions now share the same selected-mail continuity hint path, and the workflow tests verify that desktop reading either advances to the next visible mail or falls back to the previous visible mail when it was the last item
-- focused frontend regression suite now passes at 34 files / 132 tests
+- focused frontend regression suite now passes at 35 files / 134 tests
 
 Still open from this plan:
 

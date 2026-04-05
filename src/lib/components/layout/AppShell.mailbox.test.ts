@@ -9,6 +9,7 @@ const {
 	isSyncingStore,
 	preferencesStore,
 	displayedEmailsStore,
+	selectedAccountIdStore,
 	switchFolderMock,
 	setSelectedAccountMock,
 	loadMailsMock,
@@ -64,6 +65,7 @@ const {
 		}
 	}),
 	displayedEmailsStore: createMockStore<Mail[]>([]),
+	selectedAccountIdStore: createMockStore<string | null>(null),
 	switchFolderMock: vi.fn(),
 	setSelectedAccountMock: vi.fn(),
 	loadMailsMock: vi.fn(),
@@ -162,6 +164,7 @@ vi.mock('$lib/stores/mailStore.js', () => ({
 	markMailReadLocally: vi.fn(),
 	markMailUnreadLocally: vi.fn(),
 	displayedEmails: displayedEmailsStore,
+	selectedAccountId: selectedAccountIdStore,
 	loadMails: loadMailsMock
 }));
 
@@ -206,6 +209,7 @@ describe('AppShell mailbox workflow', () => {
 		});
 		isSyncingStore.set(false);
 		displayedEmailsStore.set([createMail()]);
+		selectedAccountIdStore.set(null);
 		switchFolderMock.mockReset();
 		setSelectedAccountMock.mockReset();
 		loadMailsMock.mockReset();

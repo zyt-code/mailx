@@ -8,6 +8,7 @@ const {
 	isSyncingStore,
 	preferencesStore,
 	displayedEmailsStore,
+	selectedAccountIdStore,
 	switchFolderMock,
 	setSelectedAccountMock,
 	eventBusEmitMock,
@@ -70,6 +71,7 @@ const {
 			html_body: '<p>Body</p>'
 		}
 	]),
+	selectedAccountIdStore: createMockStore<string | null>(null),
 	switchFolderMock: vi.fn(),
 	setSelectedAccountMock: vi.fn(),
 	eventBusEmitMock: vi.fn(),
@@ -159,6 +161,7 @@ vi.mock('$lib/stores/mailStore.js', () => ({
 	markMailReadLocally: vi.fn(),
 	markMailUnreadLocally: vi.fn(),
 	displayedEmails: displayedEmailsStore,
+	selectedAccountId: selectedAccountIdStore,
 	loadMails: vi.fn()
 }));
 
@@ -197,6 +200,7 @@ describe('AppShell mobile workflow', () => {
 			is_active: true
 		});
 		isSyncingStore.set(false);
+		selectedAccountIdStore.set(null);
 		displayedEmailsStore.set([
 			{
 				id: 'mail-1',

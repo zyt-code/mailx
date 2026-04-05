@@ -8,6 +8,7 @@ const {
 	isSyncingStore,
 	preferencesStore,
 	displayedEmailsStore,
+	selectedAccountIdStore,
 	loadMailsMock,
 	moveToTrashMock
 } = vi.hoisted(() => ({
@@ -57,6 +58,7 @@ const {
 		}
 	}),
 	displayedEmailsStore: createMockStore(createMails()),
+	selectedAccountIdStore: createMockStore<string | null>(null),
 	loadMailsMock: vi.fn().mockImplementation(async () => {
 		displayedEmailsStore.set([createMails()[1]]);
 	}),
@@ -167,6 +169,7 @@ vi.mock('$lib/stores/mailStore.js', () => ({
 	markMailReadLocally: vi.fn(),
 	markMailUnreadLocally: vi.fn(),
 	displayedEmails: displayedEmailsStore,
+	selectedAccountId: selectedAccountIdStore,
 	loadMails: loadMailsMock
 }));
 
@@ -206,6 +209,7 @@ describe('AppShell selection workflow', () => {
 		});
 		isSyncingStore.set(false);
 		displayedEmailsStore.set(createMails());
+		selectedAccountIdStore.set(null);
 		loadMailsMock.mockClear();
 		loadMailsMock.mockImplementation(async () => {
 			displayedEmailsStore.set([createMails()[1]]);

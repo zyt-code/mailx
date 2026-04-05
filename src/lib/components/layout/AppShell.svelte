@@ -8,7 +8,15 @@
 	import * as db from '$lib/db/index.js';
 	import { hasAccounts, activeAccount } from '$lib/stores/accountStore.js';
 	import { isSyncing } from '$lib/stores/syncStore.js';
-	import { switchFolder, setSelectedAccount, markMailReadLocally, markMailUnreadLocally, displayedEmails, loadMails } from '$lib/stores/mailStore.js';
+	import {
+		switchFolder,
+		setSelectedAccount,
+		markMailReadLocally,
+		markMailUnreadLocally,
+		displayedEmails,
+		selectedAccountId as selectedMailboxAccountId,
+		loadMails
+	} from '$lib/stores/mailStore.js';
 	import { eventBus } from '$lib/events/index.js';
 	import { createMailboxContextActions } from '$lib/mailbox/mailboxContextActions.js';
 	import { bindAutoSyncLifecycle } from '$lib/sync/autoSyncLifecycle.js';
@@ -240,7 +248,12 @@ const DEFAULTS = { sidebarCollapsed: false, mailListWidth: DEFAULT_MAIL_LIST_WID
 				void mailSelection.stepSelection(delta);
 			},
 			openCompose: () => eventBus.emit('compose:open'),
-			triggerSync: () => eventBus.emitAsync('sync:trigger')
+			triggerSync: () => {
+				const accountId = get(selectedMailboxAccountId);
+				return accountId
+					? eventBus.emitAsync('sync:trigger', { accountId })
+					: eventBus.emitAsync('sync:trigger');
+			}
 		});
 	});
 </script>

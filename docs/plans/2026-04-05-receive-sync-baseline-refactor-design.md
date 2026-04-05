@@ -332,7 +332,7 @@ Completed in the first refactor pass:
 - runtime `mailStore` scope normalization when leaving aggregate inbox
 - `src/lib/stores/mailStore.ts` migrated into a compatibility facade over `src/lib/mailbox/mailboxStore.ts`
 - `AppShell.svelte` no longer forces an extra `loadMails()` on account selection
-- `Sidebar` refresh and `AppShell` keyboard refresh now emit `sync:trigger` intent instead of directly invoking sync commands
+- `Sidebar` refresh and `AppShell` keyboard refresh now emit `sync:trigger` intent instead of directly invoking sync commands, and the AppShell shortcut now scopes refresh to the currently selected mailbox account when one is explicit
 - AppShell runtime initialization now goes through a dedicated `appShellRuntime` entry point
 - `AppShell` single-key shortcut binding moved into a dedicated module with focused shortcut tests
 - mailbox selection, folder selection, and account-switch resets now go through a dedicated `appShellMailboxNavigation` controller
@@ -352,10 +352,11 @@ Completed in the first refactor pass:
 - AppShell workflow integration coverage now verifies both settings-entry routes: `GetStarted -> /settings/accounts/new` when no accounts exist and `Sidebar -> /settings` when accounts are configured
 - AppShell mobile workflow integration coverage now verifies `list -> reading -> back`, stale-selected-mail recovery, mobile folder/account navigation back into the mailbox list, and ReadingPane delete/archive actions returning mobile users to the mailbox list
 - Sidebar refresh workflow integration coverage now verifies `refresh -> sync:trigger -> sync orchestrator -> mails:updated -> mailbox reload` for both aggregate and explicit-account mailbox scopes
+- AppShell keyboard refresh workflow integration coverage now verifies `shortcut -> sync:trigger -> sync orchestrator -> mails:updated -> mailbox reload` for both aggregate inbox and explicit-account mailbox scopes
 - AppShell desktop mailbox workflow coverage now verifies that switching folders or accounts clears stale list selection and Reading Pane state instead of carrying a message across mailbox contexts
 - AppShell desktop selection workflow coverage now verifies continuous-reading behavior for list-side delete, ReadingPane delete, ReadingPane archive, and the fallback-to-previous case when the removed selection was the last visible mail
 - ReadingPane delete and archive continuity now use the same selected-mail removal strategy, so desktop reading actions and list-side actions keep the next visible message selected when possible and fall back to the previous visible message when necessary
-- focused frontend regression coverage now verifies 34 Vitest files / 132 tests plus `npm run check`
+- focused frontend regression coverage now verifies 35 Vitest files / 134 tests plus `npm run check`
 
 Still pending in a follow-up pass:
 
