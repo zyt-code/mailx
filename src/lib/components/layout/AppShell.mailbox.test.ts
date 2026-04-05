@@ -1,72 +1,31 @@
 import { fireEvent, render, screen } from '@testing-library/svelte';
-import { writable } from 'svelte/store';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import AppShell from './AppShell.svelte';
 
 const {
+	hasAccountsStore,
+	activeAccountStore,
+	isSyncingStore,
+	preferencesStore,
+	displayedEmailsStore,
 	switchFolderMock,
 	setSelectedAccountMock,
 	loadMailsMock,
 	syncAccountMock,
 	syncAllAccountsMock,
 	eventBusEmitMock,
-	eventBusEmitAsyncMock
+	eventBusEmitAsyncMock,
+	gotoMock
 } = vi.hoisted(() => ({
-	switchFolderMock: vi.fn(),
-	setSelectedAccountMock: vi.fn(),
-	loadMailsMock: vi.fn(),
-	syncAccountMock: vi.fn().mockResolvedValue(undefined),
-	syncAllAccountsMock: vi.fn().mockResolvedValue(undefined),
-	eventBusEmitMock: vi.fn(),
-	eventBusEmitAsyncMock: vi.fn().mockResolvedValue(undefined)
-}));
-
-vi.mock('./Sidebar.svelte', async () => {
-	const { default: SidebarMock } = await import('$lib/test/AppShellSidebarMock.svelte');
-	return { default: SidebarMock };
-});
-
-vi.mock('./MailList.svelte', async () => {
-	const { default: Mock } = await import('$lib/test/EmptyComponentMock.svelte');
-	return { default: Mock };
-});
-
-vi.mock('./Resizer.svelte', async () => {
-	const { default: Mock } = await import('$lib/test/EmptyComponentMock.svelte');
-	return { default: Mock };
-});
-
-vi.mock('./ReadingPane.svelte', async () => {
-	const { default: Mock } = await import('$lib/test/EmptyComponentMock.svelte');
-	return { default: Mock };
-});
-
-vi.mock('$lib/components/get-started/index.js', async () => {
-	const { default: Mock } = await import('$lib/test/EmptyComponentMock.svelte');
-	return { GetStarted: Mock };
-});
-
-vi.mock('$lib/stores/accountStore.js', () => ({
-	hasAccounts: writable(true),
-	activeAccount: writable({
+	hasAccountsStore: createMockStore(true),
+	activeAccountStore: createMockStore({
 		id: 'acc-1',
 		name: 'Primary',
 		email: 'primary@example.com',
 		is_active: true
-	})
-}));
-
-vi.mock('$lib/stores/syncStore.js', () => ({
-	initSyncStore: vi.fn(),
-	isSyncing: writable(false)
-}));
-
-vi.mock('$lib/stores/unreadStore.js', () => ({
-	initUnreadStore: vi.fn()
-}));
-
-vi.mock('$lib/stores/preferencesStore.js', () => ({
-	preferences: writable({
+	}),
+	isSyncingStore: createMockStore(false),
+	preferencesStore: createMockStore({
 		appearance: {
 			accentTone: 'blue',
 			mailDensity: 'comfortable',
@@ -102,7 +61,80 @@ vi.mock('$lib/stores/preferencesStore.js', () => ({
 			locale: 'en',
 			autoDetect: true
 		}
-	})
+	}),
+	displayedEmailsStore: createMockStore([]),
+	switchFolderMock: vi.fn(),
+	setSelectedAccountMock: vi.fn(),
+	loadMailsMock: vi.fn(),
+	syncAccountMock: vi.fn().mockResolvedValue(undefined),
+	syncAllAccountsMock: vi.fn().mockResolvedValue(undefined),
+	eventBusEmitMock: vi.fn(),
+	eventBusEmitAsyncMock: vi.fn().mockResolvedValue(undefined),
+	gotoMock: vi.fn()
+}));
+
+function createMockStore<T>(initialValue: T) {
+	let value = initialValue;
+	const subscribers = new Set<(nextValue: T) => void>();
+
+	return {
+		subscribe(callback: (nextValue: T) => void) {
+			callback(value);
+			subscribers.add(callback);
+			return () => {
+				subscribers.delete(callback);
+			};
+		},
+		set(nextValue: T) {
+			value = nextValue;
+			for (const subscriber of subscribers) {
+				subscriber(value);
+			}
+		}
+	};
+}
+
+vi.mock('./Sidebar.svelte', async () => {
+	const { default: SidebarMock } = await import('$lib/test/AppShellSidebarMock.svelte');
+	return { default: SidebarMock };
+});
+
+vi.mock('./MailList.svelte', async () => {
+	const { default: Mock } = await import('$lib/test/EmptyComponentMock.svelte');
+	return { default: Mock };
+});
+
+vi.mock('./Resizer.svelte', async () => {
+	const { default: Mock } = await import('$lib/test/EmptyComponentMock.svelte');
+	return { default: Mock };
+});
+
+vi.mock('./ReadingPane.svelte', async () => {
+	const { default: Mock } = await import('$lib/test/EmptyComponentMock.svelte');
+	return { default: Mock };
+});
+
+vi.mock('$lib/components/get-started/index.js', async () => {
+	const { default: Mock } = await import('$lib/test/AppShellGetStartedMock.svelte');
+	return { GetStarted: Mock };
+});
+
+vi.mock('$lib/stores/accountStore.js', () => ({
+	hasAccounts: hasAccountsStore,
+	activeAccount: activeAccountStore
+}));
+
+vi.mock('$lib/stores/syncStore.js', () => ({
+	initSyncStore: vi.fn(),
+	isSyncing: isSyncingStore
+}));
+
+vi.mock('$lib/stores/unreadStore.js', () => ({
+	initUnreadStore: vi.fn()
+}));
+
+vi.mock('$lib/stores/preferencesStore.js', () => ({
+	preferences: preferencesStore
 }));
 
 vi.mock('$lib/stores/mailStore.js', () => ({
@@ -111,7 +143,7 @@ vi.mock('$lib/stores/mailStore.js', () => ({
 	setSelectedAccount: setSelectedAccountMock,
 	markMailReadLocally: vi.fn(),
 	markMailUnreadLocally: vi.fn(),
-	displayedEmails: writable([]),
+	displayedEmails: displayedEmailsStore,
 	loadMails: loadMailsMock
 }));
 
@@ -132,7 +164,7 @@ vi.mock('$lib/sync/index.js', () => ({
 }));
 
 vi.mock('$app/navigation', () => ({
-	goto: vi.fn()
+	goto: gotoMock
 }));
 
 vi.mock('$app/environment', () => ({
@@ -147,6 +179,14 @@ vi.mock('$lib/db/index.js', () => ({
 
 describe('AppShell mailbox workflow', () => {
 	beforeEach(() => {
+		hasAccountsStore.set(true);
+		activeAccountStore.set({
+			id: 'acc-1',
+			name: 'Primary',
+			email: 'primary@example.com',
+			is_active: true
+		});
+		isSyncingStore.set(false);
 		switchFolderMock.mockReset();
 		setSelectedAccountMock.mockReset();
 		loadMailsMock.mockReset();
@@ -155,6 +195,7 @@ describe('AppShell mailbox workflow', () => {
 		eventBusEmitMock.mockReset();
 		eventBusEmitAsyncMock.mockReset();
 		eventBusEmitAsyncMock.mockResolvedValue(undefined);
+		gotoMock.mockReset();
 	});
 
 	it('routes account selection through selected-account state and folder switch without forcing an extra reload', async () => {
@@ -176,5 +217,23 @@ describe('AppShell mailbox workflow', () => {
 
 		expect(eventBusEmitAsyncMock).toHaveBeenCalledWith('sync:trigger');
 		expect(syncAllAccountsMock).not.toHaveBeenCalled();
+	});
+
+	it('routes get-started settings entry to add-account setup when no accounts are configured', async () => {
+		hasAccountsStore.set(false);
+
+		render(AppShell);
+
+		await fireEvent.click(screen.getByRole('button', { name: 'mock-get-started-open-settings' }));
+
+		expect(gotoMock).toHaveBeenCalledWith('/settings/accounts/new');
+	});
+
+	it('routes shell settings entry to the settings screen when accounts are configured', async () => {
+		render(AppShell);
+
+		await fireEvent.click(screen.getByRole('button', { name: 'mock-sidebar-open-settings' }));
+
+		expect(gotoMock).toHaveBeenCalledWith('/settings');
 	});
 });

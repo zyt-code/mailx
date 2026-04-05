@@ -349,7 +349,8 @@ Completed in the first refactor pass:
 - Sidebar onboarding tooltip timing and cleanup now go through a dedicated `sidebarDisabledFeedback` helper
 - Sidebar account-list collapse initialization and persistence now go through a dedicated `sidebarAccountsCollapse` helper
 - Sidebar compose-open event binding now goes through a dedicated `sidebarComposeEvents` helper
-- focused frontend regression coverage now verifies 30 Vitest files / 107 tests plus `npm run check`
+- AppShell workflow integration coverage now verifies both settings-entry routes: `GetStarted -> /settings/accounts/new` when no accounts exist and `Sidebar -> /settings` when accounts are configured
+- focused frontend regression coverage now verifies 30 Vitest files / 109 tests plus `npm run check`
 
 Still pending in a follow-up pass:
 
