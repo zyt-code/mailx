@@ -352,9 +352,9 @@ Completed in the first refactor pass:
 - AppShell workflow integration coverage now verifies both settings-entry routes: `GetStarted -> /settings/accounts/new` when no accounts exist and `Sidebar -> /settings` when accounts are configured
 - AppShell mobile workflow integration coverage now verifies `list -> reading -> back`, stale-selected-mail recovery, and mobile folder/account navigation back into the mailbox list
 - Sidebar refresh workflow integration coverage now verifies `refresh -> sync:trigger -> sync orchestrator -> mails:updated -> mailbox reload` for both aggregate and explicit-account mailbox scopes
-- AppShell desktop selection workflow coverage now verifies that deleting the selected message from the list advances the Reading Pane to the next visible mail instead of collapsing to an empty state
-- ReadingPane delete continuity now uses the same selected-mail removal strategy, so desktop reading actions and list-side actions both keep the next visible message selected
-- focused frontend regression coverage now verifies 33 Vitest files / 120 tests plus `npm run check`
+- AppShell desktop selection workflow coverage now verifies continuous-reading behavior for list-side delete, ReadingPane delete, ReadingPane archive, and the fallback-to-previous case when the removed selection was the last visible mail
+- ReadingPane delete and archive continuity now use the same selected-mail removal strategy, so desktop reading actions and list-side actions keep the next visible message selected when possible and fall back to the previous visible message when necessary
+- focused frontend regression coverage now verifies 34 Vitest files / 128 tests plus `npm run check`
 
 Still pending in a follow-up pass:
 

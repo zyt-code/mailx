@@ -8,7 +8,7 @@
 
 **Tech Stack:** Svelte 5, Svelte stores, Vitest, Testing Library, Tauri v2, TypeScript, Rust IMAP commands
 
-> **Status update (2026-04-05):** Core mailbox/sync extraction is in place, `AppShell`, `ReadingPane`, and `Sidebar` have been thinned further through dedicated helpers, `npm run check` is green, and the focused frontend regression suite currently passes at 33 files / 120 tests. Workflow integration coverage now includes settings entry, primary mobile mailbox flows, sidebar-driven mailbox transitions, the refresh-to-reload receive path, and desktop continuous-reading selection after both list-side and ReadingPane mailbox mutations, with remaining work focused on broader workflow-level coverage and any hardening that emerges from it.
+> **Status update (2026-04-05):** Core mailbox/sync extraction is in place, `AppShell`, `ReadingPane`, and `Sidebar` have been thinned further through dedicated helpers, `npm run check` is green, and the focused frontend regression suite currently passes at 34 files / 128 tests. Workflow integration coverage now includes settings entry, primary mobile mailbox flows, sidebar-driven mailbox transitions, the refresh-to-reload receive path, and desktop continuous-reading selection after list-side delete, ReadingPane delete, ReadingPane archive, and last-visible fallback mutations, with remaining work focused on broader workflow-level coverage and any hardening that emerges from it.
 
 ---
 
@@ -743,9 +743,9 @@ Completed so far:
 - `AppShell.mailbox.test.ts` now covers settings-entry workflow integration for both `GetStarted` and `Sidebar`
 - `AppShell.mobile-workflow.test.ts` now covers `list -> reading -> back`, the stale-selected-mail return-to-list flow on mobile, and mobile sidebar folder/account transitions back into the mailbox list
 - `Sidebar.sync-workflow.test.ts` now covers `refresh -> sync:trigger -> sync orchestrator -> mails:updated -> mailbox reload` for aggregate and explicit-account mailbox scopes
-- `AppShell.selection-workflow.test.ts` now covers desktop continuous-reading selection advancing to the next visible mail after list-side delete actions
-- `ReadingPane` delete actions now emit the same selected-mail continuity hint, and `AppShell.selection-workflow.test.ts` verifies the ReadingPane delete path also advances desktop reading selection to the next visible mail
-- focused frontend regression suite now passes at 33 files / 120 tests
+- `AppShell.selection-workflow.test.ts` now covers desktop continuous-reading selection for list-side delete, ReadingPane delete, ReadingPane archive, and the fallback-to-previous path when the removed selection was the last visible mail
+- `ReadingPane` delete and archive actions now share the same selected-mail continuity hint path, and the workflow tests verify that desktop reading either advances to the next visible mail or falls back to the previous visible mail when it was the last item
+- focused frontend regression suite now passes at 34 files / 128 tests
 
 Still open from this plan:
 

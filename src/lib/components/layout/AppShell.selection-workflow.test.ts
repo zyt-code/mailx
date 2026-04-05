@@ -253,4 +253,47 @@ describe('AppShell selection workflow', () => {
 			expect(screen.getByTestId('mock-reading-pane')).toHaveAttribute('data-mail-id', 'mail-2');
 		});
 	});
+
+	it('moves desktop reading selection to the next visible mail after archiving from the reading pane', async () => {
+		render(AppShell);
+
+		await fireEvent.click(screen.getByRole('button', { name: 'mock-select-mail-1' }));
+
+		await waitFor(() => {
+			expect(screen.getByTestId('mock-reading-pane')).toHaveAttribute('data-mail-id', 'mail-1');
+		});
+
+		await fireEvent.click(screen.getByRole('button', { name: 'mock-reading-pane-archive' }));
+
+		await waitFor(() => {
+			expect(loadMailsMock).toHaveBeenCalledTimes(1);
+		});
+		await waitFor(() => {
+			expect(screen.getByTestId('mock-reading-pane')).toHaveAttribute('data-mail-id', 'mail-2');
+		});
+	});
+
+	it('falls back to the previous visible mail after removing the last visible selected mail', async () => {
+		displayedEmailsStore.set([createMails()[1], createMails()[0]]);
+		loadMailsMock.mockImplementation(async () => {
+			displayedEmailsStore.set([createMails()[1]]);
+		});
+
+		render(AppShell);
+
+		await fireEvent.click(screen.getByRole('button', { name: 'mock-select-mail-1' }));
+
+		await waitFor(() => {
+			expect(screen.getByTestId('mock-reading-pane')).toHaveAttribute('data-mail-id', 'mail-1');
+		});
+
+		await fireEvent.click(screen.getByRole('button', { name: 'mock-reading-pane-delete' }));
+
+		await waitFor(() => {
+			expect(loadMailsMock).toHaveBeenCalledTimes(1);
+		});
+		await waitFor(() => {
+			expect(screen.getByTestId('mock-reading-pane')).toHaveAttribute('data-mail-id', 'mail-2');
+		});
+	});
 });

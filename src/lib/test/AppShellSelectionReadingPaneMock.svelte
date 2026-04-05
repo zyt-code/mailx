@@ -13,6 +13,18 @@
 <div data-testid="mock-reading-pane" data-mail-id={mail?.id ?? ''}></div>
 <button
 	type="button"
+	aria-label="mock-reading-pane-archive"
+	onclick={() => {
+		if (mail) {
+			onRemoveMail?.(mail);
+		}
+		onRefresh?.();
+	}}
+>
+	archive in reading pane
+</button>
+<button
+	type="button"
 	aria-label="mock-reading-pane-delete"
 	onclick={() => {
 		if (mail) {
