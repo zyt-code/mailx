@@ -8,7 +8,7 @@
 
 **Tech Stack:** Svelte 5, Svelte stores, Vitest, Testing Library, Tauri v2, TypeScript, Rust IMAP commands
 
-> **Status update (2026-04-05):** Core mailbox/sync extraction is in place, `AppShell`, `ReadingPane`, and `Sidebar` have been thinned further through dedicated helpers, `npm run check` is green, and the focused frontend regression suite currently passes at 30 files / 109 tests. `AppShell` workflow integration coverage now includes both settings-entry routes, with remaining work focused on broader workflow-level coverage and any hardening that emerges from it.
+> **Status update (2026-04-05):** Core mailbox/sync extraction is in place, `AppShell`, `ReadingPane`, and `Sidebar` have been thinned further through dedicated helpers, `npm run check` is green, and the focused frontend regression suite currently passes at 31 files / 111 tests. `AppShell` workflow integration coverage now includes both settings-entry routes plus the primary mobile mailbox flow, with remaining work focused on broader workflow-level coverage and any hardening that emerges from it.
 
 ---
 
@@ -741,7 +741,8 @@ Completed so far:
 - Sidebar accounts collapse persistence extracted into `src/lib/components/layout/sidebarAccountsCollapse.ts`
 - Sidebar compose-open event binding extracted into `src/lib/components/layout/sidebarComposeEvents.ts`
 - `AppShell.mailbox.test.ts` now covers settings-entry workflow integration for both `GetStarted` and `Sidebar`
-- focused frontend regression suite now passes at 30 files / 109 tests
+- `AppShell.mobile-workflow.test.ts` now covers `list -> reading -> back` and the stale-selected-mail return-to-list flow on mobile
+- focused frontend regression suite now passes at 31 files / 111 tests
 
 Still open from this plan:
 

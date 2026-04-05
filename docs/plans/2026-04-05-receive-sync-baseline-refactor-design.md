@@ -350,7 +350,8 @@ Completed in the first refactor pass:
 - Sidebar account-list collapse initialization and persistence now go through a dedicated `sidebarAccountsCollapse` helper
 - Sidebar compose-open event binding now goes through a dedicated `sidebarComposeEvents` helper
 - AppShell workflow integration coverage now verifies both settings-entry routes: `GetStarted -> /settings/accounts/new` when no accounts exist and `Sidebar -> /settings` when accounts are configured
-- focused frontend regression coverage now verifies 30 Vitest files / 109 tests plus `npm run check`
+- AppShell mobile workflow integration coverage now verifies `list -> reading -> back` and returns to list when the selected mail disappears from the current mailbox
+- focused frontend regression coverage now verifies 31 Vitest files / 111 tests plus `npm run check`
 
 Still pending in a follow-up pass:
 
