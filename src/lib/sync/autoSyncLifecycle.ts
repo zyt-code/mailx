@@ -26,10 +26,12 @@ export function bindAutoSyncLifecycle({
 	intervalMs = DEFAULT_INTERVAL_MS
 }: AutoSyncDeps): () => void {
 	let currentAccountId: string | null = null;
+	let pendingInitialSyncAccountId: string | null = null;
 	let hasAccounts = get(hasAccountsStore);
 	let isSyncing = get(isSyncingStore);
 	let syncIntervalId: ReturnType<typeof setInterval> | null = null;
 	let destroyed = false;
+	let initialSyncInFlight = false;
 
 	function clearSyncInterval(): void {
 		if (syncIntervalId) {
@@ -38,37 +40,35 @@ export function bindAutoSyncLifecycle({
 		}
 	}
 
-	const unsubscribeHasAccounts = hasAccountsStore.subscribe((value) => {
-		hasAccounts = value;
-	});
-
-	const unsubscribeIsSyncing = isSyncingStore.subscribe((value) => {
-		isSyncing = value;
-	});
-
-	const unsubscribeActiveAccount = activeAccountStore.subscribe(async (account) => {
-		if (destroyed) {
+	async function flushPendingInitialSync(): Promise<void> {
+		if (
+			destroyed ||
+			initialSyncInFlight ||
+			!pendingInitialSyncAccountId ||
+			!hasAccounts ||
+			isSyncing
+		) {
 			return;
 		}
 
-		if (!account || account.id === currentAccountId) {
-			return;
-		}
-
-		currentAccountId = account.id;
-
-		if (!hasAccounts || isSyncing) {
-			return;
-		}
+		const accountId = pendingInitialSyncAccountId;
+		pendingInitialSyncAccountId = null;
+		initialSyncInFlight = true;
 
 		try {
-			await triggerSync({ accountId: account.id });
+			await triggerSync({ accountId });
 		} catch (error) {
 			console.error('[autoSyncLifecycle] Initial account sync failed:', error);
+			if (!destroyed && currentAccountId === accountId) {
+				pendingInitialSyncAccountId = accountId;
+			}
 			return;
+		} finally {
+			initialSyncInFlight = false;
 		}
 
-		if (destroyed) {
+		if (destroyed || currentAccountId !== accountId) {
+			void flushPendingInitialSync();
 			return;
 		}
 
@@ -82,6 +82,39 @@ export function bindAutoSyncLifecycle({
 				console.error('[autoSyncLifecycle] Periodic sync failed:', error);
 			});
 		}, intervalMs);
+	}
+
+	const unsubscribeHasAccounts = hasAccountsStore.subscribe((value) => {
+		hasAccounts = value;
+		void flushPendingInitialSync();
+	});
+
+	const unsubscribeIsSyncing = isSyncingStore.subscribe((value) => {
+		isSyncing = value;
+		void flushPendingInitialSync();
+	});
+
+	const unsubscribeActiveAccount = activeAccountStore.subscribe(async (account) => {
+		if (destroyed) {
+			return;
+		}
+
+		if (!account) {
+			currentAccountId = null;
+			pendingInitialSyncAccountId = null;
+			clearSyncInterval();
+			return;
+		}
+
+		if (account.id === currentAccountId && !pendingInitialSyncAccountId) {
+			return;
+		}
+
+		currentAccountId = account.id;
+		pendingInitialSyncAccountId = account.id;
+		clearSyncInterval();
+
+		void flushPendingInitialSync();
 	});
 
 	return () => {

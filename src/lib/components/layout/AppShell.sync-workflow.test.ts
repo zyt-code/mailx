@@ -445,4 +445,70 @@ describe('AppShell sync workflow', () => {
 		});
 		expect(syncAllAccounts).not.toHaveBeenCalled();
 	});
+
+	it('syncs the latest active account after an in-flight sync finishes', async () => {
+		const getMails = vi.fn().mockResolvedValue([]);
+		const getMailsCount = vi.fn().mockResolvedValue(0);
+		const markMailRead = vi.fn().mockResolvedValue(undefined);
+		const syncAccount = vi.fn(async () => {
+			await fakeEventBus.emitTauri('mails:updated');
+		});
+		const syncAllAccounts = vi.fn().mockResolvedValue(undefined);
+		const accountsStore = writable([
+			{ id: 'acc-1', is_active: true },
+			{ id: 'acc-2', is_active: false }
+		]);
+		const mailboxStore = createMailboxStore({
+			db: { getMails, getMailsCount, markMailRead },
+			accountsStore,
+			eventBus: fakeEventBus
+		});
+
+		isSyncingStore.set(true);
+		activeAccountStore.set({
+			id: 'acc-1',
+			name: 'Primary',
+			email: 'primary@example.com',
+			is_active: true
+		});
+
+		connectMailStoreBridge(mailboxStore);
+		mailboxStore.init();
+		await waitFor(() => {
+			expect(getMails).toHaveBeenCalledWith('inbox', null, 50, 0);
+		});
+		getMails.mockClear();
+		getMailsCount.mockClear();
+
+		let currentActiveAccountId = 'acc-1';
+		initSyncOrchestrator({
+			eventBus: createSyncOrchestratorEventBus(),
+			syncAccount,
+			syncAllAccounts,
+			getActiveAccount: () => ({ id: currentActiveAccountId })
+		});
+
+		render(AppShell);
+
+		currentActiveAccountId = 'acc-2';
+		activeAccountStore.set({
+			id: 'acc-2',
+			name: 'Secondary',
+			email: 'secondary@example.com',
+			is_active: true
+		});
+		await Promise.resolve();
+
+		expect(syncAccount).not.toHaveBeenCalled();
+
+		isSyncingStore.set(false);
+
+		await waitFor(() => {
+			expect(syncAccount).toHaveBeenCalledWith('acc-2');
+		});
+		await waitFor(() => {
+			expect(getMails).toHaveBeenCalledWith('inbox', null, 50, 0);
+		});
+		expect(syncAllAccounts).not.toHaveBeenCalled();
+	});
 });

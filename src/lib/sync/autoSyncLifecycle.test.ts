@@ -86,4 +86,30 @@ describe('bindAutoSyncLifecycle', () => {
 
 		expect(triggerSync).toHaveBeenCalledTimes(1);
 	});
+
+	it('syncs the latest active account after an in-flight sync finishes', async () => {
+		const activeAccountStore = writable<{ id: string } | null>({ id: 'acc-1' });
+		const hasAccountsStore = writable(true);
+		const isSyncingStore = writable(true);
+		const triggerSync = vi.fn().mockResolvedValue(undefined);
+
+		const cleanup = bindAutoSyncLifecycle({
+			activeAccountStore,
+			hasAccountsStore,
+			isSyncingStore,
+			triggerSync,
+			intervalMs: 1000
+		});
+
+		activeAccountStore.set({ id: 'acc-2' });
+		await Promise.resolve();
+
+		expect(triggerSync).not.toHaveBeenCalled();
+
+		isSyncingStore.set(false);
+		await Promise.resolve();
+
+		expect(triggerSync).toHaveBeenCalledWith({ accountId: 'acc-2' });
+		cleanup();
+	});
 });
