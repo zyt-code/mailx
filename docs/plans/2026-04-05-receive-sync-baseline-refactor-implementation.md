@@ -8,7 +8,7 @@
 
 **Tech Stack:** Svelte 5, Svelte stores, Vitest, Testing Library, Tauri v2, TypeScript, Rust IMAP commands
 
-> **Status update (2026-04-05):** Core mailbox/sync extraction is in place, `AppShell`, `ReadingPane`, and `Sidebar` have been thinned further through dedicated helpers, `npm run check` is green, and the focused frontend regression suite currently passes at 35 files / 135 tests. Workflow integration coverage now includes settings entry, primary mobile mailbox flows, mobile ReadingPane delete/archive return-to-list behavior, sidebar-driven mailbox transitions, the refresh-to-reload receive path, keyboard-refresh sync/reload coverage for aggregate and explicit mailbox scopes, initial auto-sync sync/reload coverage on account activation, desktop mailbox-context selection clearing on folder/account switches, and desktop continuous-reading selection after list-side delete, ReadingPane delete, ReadingPane archive, and last-visible fallback mutations, with remaining work focused on broader workflow-level coverage and any hardening that emerges from it.
+> **Status update (2026-04-05):** Core mailbox/sync extraction is in place, `AppShell`, `ReadingPane`, and `Sidebar` have been thinned further through dedicated helpers, `npm run check` is green, and the focused frontend regression suite currently passes at 36 files / 138 tests. Workflow integration coverage now includes settings entry, primary mobile mailbox flows, mobile ReadingPane delete/archive return-to-list behavior, sidebar-driven mailbox transitions, the refresh-to-reload receive path, keyboard-refresh sync/reload coverage for aggregate and explicit mailbox scopes, initial auto-sync sync/reload coverage on account activation, account lifecycle recovery coverage for `account:deleted` and `account:created`, desktop mailbox-context selection clearing on folder/account switches, and desktop continuous-reading selection after list-side delete, ReadingPane delete, ReadingPane archive, and last-visible fallback mutations, with remaining work focused on broader workflow-level coverage and any hardening that emerges from it.
 
 ---
 
@@ -746,9 +746,10 @@ Completed so far:
 - `Sidebar.sync-workflow.test.ts` now covers `refresh -> sync:trigger -> sync orchestrator -> mails:updated -> mailbox reload` for aggregate and explicit-account mailbox scopes
 - `AppShell.sync-workflow.test.ts` now covers `keyboard refresh -> sync:trigger -> sync orchestrator -> mails:updated -> mailbox reload` for aggregate inbox and explicit-account mailbox scopes
 - `AppShell.sync-workflow.test.ts` now also covers `active account -> autoSyncLifecycle -> sync:trigger -> sync orchestrator -> mails:updated -> mailbox reload` so the initial AppShell auto-sync path is locked down at workflow level
+- `AppShell.account-workflow.test.ts` now covers desktop selection reset when an explicit mailbox account is deleted, mobile return-to-list when that account disappears mid-reading, and `GetStarted -> mailbox list` recovery when an account is created
 - `AppShell.selection-workflow.test.ts` now covers desktop continuous-reading selection for list-side delete, ReadingPane delete, ReadingPane archive, and the fallback-to-previous path when the removed selection was the last visible mail
 - `ReadingPane` delete and archive actions now share the same selected-mail continuity hint path, and the workflow tests verify that desktop reading either advances to the next visible mail or falls back to the previous visible mail when it was the last item
-- focused frontend regression suite now passes at 35 files / 135 tests
+- focused frontend regression suite now passes at 36 files / 138 tests
 
 Still open from this plan:
 

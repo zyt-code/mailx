@@ -354,10 +354,11 @@ Completed in the first refactor pass:
 - Sidebar refresh workflow integration coverage now verifies `refresh -> sync:trigger -> sync orchestrator -> mails:updated -> mailbox reload` for both aggregate and explicit-account mailbox scopes
 - AppShell keyboard refresh workflow integration coverage now verifies `shortcut -> sync:trigger -> sync orchestrator -> mails:updated -> mailbox reload` for both aggregate inbox and explicit-account mailbox scopes
 - AppShell auto-sync workflow integration coverage now verifies `active account -> autoSyncLifecycle -> sync:trigger -> sync orchestrator -> mails:updated -> mailbox reload` during initial account activation
+- AppShell account lifecycle workflow coverage now verifies desktop selection reset on `account:deleted`, mobile reading fallback to list on `account:deleted`, and `GetStarted -> mailbox list` recovery on `account:created`
 - AppShell desktop mailbox workflow coverage now verifies that switching folders or accounts clears stale list selection and Reading Pane state instead of carrying a message across mailbox contexts
 - AppShell desktop selection workflow coverage now verifies continuous-reading behavior for list-side delete, ReadingPane delete, ReadingPane archive, and the fallback-to-previous case when the removed selection was the last visible mail
 - ReadingPane delete and archive continuity now use the same selected-mail removal strategy, so desktop reading actions and list-side actions keep the next visible message selected when possible and fall back to the previous visible message when necessary
-- focused frontend regression coverage now verifies 35 Vitest files / 135 tests plus `npm run check`
+- focused frontend regression coverage now verifies 36 Vitest files / 138 tests plus `npm run check`
 
 Still pending in a follow-up pass:
 
