@@ -1,6 +1,6 @@
 import { get } from 'svelte/store';
 import { eventBus } from '$lib/events/eventBus.js';
-import { activeAccount } from '$lib/stores/accountStore.js';
+import { activeAccount, hasAccounts } from '$lib/stores/accountStore.js';
 import { syncAccount, syncAllAccounts } from '$lib/sync/index.js';
 
 type SyncTriggerPayload = {
@@ -17,6 +17,7 @@ type SyncOrchestratorDeps = {
 	syncAccount: (accountId: string) => Promise<unknown>;
 	syncAllAccounts: () => Promise<unknown>;
 	getActiveAccount: () => { id: string } | null;
+	getHasAccounts?: () => boolean;
 };
 
 let initialized = false;
@@ -26,7 +27,8 @@ export function initSyncOrchestrator(
 		eventBus,
 		syncAccount,
 		syncAllAccounts,
-		getActiveAccount: () => get(activeAccount)
+		getActiveAccount: () => get(activeAccount),
+		getHasAccounts: () => get(hasAccounts)
 	}
 ): void {
 	if (deps.eventBus === eventBus && initialized) {
@@ -41,6 +43,10 @@ export function initSyncOrchestrator(
 		try {
 			if (payload?.accountId) {
 				await deps.syncAccount(payload.accountId);
+				return;
+			}
+
+			if (deps.getHasAccounts && !deps.getHasAccounts()) {
 				return;
 			}
 

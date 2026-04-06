@@ -45,4 +45,27 @@ describe('initSyncOrchestrator', () => {
 		expect(syncAccount).toHaveBeenCalledWith('acc-2');
 		expect(syncAllAccounts).not.toHaveBeenCalled();
 	});
+
+	it('ignores sync intent when no accounts are configured', async () => {
+		const handlers = new Map<string, (payload?: { accountId?: string }) => void | Promise<void>>();
+		const syncAccount = vi.fn().mockResolvedValue(undefined);
+		const syncAllAccounts = vi.fn().mockResolvedValue(undefined);
+
+		initSyncOrchestrator({
+			eventBus: {
+				on(event, callback) {
+					handlers.set(event, callback);
+				}
+			},
+			syncAccount,
+			syncAllAccounts,
+			getHasAccounts: () => false,
+			getActiveAccount: () => null
+		});
+
+		await handlers.get('sync:trigger')?.();
+
+		expect(syncAccount).not.toHaveBeenCalled();
+		expect(syncAllAccounts).not.toHaveBeenCalled();
+	});
 });
