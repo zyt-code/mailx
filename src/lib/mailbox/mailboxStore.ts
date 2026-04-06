@@ -163,6 +163,16 @@ export function createMailboxStore({ db, accountsStore, eventBus }: MailboxStore
 		await loadMails();
 	}
 
+	function shouldReloadForAccountUpdate(updatedAccountId?: string): boolean {
+		if (!updatedAccountId) {
+			return true;
+		}
+
+		return (
+			get(_selectedAccountId) === updatedAccountId || get(_effectiveAccountId) === updatedAccountId
+		);
+	}
+
 	function init(): void {
 		if (initialized) {
 			return;
@@ -209,7 +219,12 @@ export function createMailboxStore({ db, accountsStore, eventBus }: MailboxStore
 				await loadMails();
 			});
 
-			void eventBus.onTauri('account:updated', async () => {
+			void eventBus.onTauri('account:updated', async (payload) => {
+				const id = (payload as { id?: string } | undefined)?.id;
+				if (!shouldReloadForAccountUpdate(id)) {
+					return;
+				}
+
 				await loadMails();
 			});
 

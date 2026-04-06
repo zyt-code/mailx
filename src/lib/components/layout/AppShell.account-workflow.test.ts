@@ -518,4 +518,38 @@ describe('AppShell account workflow', () => {
 			expect(screen.getByRole('button', { name: 'mock-get-started-open-settings' })).toBeTruthy();
 		});
 	});
+
+	it('keeps the current reading session when a different account is updated', async () => {
+		const accountsStore = writable([
+			{ id: 'acc-1', is_active: true },
+			{ id: 'acc-2', is_active: false }
+		]);
+		const { db, getMails } = createMailboxDb();
+		const mailboxStore = createMailboxStore({
+			db,
+			accountsStore,
+			eventBus: fakeEventBus
+		});
+
+		connectMailStoreBridge(mailboxStore);
+		mailboxStore.init();
+		await mailboxStore.selectAccount('acc-2');
+
+		render(AppShell);
+
+		await fireEvent.click(screen.getByRole('button', { name: 'mock-select-mail' }));
+
+		await waitFor(() => {
+			expect(screen.getByTestId('mock-reading-pane')).toHaveAttribute('data-mail-id', 'mail-1');
+		});
+
+		getMails.mockClear();
+
+		await fakeEventBus.emitTauri('account:updated', { id: 'acc-1' });
+
+		expect(getMails).not.toHaveBeenCalled();
+		await waitFor(() => {
+			expect(screen.getByTestId('mock-reading-pane')).toHaveAttribute('data-mail-id', 'mail-1');
+		});
+	});
 });
