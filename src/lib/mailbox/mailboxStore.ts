@@ -173,6 +173,14 @@ export function createMailboxStore({ db, accountsStore, eventBus }: MailboxStore
 		);
 	}
 
+	function shouldReloadForAccountDeletion(deletedAccountId: string): boolean {
+		return (
+			get(_selectedAccountId) === deletedAccountId ||
+			get(_effectiveAccountId) === deletedAccountId ||
+			(get(_selectedAccountId) === null && get(_effectiveAccountId) === null)
+		);
+	}
+
 	function init(): void {
 		if (initialized) {
 			return;
@@ -205,11 +213,16 @@ export function createMailboxStore({ db, accountsStore, eventBus }: MailboxStore
 				const id = (payload as { id?: string } | undefined)?.id;
 				if (!id) return;
 				const remainingAccounts = get(accountsStore).filter((account) => account.id !== id);
+				const needsReload = shouldReloadForAccountDeletion(id);
 
 				_mails.update((current) => current.filter((mail) => mail.account_id !== id));
 
 				if (get(_selectedAccountId) === id) {
 					_selectedAccountId.set(resolveFallbackAccountId(remainingAccounts));
+				}
+
+				if (!needsReload) {
+					return;
 				}
 
 				await loadMailsForAccounts(get(_activeFolder), remainingAccounts);
