@@ -247,7 +247,13 @@ const DEFAULTS = { sidebarCollapsed: false, mailListWidth: DEFAULT_MAIL_LIST_WID
 			stepMailSelection: (delta) => {
 				void mailSelection.stepSelection(delta);
 			},
-			openCompose: () => eventBus.emit('compose:open'),
+			openCompose: () => {
+				if (!isAccountConfigured) {
+					return;
+				}
+
+				eventBus.emit('compose:open');
+			},
 			triggerSync: () => {
 				if (!isAccountConfigured) {
 					return Promise.resolve();
