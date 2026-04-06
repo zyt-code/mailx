@@ -26,6 +26,7 @@ describe('createAppShellSelectedMailLifecycle', () => {
 			getSelectedMailId: () => 'mail-9',
 			getMobileView: () => 'list',
 			clearSelectedMail,
+			setSelectedMailId: vi.fn(),
 			setMobileView
 		});
 
@@ -43,6 +44,7 @@ describe('createAppShellSelectedMailLifecycle', () => {
 			getSelectedMailId: () => 'mail-9',
 			getMobileView: () => 'reading',
 			clearSelectedMail,
+			setSelectedMailId: vi.fn(),
 			setMobileView
 		});
 
@@ -50,6 +52,33 @@ describe('createAppShellSelectedMailLifecycle', () => {
 
 		expect(clearSelectedMail).toHaveBeenCalledTimes(1);
 		expect(setMobileView).toHaveBeenCalledWith('list');
+	});
+
+	it('moves desktop selection to the nearest remaining mail when an external update removes it', () => {
+		let visibleMails = [createMail('mail-1'), createMail('mail-2')];
+		let selectedMailId: string | null = 'mail-1';
+		const clearSelectedMail = vi.fn();
+		const setSelectedMailId = vi.fn((nextMailId: string | null) => {
+			selectedMailId = nextMailId;
+		});
+		const setMobileView = vi.fn();
+		const lifecycle = createAppShellSelectedMailLifecycle({
+			getVisibleMails: () => visibleMails,
+			getSelectedMailId: () => selectedMailId,
+			getMobileView: () => 'list',
+			clearSelectedMail,
+			setSelectedMailId,
+			setMobileView
+		});
+
+		lifecycle.reconcile();
+
+		visibleMails = [createMail('mail-2')];
+		lifecycle.reconcile();
+
+		expect(setSelectedMailId).toHaveBeenCalledWith('mail-2');
+		expect(clearSelectedMail).not.toHaveBeenCalled();
+		expect(setMobileView).not.toHaveBeenCalled();
 	});
 
 	it('keeps the current selection when the selected mail still exists', () => {
@@ -60,6 +89,7 @@ describe('createAppShellSelectedMailLifecycle', () => {
 			getSelectedMailId: () => 'mail-1',
 			getMobileView: () => 'reading',
 			clearSelectedMail,
+			setSelectedMailId: vi.fn(),
 			setMobileView
 		});
 
@@ -77,6 +107,7 @@ describe('createAppShellSelectedMailLifecycle', () => {
 			getSelectedMailId: () => null,
 			getMobileView: () => 'list',
 			clearSelectedMail,
+			setSelectedMailId: vi.fn(),
 			setMobileView
 		});
 

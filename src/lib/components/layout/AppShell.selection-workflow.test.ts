@@ -300,4 +300,20 @@ describe('AppShell selection workflow', () => {
 			expect(screen.getByTestId('mock-reading-pane')).toHaveAttribute('data-mail-id', 'mail-2');
 		});
 	});
+
+	it('keeps desktop reading continuity when an external mailbox update removes the selected mail', async () => {
+		render(AppShell);
+
+		await fireEvent.click(screen.getByRole('button', { name: 'mock-select-mail-1' }));
+
+		await waitFor(() => {
+			expect(screen.getByTestId('mock-reading-pane')).toHaveAttribute('data-mail-id', 'mail-1');
+		});
+
+		displayedEmailsStore.set([createMails()[1]]);
+
+		await waitFor(() => {
+			expect(screen.getByTestId('mock-reading-pane')).toHaveAttribute('data-mail-id', 'mail-2');
+		});
+	});
 });

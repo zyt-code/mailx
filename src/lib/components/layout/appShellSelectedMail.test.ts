@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { Mail } from '$lib/types.js';
-import { resolveNextSelectedMailId, resolveSelectedMail } from './appShellSelectedMail.js';
+import {
+	resolveNextSelectedMailId,
+	resolveReplacementSelectedMailId,
+	resolveSelectedMail
+} from './appShellSelectedMail.js';
 
 function createMail(id: string): Mail {
 	return {
@@ -51,5 +55,37 @@ describe('resolveNextSelectedMailId', () => {
 
 	it('returns null when no visible mail remains after removal', () => {
 		expect(resolveNextSelectedMailId([createMail('mail-1')], 'mail-1')).toBeNull();
+	});
+});
+
+describe('resolveReplacementSelectedMailId', () => {
+	it('prefers the next still-visible mail when an external update removes the selection', () => {
+		expect(
+			resolveReplacementSelectedMailId(
+				[createMail('mail-1'), createMail('mail-2'), createMail('mail-3')],
+				[createMail('mail-2'), createMail('mail-3')],
+				'mail-1'
+			)
+		).toBe('mail-2');
+	});
+
+	it('falls back to the previous still-visible mail when no later mail remains', () => {
+		expect(
+			resolveReplacementSelectedMailId(
+				[createMail('mail-1'), createMail('mail-2')],
+				[createMail('mail-1')],
+				'mail-2'
+			)
+		).toBe('mail-1');
+	});
+
+	it('returns null when no nearby visible mail survives the update', () => {
+		expect(
+			resolveReplacementSelectedMailId(
+				[createMail('mail-1'), createMail('mail-2')],
+				[],
+				'mail-1'
+			)
+		).toBeNull();
 	});
 });

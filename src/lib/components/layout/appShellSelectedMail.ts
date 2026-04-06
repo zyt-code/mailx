@@ -16,3 +16,30 @@ export function resolveNextSelectedMailId(mails: Mail[], removedMailId: string):
 
 	return mails[removedIndex + 1]?.id ?? mails[removedIndex - 1]?.id ?? null;
 }
+
+export function resolveReplacementSelectedMailId(
+	previousMails: Mail[],
+	currentMails: Mail[],
+	removedMailId: string
+): string | null {
+	const removedIndex = previousMails.findIndex((mail) => mail.id === removedMailId);
+	if (removedIndex === -1) {
+		return null;
+	}
+
+	const currentMailIds = new Set(currentMails.map((mail) => mail.id));
+
+	for (let offset = 1; offset < previousMails.length; offset += 1) {
+		const nextId = previousMails[removedIndex + offset]?.id;
+		if (nextId && currentMailIds.has(nextId)) {
+			return nextId;
+		}
+
+		const previousId = previousMails[removedIndex - offset]?.id;
+		if (previousId && currentMailIds.has(previousId)) {
+			return previousId;
+		}
+	}
+
+	return null;
+}

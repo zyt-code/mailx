@@ -178,6 +178,9 @@ const DEFAULTS = { sidebarCollapsed: false, mailListWidth: DEFAULT_MAIL_LIST_WID
 		clearSelectedMail: () => {
 			selectedMailId = null;
 		},
+		setSelectedMailId: (mailId) => {
+			selectedMailId = mailId;
+		},
 		setMobileView: (view) => {
 			mobileView = view;
 		}
