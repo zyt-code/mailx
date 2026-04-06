@@ -350,6 +350,7 @@ Completed in the first refactor pass:
 - Sidebar account-list collapse initialization and persistence now go through a dedicated `sidebarAccountsCollapse` helper
 - Sidebar compose-open event binding now goes through a dedicated `sidebarComposeEvents` helper
 - AppShell workflow integration coverage now verifies both settings-entry routes: `GetStarted -> /settings/accounts/new` when no accounts exist and `Sidebar -> /settings` when accounts are configured
+- AppShell mailbox workflow integration coverage now verifies that the keyboard refresh shortcut is ignored while the app is in a no-account `GetStarted` state
 - AppShell mobile workflow integration coverage now verifies `list -> reading -> back`, stale-selected-mail recovery, mobile folder/account navigation back into the mailbox list, ReadingPane delete/archive actions returning mobile users to the mailbox list, and the mobile no-account state rendering `GetStarted` instead of a mailbox shell
 - Sidebar refresh workflow integration coverage now verifies `refresh -> sync:trigger -> sync orchestrator -> mails:updated -> mailbox reload` for both aggregate and explicit-account mailbox scopes
 - AppShell keyboard refresh workflow integration coverage now verifies `shortcut -> sync:trigger -> sync orchestrator -> mails:updated -> mailbox reload` for both aggregate inbox and explicit-account mailbox scopes
@@ -358,7 +359,7 @@ Completed in the first refactor pass:
 - AppShell desktop mailbox workflow coverage now verifies that switching folders or accounts clears stale list selection and Reading Pane state instead of carrying a message across mailbox contexts
 - AppShell desktop selection workflow coverage now verifies continuous-reading behavior for list-side delete, ReadingPane delete, ReadingPane archive, and the fallback-to-previous case when the removed selection was the last visible mail
 - ReadingPane delete and archive continuity now use the same selected-mail removal strategy, so desktop reading actions and list-side actions keep the next visible message selected when possible and fall back to the previous visible message when necessary
-- focused frontend regression coverage now verifies 36 Vitest files / 139 tests plus `npm run check`
+- focused frontend regression coverage now verifies 36 Vitest files / 140 tests plus `npm run check`
 
 Still pending in a follow-up pass:
 

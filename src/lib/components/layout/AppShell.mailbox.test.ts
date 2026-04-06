@@ -271,6 +271,19 @@ describe('AppShell mailbox workflow', () => {
 		expect(syncAllAccountsMock).not.toHaveBeenCalled();
 	});
 
+	it('does not emit sync intent from the refresh shortcut when no accounts are configured', async () => {
+		hasAccountsStore.set(false);
+
+		render(AppShell);
+		await Promise.resolve();
+		eventBusEmitAsyncMock.mockClear();
+
+		await fireEvent.keyDown(document.body, { key: 'r' });
+
+		expect(eventBusEmitAsyncMock).not.toHaveBeenCalled();
+		expect(syncAllAccountsMock).not.toHaveBeenCalled();
+	});
+
 	it('routes get-started settings entry to add-account setup when no accounts are configured', async () => {
 		hasAccountsStore.set(false);
 

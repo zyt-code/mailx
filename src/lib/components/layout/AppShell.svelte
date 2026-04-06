@@ -249,6 +249,10 @@ const DEFAULTS = { sidebarCollapsed: false, mailListWidth: DEFAULT_MAIL_LIST_WID
 			},
 			openCompose: () => eventBus.emit('compose:open'),
 			triggerSync: () => {
+				if (!isAccountConfigured) {
+					return Promise.resolve();
+				}
+
 				const accountId = get(selectedMailboxAccountId);
 				return accountId
 					? eventBus.emitAsync('sync:trigger', { accountId })
