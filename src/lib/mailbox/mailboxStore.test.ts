@@ -102,6 +102,28 @@ describe('createMailboxStore', () => {
 		expect(getMails).not.toHaveBeenCalled();
 	});
 
+	it('falls back to the active account when loadMails receives a stale selected account id', async () => {
+		const getMails = vi.fn().mockResolvedValue([makeMail({ folder: 'inbox', account_id: 'acc-2' })]);
+		const getMailsCount = vi.fn().mockResolvedValue(1);
+		const markMailRead = vi.fn().mockResolvedValue(undefined);
+		const accountsStore = writable([
+			{ id: 'acc-1', is_active: false },
+			{ id: 'acc-2', is_active: true }
+		]);
+
+		const store = createMailboxStore({
+			db: { getMails, getMailsCount, markMailRead },
+			accountsStore
+		});
+
+		store.setSelectedAccount('acc-9');
+		await store.loadMails();
+
+		expect(get(store.selectedAccountId)).toBe('acc-2');
+		expect(get(store.effectiveAccountId)).toBe('acc-2');
+		expect(getMails).toHaveBeenCalledWith('inbox', 'acc-2', 50, 0);
+	});
+
 	it('reloads the current mailbox when mails:updated arrives from tauri', async () => {
 		const getMails = vi.fn().mockResolvedValue([makeMail({ folder: 'inbox', account_id: 'acc-1' })]);
 		const getMailsCount = vi.fn().mockResolvedValue(1);

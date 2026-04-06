@@ -5,6 +5,10 @@ type AccountLike = {
 	is_active: boolean;
 };
 
+function accountExists(accountId: string | null, accounts: AccountLike[]): boolean {
+	return accountId !== null && accounts.some((account) => account.id === accountId);
+}
+
 export function resolveFallbackAccountId(accounts: AccountLike[]): string | null {
 	return accounts.find((account) => account.is_active)?.id ?? accounts[0]?.id ?? null;
 }
@@ -14,6 +18,10 @@ export function normalizeMailboxSelection(
 	selectedAccountId: string | null,
 	accounts: AccountLike[]
 ): string | null {
+	if (selectedAccountId !== null && !accountExists(selectedAccountId, accounts)) {
+		return resolveFallbackAccountId(accounts);
+	}
+
 	if (folder === 'inbox') {
 		return selectedAccountId;
 	}

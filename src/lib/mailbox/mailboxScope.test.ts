@@ -39,6 +39,17 @@ describe('mailboxScope', () => {
 		});
 	});
 
+	it('falls back to the active account when the selected account no longer exists', () => {
+		expect(scope('inbox', 'acc-9')).toEqual({
+			selectedAccountId: 'acc-2',
+			effectiveAccountId: 'acc-2'
+		});
+		expect(scope('archive', 'acc-9')).toEqual({
+			selectedAccountId: 'acc-2',
+			effectiveAccountId: 'acc-2'
+		});
+	});
+
 	it('normalizes aggregate selection to the active account when leaving inbox', () => {
 		expect(normalizeMailboxSelection('drafts', null, accounts)).toBe('acc-2');
 	});
