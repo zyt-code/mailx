@@ -212,4 +212,36 @@ describe('createMailboxStore', () => {
 		expect(get(store.selectedAccountId)).toBe('acc-2');
 		expect(getMails).toHaveBeenCalledWith('inbox', 'acc-2', 50, 0);
 	});
+
+	it('does not reload the deleted last account from a non-inbox mailbox context', async () => {
+		const getMails = vi.fn().mockResolvedValue([]);
+		const getMailsCount = vi.fn().mockResolvedValue(0);
+		const markMailRead = vi.fn().mockResolvedValue(undefined);
+		const accountsStore = writable([{ id: 'acc-1', is_active: true }]);
+		const tauriHandlers = new Map<string, (payload?: unknown) => void | Promise<void>>();
+
+		const store = createMailboxStore({
+			db: { getMails, getMailsCount, markMailRead },
+			accountsStore,
+			eventBus: {
+				on: vi.fn(),
+				onTauri(event, callback) {
+					tauriHandlers.set(event, callback);
+					return Promise.resolve();
+				},
+				emit: vi.fn()
+			}
+		});
+
+		store.init();
+		await store.switchFolder('sent');
+		getMails.mockClear();
+		getMailsCount.mockClear();
+
+		await tauriHandlers.get('account:deleted')?.({ id: 'acc-1' });
+
+		expect(get(store.selectedAccountId)).toBeNull();
+		expect(getMails).toHaveBeenCalledWith('sent', null, 50, 0);
+		expect(getMails).not.toHaveBeenCalledWith('sent', 'acc-1', 50, 0);
+	});
 });

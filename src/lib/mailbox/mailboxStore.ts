@@ -83,12 +83,16 @@ export function createMailboxStore({ db, accountsStore, eventBus }: MailboxStore
 	}
 
 	async function loadMails(folder: Folder = get(_activeFolder)): Promise<void> {
+		return loadMailsForAccounts(folder, get(accountsStore));
+	}
+
+	async function loadMailsForAccounts(folder: Folder, accounts: AccountLike[]): Promise<void> {
 		_isLoading.set(true);
 		_error.set(null);
 		currentOffset = 0;
 
 		try {
-			const scope = resolveMailboxScope(folder, get(_selectedAccountId), get(accountsStore));
+			const scope = resolveMailboxScope(folder, get(_selectedAccountId), accounts);
 			const [data, count] = await Promise.all([
 				db.getMails(folder, scope.effectiveAccountId, PAGE_SIZE, 0),
 				db.getMailsCount(folder, scope.effectiveAccountId)
@@ -198,7 +202,7 @@ export function createMailboxStore({ db, accountsStore, eventBus }: MailboxStore
 					_selectedAccountId.set(resolveFallbackAccountId(remainingAccounts));
 				}
 
-				await loadMails();
+				await loadMailsForAccounts(get(_activeFolder), remainingAccounts);
 			});
 
 			void eventBus.onTauri('account:created', async () => {

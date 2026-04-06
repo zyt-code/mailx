@@ -358,13 +358,13 @@ Completed in the first refactor pass:
 - Sync orchestrator contract coverage now also verifies that stale explicit `accountId` payloads for deleted accounts are ignored instead of syncing the wrong mailbox
 - AppShell auto-sync workflow integration coverage now verifies `active account -> autoSyncLifecycle -> sync:trigger -> sync orchestrator -> mails:updated -> mailbox reload` during initial account activation
 - AppShell auto-sync workflow integration coverage now also verifies that when the active account changes during an in-flight sync, the newest account still gets its deferred initial sync once syncing settles
-- Mailbox store contract coverage now verifies that deleting the active selected account falls back using the post-delete account set instead of briefly reloading the removed mailbox
+- Mailbox store contract coverage now verifies that deleting the active selected account falls back using the post-delete account set instead of briefly reloading the removed mailbox, including the last-account non-inbox case where the store must not reload the deleted mailbox before accounts catch up
 - Mailbox scope/store contract coverage now also verifies that stale explicit selected-account ids are normalized back to a real configured account before mailbox reload
-- AppShell account lifecycle workflow coverage now verifies desktop selection reset on `account:deleted`, mobile reading fallback to list on `account:deleted`, and `GetStarted -> mailbox list` recovery on `account:created`
+- AppShell account lifecycle workflow coverage now verifies desktop selection reset on `account:deleted`, mobile reading fallback to list on `account:deleted`, direct non-inbox `account:deleted -> GetStarted` recovery when the final account disappears, and `GetStarted -> mailbox list` recovery on `account:created`
 - AppShell desktop mailbox workflow coverage now verifies that switching folders or accounts clears stale list selection and Reading Pane state instead of carrying a message across mailbox contexts
 - AppShell desktop selection workflow coverage now verifies continuous-reading behavior for list-side delete, ReadingPane delete, ReadingPane archive, the fallback-to-previous case when the removed selection was the last visible mail, and external mailbox updates removing the current selection
 - ReadingPane delete and archive continuity now use the same selected-mail removal strategy, so desktop reading actions and list-side actions keep the next visible message selected when possible and fall back to the previous visible message when necessary
-- focused frontend regression coverage now verifies 36 Vitest files / 153 tests plus `npm run check`
+- focused frontend regression coverage now verifies 36 Vitest files / 155 tests plus `npm run check`
 
 Still pending in a follow-up pass:
 

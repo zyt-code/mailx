@@ -484,4 +484,38 @@ describe('AppShell account workflow', () => {
 			expect(screen.getByTestId('mock-mail-list')).toBeTruthy();
 		});
 	});
+
+	it('returns to get-started without reloading the deleted last account from a non-inbox mailbox context', async () => {
+		const accountsStore = writable([{ id: 'acc-1', is_active: true }]);
+		const { db, getMails } = createMailboxDb({
+			aggregate: [createMail('mail-1', 'acc-1')],
+			'acc-1': [createMail('mail-1', 'acc-1')],
+			'acc-2': []
+		});
+		const mailboxStore = createMailboxStore({
+			db,
+			accountsStore,
+			eventBus: fakeEventBus
+		});
+
+		connectMailStoreBridge(mailboxStore);
+		mailboxStore.init();
+		await mailboxStore.switchFolder('sent');
+		getMails.mockClear();
+
+		render(AppShell);
+
+		await fakeEventBus.emitTauri('account:deleted', { id: 'acc-1' });
+		accountsStore.set([]);
+		hasAccountsStore.set(false);
+		activeAccountStore.set(null);
+
+		await waitFor(() => {
+			expect(getMails).toHaveBeenCalledWith('sent', null, 50, 0);
+		});
+		expect(getMails).not.toHaveBeenCalledWith('sent', 'acc-1', 50, 0);
+		await waitFor(() => {
+			expect(screen.getByRole('button', { name: 'mock-get-started-open-settings' })).toBeTruthy();
+		});
+	});
 });
