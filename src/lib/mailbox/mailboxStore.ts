@@ -190,11 +190,12 @@ export function createMailboxStore({ db, accountsStore, eventBus }: MailboxStore
 			void eventBus.onTauri('account:deleted', async (payload) => {
 				const id = (payload as { id?: string } | undefined)?.id;
 				if (!id) return;
+				const remainingAccounts = get(accountsStore).filter((account) => account.id !== id);
 
 				_mails.update((current) => current.filter((mail) => mail.account_id !== id));
 
 				if (get(_selectedAccountId) === id) {
-					_selectedAccountId.set(resolveFallbackAccountId(get(accountsStore)));
+					_selectedAccountId.set(resolveFallbackAccountId(remainingAccounts));
 				}
 
 				await loadMails();

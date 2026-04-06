@@ -156,4 +156,38 @@ describe('createMailboxStore', () => {
 		});
 		expect(getMails).toHaveBeenCalledWith('inbox', 'acc-1', 50, 0);
 	});
+
+	it('does not reload the just-deleted active account before accounts store catches up', async () => {
+		const getMails = vi.fn().mockResolvedValue([makeMail({ folder: 'inbox', account_id: 'acc-2' })]);
+		const getMailsCount = vi.fn().mockResolvedValue(1);
+		const markMailRead = vi.fn().mockResolvedValue(undefined);
+		const accountsStore = writable([
+			{ id: 'acc-1', is_active: true },
+			{ id: 'acc-2', is_active: false }
+		]);
+		const tauriHandlers = new Map<string, (payload?: unknown) => void | Promise<void>>();
+
+		const store = createMailboxStore({
+			db: { getMails, getMailsCount, markMailRead },
+			accountsStore,
+			eventBus: {
+				on: vi.fn(),
+				onTauri(event, callback) {
+					tauriHandlers.set(event, callback);
+					return Promise.resolve();
+				},
+				emit: vi.fn()
+			}
+		});
+
+		store.init();
+		await store.selectAccount('acc-1');
+		getMails.mockClear();
+		getMailsCount.mockClear();
+
+		await tauriHandlers.get('account:deleted')?.({ id: 'acc-1' });
+
+		expect(get(store.selectedAccountId)).toBe('acc-2');
+		expect(getMails).toHaveBeenCalledWith('inbox', 'acc-2', 50, 0);
+	});
 });
