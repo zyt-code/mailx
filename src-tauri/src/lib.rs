@@ -22,12 +22,14 @@ use database::Database;
 use std::sync::Arc;
 
 // Menu and navigation constants
+#[cfg(target_os = "macos")]
 const MENU_ID_ABOUT: &str = "about";
 const WINDOW_ID_MAIN: &str = "main";
+#[cfg(target_os = "macos")]
 const NAV_ROUTE_ABOUT: &str = "/about";
 use sync_manager::SyncManager;
 use tauri::webview::Color;
-use tauri::{Emitter, Manager, Theme, WebviewWindow};
+use tauri::{Manager, Theme, WebviewWindow};
 
 const LIGHT_WINDOW_BG: Color = Color(255, 255, 255, 255);
 const DARK_WINDOW_BG: Color = Color(13, 17, 23, 255);
@@ -185,6 +187,7 @@ pub fn run() {
             commands::get_mails,
             commands::get_mails_count,
             commands::get_mail,
+            commands::ensure_mail_content,
             commands::create_mail,
             commands::add_mail_attachment,
             commands::get_mail_attachments,

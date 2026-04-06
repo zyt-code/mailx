@@ -31,6 +31,7 @@ base64 = "0.22"
 thiserror = "2"
 mail-parser = "0.9"
 imap = { version = "0.9", default-features = false }
+imap-proto = "0.6"
 native-tls = "0.2"
 futures = "0.3"
 regex = "1"

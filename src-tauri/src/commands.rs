@@ -1,8 +1,11 @@
 use crate::accounts::{Account, AccountManager};
 use crate::credentials_legacy::CredentialManager;
-use crate::database::{Attachment, Database, Mail, NotificationRecord};
+use crate::database::{
+    Attachment, Database, Mail, MailboxFolder, NotificationRecord, MAIL_CONTENT_STATE_BODY_CACHED,
+};
 use crate::html_sanitize;
 use crate::imap_client::ImapClient;
+use crate::mail_provider::MailProvider;
 
 use crate::provider_defaults;
 use crate::smtp_client::SmtpClient;
@@ -61,6 +64,77 @@ pub fn get_mail(id: String, db: State<'_, Database>) -> Result<Mail, String> {
         .map_err(|e| format!("Failed to get mail: {}", e))?
         .map(sanitize_mail_html)
         .ok_or_else(|| format!("Mail with id '{}' not found", id))
+}
+
+#[tauri::command]
+pub async fn ensure_mail_content(
+    id: String,
+    db: State<'_, Database>,
+    account_manager: State<'_, Arc<AccountManager>>,
+    credential_manager: State<'_, Arc<CredentialManager>>,
+) -> Result<Mail, String> {
+    let mail = db
+        .inner()
+        .get_mail(&id)
+        .map_err(|e| format!("Failed to get mail: {}", e))?
+        .ok_or_else(|| format!("Mail with id '{}' not found", id))?;
+
+    if mail.content_state == MAIL_CONTENT_STATE_BODY_CACHED {
+        return Ok(sanitize_mail_html(mail));
+    }
+
+    let account_id = mail
+        .account_id
+        .clone()
+        .ok_or_else(|| format!("Mail '{}' is not associated with an account", id))?;
+    let uid = mail
+        .uid
+        .ok_or_else(|| format!("Mail '{}' does not have a remote UID", id))?;
+
+    let account = account_manager
+        .get(&account_id)
+        .map_err(|e| format!("Failed to get account: {}", e))?;
+    let password = credential_manager
+        .get_password(&account_id)
+        .map_err(|e| format!("Failed to get password: {}", e))?;
+    let imap_config = account_manager
+        .get_imap_config(&account_id)
+        .map_err(|e| format!("Failed to get IMAP config: {}", e))?;
+
+    let provider = MailProvider::detect_from_host(&imap_config.server);
+    let remote_folder = db
+        .inner()
+        .get_remote_folder_name(&account_id, &mail.folder)
+        .map_err(|e| format!("Failed to resolve remote folder: {}", e))?
+        .or_else(|| {
+            provider
+                .preferred_remote_folder_for_local(&mail.folder)
+                .map(str::to_string)
+        })
+        .ok_or_else(|| format!("No remote folder mapping found for '{}'", mail.folder))?;
+
+    let imap_client = ImapClient::new(imap_config, account.email, password);
+    let mut fetched = imap_client
+        .fetch_mail_content(&remote_folder, uid)
+        .await
+        .map_err(|e| format!("Failed to fetch mail content: {}", e))?;
+
+    fetched.id = mail.id.clone();
+    fetched.account_id = Some(account_id);
+    fetched.folder = mail.folder.clone();
+    fetched.starred = mail.starred;
+    fetched.remote_uid_validity = mail.remote_uid_validity;
+    fetched.content_state = MAIL_CONTENT_STATE_BODY_CACHED.to_string();
+
+    db.inner()
+        .upsert_mail_preserving_read_status(&fetched)
+        .map_err(|e| format!("Failed to persist fetched mail: {}", e))?;
+
+    db.inner()
+        .get_mail(&id)
+        .map_err(|e| format!("Failed to reload fetched mail: {}", e))?
+        .map(sanitize_mail_html)
+        .ok_or_else(|| format!("Mail with id '{}' not found after update", id))
 }
 
 /// Create a new mail
@@ -130,25 +204,26 @@ pub fn mark_mail_read(id: String, read: bool, db: State<'_, Database>) -> Result
 /// Mark a mail as read on the IMAP server using UID
 #[tauri::command]
 pub async fn mark_as_read(
-    uid: u32,
-    account_id: String,
+    id: String,
     db: State<'_, Database>,
     account_manager: State<'_, Arc<AccountManager>>,
     credential_manager: State<'_, Arc<CredentialManager>>,
 ) -> Result<(), String> {
-    println!("[CMD] mark_as_read: uid={}, account_id={}", uid, account_id);
+    println!("[CMD] mark_as_read: id={}", id);
 
-    // 1. Locate the mail to obtain folder + primary key
     let mail = db
         .inner()
-        .get_mail_by_account_and_uid(&account_id, uid)
-        .map_err(|e| format!("Failed to get mail by UID: {}", e))?
-        .ok_or_else(|| {
-            format!(
-                "Mail with uid '{}' not found for account {}",
-                uid, account_id
-            )
-        })?;
+        .get_mail(&id)
+        .map_err(|e| format!("Failed to get mail: {}", e))?
+        .ok_or_else(|| format!("Mail '{}' not found", id))?;
+
+    let account_id = mail
+        .account_id
+        .clone()
+        .ok_or_else(|| format!("Mail '{}' is not associated with an account", id))?;
+    let uid = mail
+        .uid
+        .ok_or_else(|| format!("Mail '{}' does not have a remote UID", id))?;
 
     println!(
         "[CMD] mark_as_read: mail found, id={}, folder={}",
@@ -171,14 +246,25 @@ pub async fn mark_as_read(
         imap_config.server, imap_config.port
     );
 
-    // 3. Store the Seen flag via UID STORE
+    let provider = MailProvider::detect_from_host(&imap_config.server);
+    let remote_folder = db
+        .inner()
+        .get_remote_folder_name(&account_id, &mail.folder)
+        .map_err(|e| format!("Failed to resolve remote folder: {}", e))?
+        .or_else(|| {
+            provider
+                .preferred_remote_folder_for_local(&mail.folder)
+                .map(str::to_string)
+        })
+        .ok_or_else(|| format!("No remote folder mapping found for '{}'", mail.folder))?;
+
     let imap_client = ImapClient::new(imap_config, account.email, password);
     println!(
         "[CMD] mark_as_read: UID STORE {}, folder={}, flags=+FLAGS (\\Seen)",
-        uid, mail.folder
+        uid, remote_folder
     );
     imap_client
-        .store_flags(&mail.folder, uid, "+FLAGS (\\Seen)")
+        .store_flags(&remote_folder, uid, "+FLAGS (\\Seen)")
         .await
         .map_err(|e| format!("Failed to store flags on server: {}", e))?;
 
@@ -239,6 +325,16 @@ pub fn get_unread_count(
     db.inner()
         .get_unread_count(&folder, account_id.as_deref())
         .map_err(|e| format!("Failed to get unread count: {}", e))
+}
+
+#[tauri::command]
+pub fn get_mailbox_folders(
+    account_id: Option<String>,
+    db: State<'_, Database>,
+) -> Result<Vec<MailboxFolder>, String> {
+    db.inner()
+        .get_mailbox_folders(account_id.as_deref())
+        .map_err(|e| format!("Failed to get mailbox folders: {}", e))
 }
 
 // ============================================================================

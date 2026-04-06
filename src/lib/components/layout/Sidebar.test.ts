@@ -77,6 +77,7 @@ const { mockState } = vi.hoisted(() => ({
 		}
 	}
 }));
+const getMailboxFoldersMock = vi.hoisted(() => vi.fn());
 
 vi.mock('$lib/stores/accountStore.js', () => ({
 	hasAccounts: { subscribe: (cb: (value: boolean) => void) => { cb(mockState.hasAccounts); return () => {}; } },
@@ -113,6 +114,10 @@ vi.mock('$lib/stores/preferencesStore.js', () => ({
 	}
 }));
 
+vi.mock('$lib/db/index.js', () => ({
+	getMailboxFolders: getMailboxFoldersMock
+}));
+
 vi.mock('$lib/sync/index.js', () => ({
 	syncAccount: vi.fn().mockResolvedValue({}),
 	syncAllAccounts: vi.fn().mockResolvedValue([])
@@ -129,6 +134,8 @@ describe('Sidebar - Internationalization', () => {
 	beforeEach(async () => {
 		await i18nStore.waitForReady();
 		await i18nStore.setLocale('en');
+		getMailboxFoldersMock.mockReset();
+		getMailboxFoldersMock.mockResolvedValue([]);
 		mockState.hasAccounts = true;
 		mockState.selectedAccountId = null;
 		mockState.isSyncing = false;
@@ -293,6 +300,39 @@ describe('Sidebar - Internationalization', () => {
 
 			expect(screen.getByText('5')).toBeInTheDocument();
 			expect(screen.getByText('2')).toBeInTheDocument();
+		});
+
+		it('renders custom folders for the selected account using mailbox folder catalog data', async () => {
+			mockState.selectedAccountId = 'acc-1';
+			getMailboxFoldersMock.mockResolvedValue([
+				{
+					id: 'inbox',
+					label: 'inbox',
+					kind: 'system',
+					unread_count: 3,
+					system_key: 'inbox',
+					account_id: 'acc-1'
+				},
+				{
+					id: 'custom:Projects',
+					label: 'Projects',
+					kind: 'custom',
+					unread_count: 4,
+					account_id: 'acc-1'
+				}
+			]);
+
+			render(Sidebar, {
+				collapsed: false,
+				isMobile: false,
+				activeFolder: 'inbox',
+				onToggle: () => {},
+				onSelectFolder: () => {}
+			});
+
+			expect(await screen.findByText('Projects')).toBeInTheDocument();
+			expect(screen.getByText('4')).toBeInTheDocument();
+			expect(getMailboxFoldersMock).toHaveBeenCalledWith('acc-1');
 		});
 	});
 

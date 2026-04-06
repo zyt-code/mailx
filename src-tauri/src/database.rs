@@ -1,11 +1,16 @@
 use regex::Regex;
-use rusqlite::{params, Connection, Result as SqliteResult};
+use rusqlite::{params, Connection, OptionalExtension, Result as SqliteResult};
 use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use tauri::AppHandle;
 use tauri::Manager;
+
+pub const MAIL_CONTENT_STATE_METADATA_ONLY: &str = "metadata_only";
+pub const MAIL_CONTENT_STATE_SNIPPET_CACHED: &str = "snippet_cached";
+pub const MAIL_CONTENT_STATE_BODY_CACHED: &str = "body_cached";
+pub const MAIL_CONTENT_STATE_BODY_FAILED: &str = "body_failed";
 
 /// Email address structure for recipients
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -24,6 +29,29 @@ pub struct Attachment {
     pub size: i64,
     pub stored_path: String,
     pub created_at: i64,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ImapFolderState {
+    pub id: String,
+    pub account_id: String,
+    pub local_name: String,
+    pub name: String,
+    pub remote_uid_validity: i64,
+    pub remote_last_uid: i64,
+    pub local_count: i64,
+    pub created_at: i64,
+    pub last_synced_at: i64,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct MailboxFolder {
+    pub id: String,
+    pub label: String,
+    pub kind: String,
+    pub unread_count: i64,
+    pub system_key: Option<String>,
+    pub account_id: Option<String>,
 }
 
 /// Notification record for history tracking
@@ -75,6 +103,10 @@ pub struct Mail {
     pub starred: Option<bool>,
     #[serde(default)]
     pub has_attachments: Option<bool>,
+    #[serde(default)]
+    pub remote_uid_validity: Option<u32>,
+    #[serde(default = "default_mail_content_state")]
+    pub content_state: String,
 }
 
 /// Database wrapper for SQLite operations
@@ -211,6 +243,17 @@ impl Database {
         conn.execute("ALTER TABLE mails ADD COLUMN is_read INTEGER DEFAULT 0", [])
             .ok();
 
+        // Add remote_uid_validity column if not exists (metadata-first sync)
+        conn.execute(
+            "ALTER TABLE mails ADD COLUMN remote_uid_validity INTEGER",
+            [],
+        )
+        .ok();
+
+        // Add content_state column if not exists (metadata-first sync)
+        conn.execute("ALTER TABLE mails ADD COLUMN content_state TEXT", [])
+            .ok();
+
         // Create accounts table
         conn.execute(
             "CREATE TABLE IF NOT EXISTS accounts (
@@ -244,6 +287,14 @@ impl Database {
             )",
             [],
         )?;
+
+        conn.execute("ALTER TABLE imap_folders ADD COLUMN local_name TEXT", [])
+            .ok();
+        conn.execute(
+            "ALTER TABLE imap_folders ADD COLUMN last_synced_at INTEGER",
+            [],
+        )
+        .ok();
 
         // Create sync_state table
         conn.execute(
@@ -294,6 +345,11 @@ impl Database {
         // Create index for account-based mail queries
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_mails_account ON mails(account_id, folder)",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_imap_folders_account_local ON imap_folders(account_id, local_name)",
             [],
         )?;
 
@@ -366,7 +422,63 @@ impl Database {
             [],
         )?;
 
+        conn.execute(
+            "UPDATE mails
+             SET content_state = CASE
+                 WHEN COALESCE(body, '') != '' OR COALESCE(html_body, '') != '' THEN 'body_cached'
+                 ELSE 'metadata_only'
+             END
+             WHERE content_state IS NULL OR content_state = ''",
+            [],
+        )?;
+
+        conn.execute(
+            "UPDATE imap_folders
+             SET local_name = name
+             WHERE local_name IS NULL OR local_name = ''",
+            [],
+        )
+        .ok();
+
+        conn.execute(
+            "UPDATE imap_folders
+             SET last_synced_at = created_at
+             WHERE last_synced_at IS NULL",
+            [],
+        )
+        .ok();
+
         Ok(())
+    }
+
+    fn read_mail_row(row: &rusqlite::Row<'_>) -> SqliteResult<Mail> {
+        let unread_flag = row.get::<_, i32>(9)? == 1;
+        Ok(Mail {
+            id: row.get(0)?,
+            uid: row.get(1)?,
+            from_name: row.get(2)?,
+            from_email: row.get(3)?,
+            subject: row.get(4)?,
+            preview: row.get(5)?,
+            body: row.get(6)?,
+            timestamp: row.get(7)?,
+            folder: row.get(8)?,
+            unread: unread_flag,
+            is_read: !unread_flag,
+            account_id: row.get(10)?,
+            to: parse_json_addresses(row.get(11)?),
+            cc: parse_json_addresses(row.get(12)?),
+            bcc: parse_json_addresses(row.get(13)?),
+            html_body: row.get(14)?,
+            reply_to: parse_json_addresses(row.get(15)?),
+            starred: Some(row.get::<_, i32>(16).unwrap_or(0) == 1),
+            has_attachments: Some(row.get::<_, i32>(17).unwrap_or(0) == 1),
+            attachments: None,
+            remote_uid_validity: row.get(18).ok().flatten(),
+            content_state: row
+                .get::<_, Option<String>>(19)?
+                .unwrap_or_else(default_mail_content_state),
+        })
     }
 
     /// Get mails with pagination, optionally filtered by folder and account
@@ -379,7 +491,7 @@ impl Database {
     ) -> SqliteResult<Vec<Mail>> {
         let conn = self.conn.lock().unwrap();
 
-        let mut query = "SELECT id, uid, from_name, from_email, subject, preview, body, timestamp, folder, unread, account_id, to_json, cc_json, bcc_json, html_body, reply_to_json, starred, has_attachments FROM mails".to_string();
+        let mut query = "SELECT id, uid, from_name, from_email, subject, preview, body, timestamp, folder, unread, account_id, to_json, cc_json, bcc_json, html_body, reply_to_json, starred, has_attachments, remote_uid_validity, content_state FROM mails".to_string();
         let mut params: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
         let mut conditions = Vec::new();
 
@@ -407,31 +519,7 @@ impl Database {
         params.push(Box::new(effective_offset));
 
         let mut stmt = conn.prepare(&query)?;
-        let mail_iter = stmt.query_map(rusqlite::params_from_iter(params), |row| {
-            let unread_flag = row.get::<_, i32>(9)? == 1;
-            Ok(Mail {
-                id: row.get(0)?,
-                uid: row.get(1)?,
-                from_name: row.get(2)?,
-                from_email: row.get(3)?,
-                subject: row.get(4)?,
-                preview: row.get(5)?,
-                body: row.get(6)?,
-                timestamp: row.get(7)?,
-                folder: row.get(8)?,
-                unread: unread_flag,
-                is_read: !unread_flag,
-                account_id: row.get(10)?,
-                to: parse_json_addresses(row.get(11)?),
-                cc: parse_json_addresses(row.get(12)?),
-                bcc: parse_json_addresses(row.get(13)?),
-                html_body: row.get(14)?,
-                reply_to: parse_json_addresses(row.get(15)?),
-                starred: Some(row.get::<_, i32>(16).unwrap_or(0) == 1),
-                has_attachments: Some(row.get::<_, i32>(17).unwrap_or(0) == 1),
-                attachments: None, // Loaded separately
-            })
-        })?;
+        let mail_iter = stmt.query_map(rusqlite::params_from_iter(params), Self::read_mail_row)?;
 
         let mut mails = Vec::new();
         for mail in mail_iter {
@@ -476,35 +564,11 @@ impl Database {
     pub fn get_mail(&self, id: &str) -> SqliteResult<Option<Mail>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT id, uid, from_name, from_email, subject, preview, body, timestamp, folder, unread, account_id, to_json, cc_json, bcc_json, html_body, reply_to_json, starred, has_attachments
+            "SELECT id, uid, from_name, from_email, subject, preview, body, timestamp, folder, unread, account_id, to_json, cc_json, bcc_json, html_body, reply_to_json, starred, has_attachments, remote_uid_validity, content_state
              FROM mails WHERE id = ?1"
         )?;
 
-        let mail = stmt.query_row(params![id], |row| {
-            let unread_flag = row.get::<_, i32>(9)? == 1;
-            Ok(Mail {
-                id: row.get(0)?,
-                uid: row.get(1)?,
-                from_name: row.get(2)?,
-                from_email: row.get(3)?,
-                subject: row.get(4)?,
-                preview: row.get(5)?,
-                body: row.get(6)?,
-                timestamp: row.get(7)?,
-                folder: row.get(8)?,
-                unread: unread_flag,
-                is_read: !unread_flag,
-                account_id: row.get(10)?,
-                to: parse_json_addresses(row.get(11)?),
-                cc: parse_json_addresses(row.get(12)?),
-                bcc: parse_json_addresses(row.get(13)?),
-                html_body: row.get(14)?,
-                reply_to: parse_json_addresses(row.get(15)?),
-                starred: Some(row.get::<_, i32>(16).unwrap_or(0) == 1),
-                has_attachments: Some(row.get::<_, i32>(17).unwrap_or(0) == 1),
-                attachments: None, // Loaded separately
-            })
-        });
+        let mail = stmt.query_row(params![id], Self::read_mail_row);
 
         match mail {
             Ok(m) => Ok(Some(m)),
@@ -517,43 +581,135 @@ impl Database {
     pub fn upsert_mail_preserving_read_status(&self, mail: &Mail) -> SqliteResult<()> {
         let conn = self.conn.lock().unwrap();
 
-        // Check if mail already exists and get the local-only fields we need to preserve
-        let existing_row = conn.query_row(
-            "SELECT unread, created_at, folder, starred FROM mails WHERE id = ?1",
-            params![&mail.id],
-            |row| {
-                let unread: i32 = row.get(0)?;
-                let created_at: i64 = row.get(1)?;
-                let folder: String = row.get(2)?;
-                // Starred is stored as 0/1 but may be NULL, so handle Option explicitly
-                let starred: bool = match row.get::<_, Option<i32>>(3)? {
-                    Some(value) => value == 1,
-                    None => false,
-                };
-                Ok((unread == 1, created_at, folder, starred))
-            },
-        );
+        let existing_row = if let (Some(account_id), Some(uid)) = (&mail.account_id, mail.uid) {
+            conn.query_row(
+                "SELECT id, unread, created_at, folder, starred, body, html_body, content_state
+                 FROM mails
+                 WHERE account_id = ?1 AND folder = ?2 AND uid = ?3
+                 ORDER BY CASE
+                     WHEN remote_uid_validity = ?4 THEN 0
+                     WHEN remote_uid_validity IS NULL THEN 1
+                     ELSE 2
+                 END, created_at ASC
+                 LIMIT 1",
+                params![
+                    account_id,
+                    &mail.folder,
+                    uid,
+                    mail.remote_uid_validity.map(i64::from)
+                ],
+                |row| {
+                    let unread: i32 = row.get(1)?;
+                    let starred = match row.get::<_, Option<i32>>(4)? {
+                        Some(value) => value == 1,
+                        None => false,
+                    };
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        unread == 1,
+                        row.get::<_, i64>(2)?,
+                        row.get::<_, String>(3)?,
+                        starred,
+                        row.get::<_, String>(5)?,
+                        row.get::<_, Option<String>>(6)?,
+                        row.get::<_, Option<String>>(7)?
+                            .unwrap_or_else(default_mail_content_state),
+                    ))
+                },
+            )
+            .optional()?
+        } else {
+            None
+        }
+        .or_else(|| {
+            conn.query_row(
+                "SELECT id, unread, created_at, folder, starred, body, html_body, content_state
+                 FROM mails WHERE id = ?1",
+                params![&mail.id],
+                |row| {
+                    let unread: i32 = row.get(1)?;
+                    let starred = match row.get::<_, Option<i32>>(4)? {
+                        Some(value) => value == 1,
+                        None => false,
+                    };
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        unread == 1,
+                        row.get::<_, i64>(2)?,
+                        row.get::<_, String>(3)?,
+                        starred,
+                        row.get::<_, String>(5)?,
+                        row.get::<_, Option<String>>(6)?,
+                        row.get::<_, Option<String>>(7)?
+                            .unwrap_or_else(default_mail_content_state),
+                    ))
+                },
+            )
+            .optional()
+            .ok()
+            .flatten()
+        });
 
-        // Use existing read status/created_at/folder/starred if mail exists,
-        // or use server status + current time if new
-        let (unread, is_read, created_at, folder_value, starred_value) = match existing_row {
-            Ok((local_unread, local_created_at, local_folder, local_starred)) => {
-                // Mail exists: preserve local read status, created timestamp,
-                // folder (moves/archives) and starred state
+        let incoming_state = if mail.content_state.is_empty() {
+            default_mail_content_state()
+        } else {
+            mail.content_state.clone()
+        };
+
+        let (
+            resolved_id,
+            unread,
+            is_read,
+            created_at,
+            folder_value,
+            starred_value,
+            body_value,
+            html_body_value,
+            content_state_value,
+        ) = match existing_row {
+            Some((
+                existing_id,
+                local_unread,
+                local_created_at,
+                local_folder,
+                local_starred,
+                existing_body,
+                existing_html_body,
+                existing_state,
+            )) => {
                 println!(
                     "[DB] Upsert mail {}: preserving local unread={}, folder='{}', starred={}, created_at={}",
-                    mail.id, local_unread, local_folder, local_starred, local_created_at
+                    existing_id, local_unread, local_folder, local_starred, local_created_at
                 );
+
+                let keep_existing_content =
+                    content_state_rank(&existing_state) > content_state_rank(&incoming_state);
+
                 (
+                    existing_id,
                     local_unread,
                     !local_unread,
                     local_created_at,
                     local_folder,
                     local_starred,
+                    if keep_existing_content {
+                        existing_body
+                    } else {
+                        mail.body.clone()
+                    },
+                    if keep_existing_content {
+                        existing_html_body
+                    } else {
+                        mail.html_body.clone()
+                    },
+                    if keep_existing_content {
+                        existing_state
+                    } else {
+                        incoming_state.clone()
+                    },
                 )
             }
-            Err(_) => {
-                // New mail: use the status from the server and current time
+            None => {
                 let now = chrono::Utc::now().timestamp_millis();
                 println!(
                     "[DB] Upsert mail {}: new mail, using server unread={}, folder='{}', starred={}, created_at={}",
@@ -564,11 +720,15 @@ impl Database {
                     now
                 );
                 (
+                    mail.id.clone(),
                     mail.unread,
                     mail.is_read,
                     now,
                     mail.folder.clone(),
                     mail.starred.unwrap_or(false),
+                    mail.body.clone(),
+                    mail.html_body.clone(),
+                    incoming_state.clone(),
                 )
             }
         };
@@ -584,16 +744,17 @@ impl Database {
             "INSERT OR REPLACE INTO mails (
                 id, uid, from_name, from_email, subject, preview, body, timestamp,
                 folder, unread, is_read, account_id, to_json, cc_json, bcc_json,
-                html_body, reply_to_json, starred, has_attachments, created_at
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)",
+                html_body, reply_to_json, starred, has_attachments, created_at,
+                remote_uid_validity, content_state
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22)",
             params![
-                &mail.id,
+                &resolved_id,
                 mail.uid,
                 &mail.from_name,
                 &mail.from_email,
                 &mail.subject,
                 clean_preview,
-                &mail.body,
+                &body_value,
                 mail.timestamp,
                 &folder_value,
                 unread as i32,
@@ -602,11 +763,13 @@ impl Database {
                 to_json,
                 cc_json,
                 bcc_json,
-                &mail.html_body,
+                &html_body_value,
                 reply_to_json,
                 starred_value as i32,
                 mail.has_attachments.unwrap_or(false) as i32,
                 created_at,
+                mail.remote_uid_validity.map(i64::from),
+                content_state_value,
             ],
         )?;
 
@@ -614,6 +777,7 @@ impl Database {
     }
 
     /// Get a single mail by account and UID
+    #[allow(dead_code)]
     pub fn get_mail_by_account_and_uid(
         &self,
         account_id: &str,
@@ -621,38 +785,151 @@ impl Database {
     ) -> SqliteResult<Option<Mail>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT id, uid, from_name, from_email, subject, preview, body, timestamp, folder, unread, account_id, to_json, cc_json, bcc_json, html_body, reply_to_json, starred, has_attachments
+            "SELECT id, uid, from_name, from_email, subject, preview, body, timestamp, folder, unread, account_id, to_json, cc_json, bcc_json, html_body, reply_to_json, starred, has_attachments, remote_uid_validity, content_state
              FROM mails WHERE account_id = ?1 AND uid = ?2 LIMIT 1"
         )?;
 
         let mut rows = stmt.query(params![account_id, uid])?;
         if let Some(row) = rows.next()? {
-            let unread_flag = row.get::<_, i32>(9)? == 1;
-            Ok(Some(Mail {
-                id: row.get(0)?,
-                uid: row.get(1)?,
-                from_name: row.get(2)?,
-                from_email: row.get(3)?,
-                subject: row.get(4)?,
-                preview: row.get(5)?,
-                body: row.get(6)?,
-                timestamp: row.get(7)?,
-                folder: row.get(8)?,
-                unread: unread_flag,
-                is_read: !unread_flag,
-                account_id: row.get(10)?,
-                to: parse_json_addresses(row.get(11)?),
-                cc: parse_json_addresses(row.get(12)?),
-                bcc: parse_json_addresses(row.get(13)?),
-                html_body: row.get(14)?,
-                reply_to: parse_json_addresses(row.get(15)?),
-                starred: Some(row.get::<_, i32>(16).unwrap_or(0) == 1),
-                has_attachments: Some(row.get::<_, i32>(17).unwrap_or(0) == 1),
-                attachments: None,
-            }))
+            Ok(Some(Self::read_mail_row(row)?))
         } else {
             Ok(None)
         }
+    }
+
+    pub fn get_imap_folder_state(
+        &self,
+        account_id: &str,
+        local_name: &str,
+    ) -> SqliteResult<Option<ImapFolderState>> {
+        let conn = self.conn.lock().unwrap();
+        conn.query_row(
+            "SELECT id, account_id, local_name, name, remote_uid_validity, remote_last_uid, local_count, created_at, last_synced_at
+             FROM imap_folders
+             WHERE account_id = ?1 AND local_name = ?2
+             LIMIT 1",
+            params![account_id, local_name],
+            |row| {
+                Ok(ImapFolderState {
+                    id: row.get(0)?,
+                    account_id: row.get(1)?,
+                    local_name: row.get(2)?,
+                    name: row.get(3)?,
+                    remote_uid_validity: row.get(4)?,
+                    remote_last_uid: row.get(5)?,
+                    local_count: row.get(6)?,
+                    created_at: row.get(7)?,
+                    last_synced_at: row.get::<_, Option<i64>>(8)?.unwrap_or(0),
+                })
+            },
+        )
+        .optional()
+    }
+
+    pub fn upsert_imap_folder_state(&self, state: &ImapFolderState) -> SqliteResult<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT OR REPLACE INTO imap_folders (
+                id, account_id, local_name, name, remote_uid_validity,
+                remote_last_uid, local_count, created_at, last_synced_at
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            params![
+                &state.id,
+                &state.account_id,
+                &state.local_name,
+                &state.name,
+                state.remote_uid_validity,
+                state.remote_last_uid,
+                state.local_count,
+                state.created_at,
+                state.last_synced_at
+            ],
+        )?;
+        Ok(())
+    }
+
+    pub fn get_remote_folder_name(
+        &self,
+        account_id: &str,
+        local_name: &str,
+    ) -> SqliteResult<Option<String>> {
+        let conn = self.conn.lock().unwrap();
+        conn.query_row(
+            "SELECT name FROM imap_folders
+             WHERE account_id = ?1 AND local_name = ?2
+             LIMIT 1",
+            params![account_id, local_name],
+            |row| row.get(0),
+        )
+        .optional()
+    }
+
+    pub fn get_mailbox_folders(&self, account_id: Option<&str>) -> SqliteResult<Vec<MailboxFolder>> {
+        let conn = self.conn.lock().unwrap();
+        let mut folders = Vec::new();
+
+        for system_folder in crate::mail_provider::SYSTEM_LOCAL_FOLDERS {
+            let unread_count: i64 = conn.query_row(
+                "SELECT COUNT(*) FROM mails
+                 WHERE folder = ?1
+                   AND unread = 1
+                   AND (?2 IS NULL OR account_id = ?2)",
+                params![system_folder, account_id],
+                |row| row.get(0),
+            )?;
+
+            folders.push(MailboxFolder {
+                id: system_folder.to_string(),
+                label: system_folder.to_string(),
+                kind: "system".to_string(),
+                unread_count,
+                system_key: Some(system_folder.to_string()),
+                account_id: account_id.map(str::to_string),
+            });
+        }
+
+        if let Some(account_id) = account_id {
+            let mut stmt = conn.prepare(
+                "SELECT f.local_name, f.name,
+                        COALESCE((
+                            SELECT COUNT(*)
+                            FROM mails m
+                            WHERE m.account_id = f.account_id
+                              AND m.folder = f.local_name
+                              AND m.unread = 1
+                        ), 0) AS unread_count
+                 FROM imap_folders f
+                 WHERE f.account_id = ?1
+                   AND f.local_name NOT IN ('inbox', 'sent', 'drafts', 'archive', 'trash')
+                 ORDER BY LOWER(f.name), f.name",
+            )?;
+
+            let rows = stmt.query_map(params![account_id], |row| {
+                Ok(MailboxFolder {
+                    id: row.get(0)?,
+                    label: row.get(1)?,
+                    kind: "custom".to_string(),
+                    unread_count: row.get(2)?,
+                    system_key: None,
+                    account_id: Some(account_id.to_string()),
+                })
+            })?;
+
+            for row in rows {
+                folders.push(row?);
+            }
+        }
+
+        Ok(folders)
+    }
+
+    pub fn clear_account_folder(&self, account_id: &str, folder: &str) -> SqliteResult<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "DELETE FROM mails WHERE account_id = ?1 AND folder = ?2",
+            params![account_id, folder],
+        )?;
+        Ok(())
     }
 
     /// Insert a new mail into the database
@@ -665,8 +942,13 @@ impl Database {
         let reply_to_json = serialize_addresses(&mail.reply_to);
         let clean_preview = strip_html(&mail.preview);
         conn.execute(
-            "INSERT INTO mails (id, uid, from_name, from_email, subject, preview, body, timestamp, folder, unread, account_id, created_at, to_json, cc_json, bcc_json, html_body, reply_to_json, starred, has_attachments)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)",
+            "INSERT INTO mails (
+                id, uid, from_name, from_email, subject, preview, body, timestamp,
+                folder, unread, account_id, created_at, to_json, cc_json, bcc_json,
+                html_body, reply_to_json, starred, has_attachments, remote_uid_validity,
+                content_state
+            )
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21)",
             params![
                 &mail.id,
                 &mail.uid,
@@ -687,6 +969,12 @@ impl Database {
                 reply_to_json,
                 if mail.starred.unwrap_or(false) { 1 } else { 0 },
                 if mail.has_attachments.unwrap_or(false) { 1 } else { 0 },
+                mail.remote_uid_validity.map(i64::from),
+                if mail.content_state.is_empty() {
+                    default_mail_content_state()
+                } else {
+                    mail.content_state.clone()
+                },
             ],
         )?;
         Ok(())
@@ -718,8 +1006,10 @@ impl Database {
              html_body = ?14,
              reply_to_json = ?15,
              starred = ?16,
-             has_attachments = ?17
-             WHERE id = ?18",
+             has_attachments = ?17,
+             remote_uid_validity = ?18,
+             content_state = ?19
+             WHERE id = ?20",
             params![
                 &mail.uid,
                 &mail.from_name,
@@ -741,6 +1031,12 @@ impl Database {
                     1
                 } else {
                     0
+                },
+                mail.remote_uid_validity.map(i64::from),
+                if mail.content_state.is_empty() {
+                    default_mail_content_state()
+                } else {
+                    mail.content_state.clone()
                 },
                 &mail.id,
             ],
@@ -1182,6 +1478,20 @@ impl Database {
     }
 }
 
+fn default_mail_content_state() -> String {
+    MAIL_CONTENT_STATE_BODY_CACHED.to_string()
+}
+
+fn content_state_rank(state: &str) -> i32 {
+    match state {
+        MAIL_CONTENT_STATE_METADATA_ONLY => 0,
+        MAIL_CONTENT_STATE_SNIPPET_CACHED => 1,
+        MAIL_CONTENT_STATE_BODY_FAILED => 2,
+        MAIL_CONTENT_STATE_BODY_CACHED => 3,
+        _ => 0,
+    }
+}
+
 /// Parse a JSON string into a vector of EmailAddress
 fn parse_json_addresses(json: Option<String>) -> Option<Vec<EmailAddress>> {
     json.and_then(|s| serde_json::from_str(&s).ok())
@@ -1236,3 +1546,7 @@ fn strip_html(html: &str) -> String {
 #[cfg(test)]
 #[path = "../test/notification_history_tests.rs"]
 mod notification_history_tests;
+
+#[cfg(test)]
+#[path = "../test/database_sync_state_tests.rs"]
+mod database_sync_state_tests;

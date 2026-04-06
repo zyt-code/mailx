@@ -85,6 +85,32 @@ describe('createMailboxStore', () => {
 		expect(getMails).toHaveBeenCalledWith('inbox', 'acc-1', 50, 0);
 	});
 
+	it('resets a custom folder back to inbox when switching accounts', async () => {
+		const getMails = vi.fn().mockResolvedValue([makeMail({ folder: 'inbox', account_id: 'acc-2' })]);
+		const getMailsCount = vi.fn().mockResolvedValue(1);
+		const markMailRead = vi.fn().mockResolvedValue(undefined);
+		const accountsStore = writable([
+			{ id: 'acc-1', is_active: true },
+			{ id: 'acc-2', is_active: false }
+		]);
+
+		const store = createMailboxStore({
+			db: { getMails, getMailsCount, markMailRead },
+			accountsStore
+		});
+
+		await store.switchFolder('custom:Projects');
+		getMails.mockClear();
+		getMailsCount.mockClear();
+
+		await store.selectAccount('acc-2');
+
+		expect(get(store.activeFolder)).toBe('inbox');
+		expect(get(store.selectedAccountId)).toBe('acc-2');
+		expect(get(store.effectiveAccountId)).toBe('acc-2');
+		expect(getMails).toHaveBeenCalledWith('inbox', 'acc-2', 50, 0);
+	});
+
 	it('updates selectedAccountId without reloading when setSelectedAccount is used as a pure state change', () => {
 		const getMails = vi.fn().mockResolvedValue([]);
 		const getMailsCount = vi.fn().mockResolvedValue(0);

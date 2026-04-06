@@ -348,7 +348,10 @@ impl AccountManager {
             |row| row.get(0),
         )?;
         if has_imap_folders_table {
-            tx.execute("DELETE FROM imap_folders WHERE account_id = ?1", params![id])?;
+            tx.execute(
+                "DELETE FROM imap_folders WHERE account_id = ?1",
+                params![id],
+            )?;
         }
 
         tx.execute("DELETE FROM accounts WHERE id = ?1", params![id])?;

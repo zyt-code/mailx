@@ -16,6 +16,7 @@ type MailStoreBridge = {
 	loadMails: (...args: any[]) => unknown;
 	switchFolder: (...args: any[]) => unknown;
 	setSelectedAccount: (...args: any[]) => unknown;
+	selectAccount: (...args: any[]) => unknown;
 	markMailReadLocally: (...args: any[]) => unknown;
 	markMailUnreadLocally: (...args: any[]) => unknown;
 	initMailStore: (...args: any[]) => unknown;
@@ -105,6 +106,7 @@ const {
 		loadMails: vi.fn(),
 		switchFolder: vi.fn(),
 		setSelectedAccount: vi.fn(),
+		selectAccount: vi.fn(),
 		markMailReadLocally: vi.fn(),
 		markMailUnreadLocally: vi.fn(),
 		initMailStore: vi.fn()
@@ -184,6 +186,7 @@ function connectMailStoreBridge(mailboxStore: ReturnType<typeof createMailboxSto
 	currentMailStore.loadMails = mailboxStore.loadMails;
 	currentMailStore.switchFolder = mailboxStore.switchFolder;
 	currentMailStore.setSelectedAccount = mailboxStore.setSelectedAccount;
+	currentMailStore.selectAccount = mailboxStore.selectAccount;
 	currentMailStore.markMailReadLocally = mailboxStore.markMailReadLocally;
 	currentMailStore.markMailUnreadLocally = mailboxStore.markMailUnreadLocally;
 }
@@ -244,6 +247,7 @@ vi.mock('$lib/stores/mailStore.js', () => ({
 	initMailStore: () => currentMailStore.initMailStore(),
 	switchFolder: (folder: string) => currentMailStore.switchFolder(folder),
 	setSelectedAccount: (accountId: string | null) => currentMailStore.setSelectedAccount(accountId),
+	selectAccount: (accountId: string | null) => currentMailStore.selectAccount(accountId),
 	markMailReadLocally: (mail: Mail) => currentMailStore.markMailReadLocally(mail),
 	markMailUnreadLocally: (mail: Mail) => currentMailStore.markMailUnreadLocally(mail),
 	displayedEmails: displayedEmailsBridge,
@@ -301,6 +305,7 @@ describe('AppShell sync workflow', () => {
 		currentMailStore.loadMails = vi.fn();
 		currentMailStore.switchFolder = vi.fn();
 		currentMailStore.setSelectedAccount = vi.fn();
+		currentMailStore.selectAccount = vi.fn();
 		currentMailStore.markMailReadLocally = vi.fn();
 		currentMailStore.markMailUnreadLocally = vi.fn();
 		currentMailStore.initMailStore = vi.fn();

@@ -1,4 +1,14 @@
-export type Folder = 'inbox' | 'sent' | 'drafts' | 'trash' | 'archive';
+export type SystemFolder = 'inbox' | 'sent' | 'drafts' | 'trash' | 'archive';
+export type Folder = string;
+
+export interface MailboxFolder {
+	id: Folder;
+	label: string;
+	kind: 'system' | 'custom';
+	unread_count: number;
+	system_key?: SystemFolder;
+	account_id?: string | null;
+}
 
 export interface Attachment {
 	id: string;
@@ -34,6 +44,8 @@ export interface Mail {
 	// IMAP sync fields
 	account_id?: string;
 	uid?: number;
+	remote_uid_validity?: number;
+	content_state?: 'metadata_only' | 'snippet_cached' | 'body_cached' | 'body_failed';
 }
 
 export interface EmailAddress {

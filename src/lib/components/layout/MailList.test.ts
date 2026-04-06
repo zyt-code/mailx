@@ -202,6 +202,19 @@ describe('MailList', () => {
 		expect(screen.getByText('No emails found')).toBeInTheDocument();
 	});
 
+	it('uses the custom folder name in the search placeholder', () => {
+		mockMails = [];
+		mockFolder = 'custom:Projects';
+
+		render(MailList, {
+			selectedMailId: null,
+			onSelectMail: vi.fn(),
+			width: 300
+		});
+
+		expect(screen.getByPlaceholderText('Search Projects')).toBeInTheDocument();
+	});
+
 	it('renders "Move to..." button with proper text wrapping', () => {
 		mockMails = [];
 		// Test that the component renders without errors when provided with optional callbacks

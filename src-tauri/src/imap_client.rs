@@ -1,8 +1,14 @@
 use crate::accounts::ImapConfig;
-use crate::database::{EmailAddress, Mail};
+use crate::database::{
+    EmailAddress, Mail, MAIL_CONTENT_STATE_BODY_CACHED, MAIL_CONTENT_STATE_METADATA_ONLY,
+    MAIL_CONTENT_STATE_SNIPPET_CACHED,
+};
 use crate::mail_provider::MailProvider;
-use mail_parser::{Message, MessageParser};
+use imap_proto::types::Address as ImapAddress;
+use mail_parser::{parsers::MessageStream, HeaderValue, Message, MessageParser};
 use std::io::BufReader;
+use std::io::{Read, Write};
+use std::time::Instant;
 use thiserror::Error;
 
 /// IMAP client errors
@@ -54,6 +60,31 @@ pub struct ImapClient {
     config: ImapConfig,
     email: String,
     password: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct SyncFolderRequest {
+    pub local_folder: String,
+    pub candidate_remote_folders: Vec<String>,
+    pub last_seen_uid: u32,
+    pub known_uid_validity: Option<u32>,
+    pub initial_fetch_limit: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct SyncFolderResult {
+    pub local_folder: String,
+    pub remote_folder: String,
+    pub uid_validity: u32,
+    pub remote_last_uid: u32,
+    pub uid_validity_changed: bool,
+    pub mails: Vec<Mail>,
+}
+
+#[derive(Debug, Clone)]
+pub struct RemoteFolder {
+    pub name: String,
+    pub attributes: Vec<String>,
 }
 
 impl ImapClient {
@@ -386,6 +417,7 @@ impl ImapClient {
     }
 
     /// Fetch emails from a folder (with 30s timeout)
+    #[allow(dead_code)]
     pub async fn fetch_emails(&self, folder: &str, limit: usize) -> Result<Vec<Mail>> {
         let config = self.config.clone();
         let email = self.email.clone();
@@ -409,7 +441,334 @@ impl ImapClient {
         }
     }
 
+    pub async fn sync_folders_metadata(
+        &self,
+        requests: Vec<SyncFolderRequest>,
+    ) -> Result<Vec<SyncFolderResult>> {
+        self.sync_folders_metadata_with_timeout(requests, std::time::Duration::from_secs(60))
+            .await
+    }
+
+    pub async fn sync_folders_metadata_with_timeout(
+        &self,
+        requests: Vec<SyncFolderRequest>,
+        timeout: std::time::Duration,
+    ) -> Result<Vec<SyncFolderResult>> {
+        let config = self.config.clone();
+        let email = self.email.clone();
+        let password = self.password.clone();
+
+        let result = tokio::time::timeout(
+            timeout,
+            tokio::task::spawn_blocking(move || {
+                let connect_started_at = Instant::now();
+                if config.use_ssl {
+                    let session = Self::connect_and_login(&config, &email, &password)?;
+                    println!(
+                        "[IMAP][Timing] metadata connect/login={}ms",
+                        connect_started_at.elapsed().as_millis()
+                    );
+                    Self::sync_folders_metadata_with_session(&config, session, requests)
+                } else {
+                    let session = Self::connect_plain(&config, &email, &password)?;
+                    println!(
+                        "[IMAP][Timing] metadata connect/login={}ms",
+                        connect_started_at.elapsed().as_millis()
+                    );
+                    Self::sync_folders_metadata_with_session(&config, session, requests)
+                }
+            }),
+        )
+        .await;
+
+        match result {
+            Ok(join_result) => join_result
+                .map_err(|e| ImapError::FetchFailed(format!("Fetch task panicked: {}", e)))?,
+            Err(_) => Err(ImapError::FetchFailed(format!(
+                "IMAP metadata sync timed out after {}s",
+                timeout.as_secs()
+            ))),
+        }
+    }
+
+    pub async fn fetch_mail_content(&self, remote_folder: &str, uid: u32) -> Result<Mail> {
+        let config = self.config.clone();
+        let email = self.email.clone();
+        let password = self.password.clone();
+        let remote_folder = remote_folder.to_string();
+
+        let result = tokio::time::timeout(
+            std::time::Duration::from_secs(30),
+            tokio::task::spawn_blocking(move || {
+                if config.use_ssl {
+                    let mut session = Self::connect_and_login(&config, &email, &password)?;
+                    let mail = Self::fetch_mail_content_with_session(
+                        &config,
+                        &mut session,
+                        &remote_folder,
+                        uid,
+                    )?;
+                    let _ = session.logout();
+                    Ok(mail)
+                } else {
+                    let mut session = Self::connect_plain(&config, &email, &password)?;
+                    let mail = Self::fetch_mail_content_with_session(
+                        &config,
+                        &mut session,
+                        &remote_folder,
+                        uid,
+                    )?;
+                    let _ = session.logout();
+                    Ok(mail)
+                }
+            }),
+        )
+        .await;
+
+        match result {
+            Ok(join_result) => join_result
+                .map_err(|e| ImapError::FetchFailed(format!("Fetch task panicked: {}", e)))?,
+            Err(_) => Err(ImapError::FetchFailed(
+                "IMAP content fetch timed out after 30s".to_string(),
+            )),
+        }
+    }
+
+    pub async fn list_remote_folders_with_timeout(
+        &self,
+        timeout: std::time::Duration,
+    ) -> Result<Vec<RemoteFolder>> {
+        let config = self.config.clone();
+        let email = self.email.clone();
+        let password = self.password.clone();
+
+        let result = tokio::time::timeout(
+            timeout,
+            tokio::task::spawn_blocking(move || {
+                let connect_started_at = Instant::now();
+                if config.use_ssl {
+                    let session = Self::connect_and_login(&config, &email, &password)?;
+                    println!(
+                        "[IMAP][Timing] list folders connect/login={}ms",
+                        connect_started_at.elapsed().as_millis()
+                    );
+                    Self::list_remote_folders_with_session(session)
+                } else {
+                    let session = Self::connect_plain(&config, &email, &password)?;
+                    println!(
+                        "[IMAP][Timing] list folders connect/login={}ms",
+                        connect_started_at.elapsed().as_millis()
+                    );
+                    Self::list_remote_folders_with_session(session)
+                }
+            }),
+        )
+        .await;
+
+        match result {
+            Ok(join_result) => join_result
+                .map_err(|e| ImapError::FetchFailed(format!("Fetch task panicked: {}", e)))?,
+            Err(_) => Err(ImapError::FetchFailed(format!(
+                "IMAP folder list timed out after {}s",
+                timeout.as_secs()
+            ))),
+        }
+    }
+
+    fn sync_folders_metadata_with_session<T: Read + Write>(
+        config: &ImapConfig,
+        mut session: imap::Session<T>,
+        requests: Vec<SyncFolderRequest>,
+    ) -> Result<Vec<SyncFolderResult>> {
+        let provider = MailProvider::detect_from_host(&config.server);
+        let total_started_at = Instant::now();
+        let mut results = Vec::new();
+
+        for request in requests {
+            let folder_started_at = Instant::now();
+            let mut selected_remote: Option<(String, imap::types::Mailbox)> = None;
+
+            for candidate in &request.candidate_remote_folders {
+                println!("[IMAP] Selecting folder '{}'...", candidate);
+                match session.select(candidate) {
+                    Ok(mailbox) => {
+                        selected_remote = Some((candidate.clone(), mailbox));
+                        break;
+                    }
+                    Err(error) => {
+                        println!("[IMAP] Select folder '{}' FAILED: {}", candidate, error);
+                    }
+                }
+            }
+
+            let Some((remote_folder, mailbox)) = selected_remote else {
+                println!(
+                    "[IMAP] Skipping local folder '{}' - no remote folder could be selected",
+                    request.local_folder
+                );
+                continue;
+            };
+
+            let uid_validity = mailbox.uid_validity.unwrap_or(0);
+            let remote_last_uid = mailbox.uid_next.unwrap_or(1).saturating_sub(1);
+            let uid_validity_changed = request
+                .known_uid_validity
+                .is_some_and(|known| known != uid_validity);
+
+            println!(
+                "[IMAP] Folder '{}': exists={}, uid_validity={:?}, uid_next={:?}",
+                remote_folder, mailbox.exists, mailbox.uid_validity, mailbox.uid_next
+            );
+
+            let mails = if mailbox.exists == 0 || remote_last_uid == 0 {
+                Vec::new()
+            } else {
+                let range = if uid_validity_changed || request.last_seen_uid == 0 {
+                    let start = remote_last_uid
+                        .saturating_sub(request.initial_fetch_limit as u32)
+                        .saturating_add(1)
+                        .max(1);
+                    format!("{}:*", start)
+                } else if remote_last_uid <= request.last_seen_uid {
+                    String::new()
+                } else {
+                    format!("{}:*", request.last_seen_uid.saturating_add(1))
+                };
+
+                if range.is_empty() {
+                    Vec::new()
+                } else {
+                    println!(
+                        "[IMAP] Provider: {}, metadata fetch command: {}, uid range={}",
+                        provider,
+                        provider.get_metadata_fetch_command(),
+                        range
+                    );
+                    let fetch_results = session
+                        .uid_fetch(&range, provider.get_metadata_fetch_command())
+                        .map_err(|e| {
+                            ImapError::FetchFailed(format!(
+                                "Metadata fetch for folder '{}' failed: {}",
+                                remote_folder, e
+                            ))
+                        })?;
+
+                    let mut mails = Vec::new();
+                    for fetch in fetch_results.iter() {
+                        if let Ok(mail) =
+                            Self::parse_metadata_fetch_response(fetch, &request.local_folder)
+                        {
+                            mails.push(mail);
+                        }
+                    }
+                    mails
+                }
+            };
+
+            println!(
+                "[IMAP][Timing] metadata folder='{}' local='{}' mails={} total={}ms",
+                remote_folder,
+                request.local_folder,
+                mails.len(),
+                folder_started_at.elapsed().as_millis()
+            );
+
+            results.push(SyncFolderResult {
+                local_folder: request.local_folder,
+                remote_folder,
+                uid_validity,
+                remote_last_uid,
+                uid_validity_changed,
+                mails,
+            });
+        }
+
+        let _ = session.logout();
+        println!(
+            "[IMAP][Timing] metadata sync total={}ms",
+            total_started_at.elapsed().as_millis()
+        );
+        Ok(results)
+    }
+
+    fn fetch_mail_content_with_session<T: Read + Write>(
+        config: &ImapConfig,
+        session: &mut imap::Session<T>,
+        remote_folder: &str,
+        uid: u32,
+    ) -> Result<Mail> {
+        let provider = MailProvider::detect_from_host(&config.server);
+
+        session.select(remote_folder).map_err(|e| {
+            ImapError::Protocol(format!(
+                "Failed to select folder '{}': {}",
+                remote_folder, e
+            ))
+        })?;
+
+        let fetches = session
+            .uid_fetch(uid.to_string(), provider.get_fetch_command())
+            .map_err(|e| ImapError::FetchFailed(format!("Fetch UID {} failed: {}", uid, e)))?;
+
+        let fetch = fetches
+            .first()
+            .ok_or_else(|| ImapError::FetchFailed(format!("UID {} not found", uid)))?;
+
+        match Self::parse_fetch_response(fetch, remote_folder) {
+            Ok(mail) => Ok(mail),
+            Err(error) if provider.needs_rfc822_fallback() => {
+                println!(
+                    "[IMAP] Full content fallback for UID={} in '{}' after error: {}",
+                    uid, remote_folder, error
+                );
+                let fallback = session
+                    .uid_fetch(uid.to_string(), provider.get_rfc822_fetch_command())
+                    .map_err(|e| {
+                        ImapError::FetchFailed(format!(
+                            "RFC822 fallback for UID {} failed: {}",
+                            uid, e
+                        ))
+                    })?;
+                let fetch = fallback
+                    .first()
+                    .ok_or_else(|| ImapError::FetchFailed(format!("UID {} not found", uid)))?;
+                Self::parse_fetch_response(fetch, remote_folder)
+            }
+            Err(error) => Err(error),
+        }
+    }
+
+    fn list_remote_folders_with_session<T: Read + Write>(
+        mut session: imap::Session<T>,
+    ) -> Result<Vec<RemoteFolder>> {
+        let started_at = Instant::now();
+        let names = session
+            .list(None, Some("*"))
+            .map_err(|e| ImapError::Protocol(format!("Failed to list folders: {}", e)))?;
+
+        let folders = names
+            .into_iter()
+            .map(|name| RemoteFolder {
+                name: name.name().to_string(),
+                attributes: name
+                    .attributes()
+                    .iter()
+                    .map(Self::format_name_attribute)
+                    .collect(),
+            })
+            .collect::<Vec<_>>();
+
+        let _ = session.logout();
+        println!(
+            "[IMAP][Timing] list folders count={} total={}ms",
+            folders.len(),
+            started_at.elapsed().as_millis()
+        );
+        Ok(folders)
+    }
+
     /// Fetch emails using blocking IMAP
+    #[allow(dead_code)]
     fn fetch_emails_blocking(
         config: ImapConfig,
         email: String,
@@ -425,6 +784,7 @@ impl ImapClient {
     }
 
     /// Fetch emails using plain TCP (no TLS)
+    #[allow(dead_code)]
     fn fetch_emails_blocking_plain(
         config: ImapConfig,
         email: String,
@@ -432,13 +792,18 @@ impl ImapClient {
         folder: &str,
         limit: usize,
     ) -> Result<Vec<Mail>> {
+        let total_started_at = Instant::now();
+        let connect_started_at = Instant::now();
         let mut session = Self::connect_plain(&config, &email, &password)?;
+        let connect_duration_ms = connect_started_at.elapsed().as_millis();
 
         println!("[IMAP] Selecting folder '{}'...", folder);
+        let select_started_at = Instant::now();
         let mailbox = session.select(folder).map_err(|e| {
             println!("[IMAP] Select folder '{}' FAILED: {}", folder, e);
             ImapError::Protocol(format!("Failed to select folder '{}': {}", folder, e))
         })?;
+        let select_duration_ms = select_started_at.elapsed().as_millis();
 
         let exists = mailbox.exists;
         println!(
@@ -474,19 +839,24 @@ impl ImapClient {
             provider, fetch_command
         );
 
+        let fetch_started_at = Instant::now();
         let fetch_results = session.fetch(&range, fetch_command).map_err(|e| {
             println!("[IMAP] Fetch FAILED: {}", e);
             ImapError::FetchFailed(format!("Fetch range {} failed: {}", range, e))
         })?;
+        let fetch_duration_ms = fetch_started_at.elapsed().as_millis();
 
         println!(
             "[IMAP] Fetched {} responses, parsing...",
             fetch_results.len()
         );
 
+        let parse_started_at = Instant::now();
         let mut mails = Vec::new();
         let mut parse_errors = 0u32;
         let needs_rfc822_retry = provider.needs_rfc822_fallback();
+        let mut rfc822_fallback_attempts = 0u32;
+        let mut rfc822_fallback_successes = 0u32;
 
         for (i, fetch) in fetch_results.iter().enumerate() {
             match Self::parse_fetch_response(fetch, folder) {
@@ -496,6 +866,7 @@ impl ImapClient {
                     if needs_rfc822_retry && e.to_string().contains("No body in fetch response") {
                         // Try RFC822 fallback - need to fetch this specific message again
                         if let Some(uid) = fetch.uid {
+                            rfc822_fallback_attempts += 1;
                             println!("[IMAP] iCloud empty body detected for UID={}, trying RFC822 fallback...", uid);
                             let uid_str = uid.to_string();
                             match session.fetch(&uid_str, provider.get_rfc822_fetch_command()) {
@@ -503,6 +874,7 @@ impl ImapClient {
                                     if let Some(rfc822_fetch) = rfc822_results.first() {
                                         match Self::parse_fetch_response(rfc822_fetch, folder) {
                                             Ok(rfc822_mail) => {
+                                                rfc822_fallback_successes += 1;
                                                 println!(
                                                     "[IMAP] RFC822 fallback succeeded for UID={}",
                                                     uid
@@ -537,20 +909,36 @@ impl ImapClient {
                 }
             }
         }
+        let parse_duration_ms = parse_started_at.elapsed().as_millis();
 
         println!(
-            "[IMAP] Parsed {} mails OK, {} parse errors",
+            "[IMAP] Parsed {} mails OK, {} parse errors, RFC822 fallback attempts={}, successes={}",
             mails.len(),
-            parse_errors
+            parse_errors,
+            rfc822_fallback_attempts,
+            rfc822_fallback_successes
         );
 
+        let logout_started_at = Instant::now();
         let _ = session.logout();
+        let logout_duration_ms = logout_started_at.elapsed().as_millis();
         println!("[IMAP] Logged out");
+        println!(
+            "[IMAP][Timing] folder='{}' connect={}ms select={}ms fetch={}ms parse={}ms logout={}ms total={}ms",
+            folder,
+            connect_duration_ms,
+            select_duration_ms,
+            fetch_duration_ms,
+            parse_duration_ms,
+            logout_duration_ms,
+            total_started_at.elapsed().as_millis()
+        );
 
         Ok(mails)
     }
 
     /// Fetch emails using TLS
+    #[allow(dead_code)]
     fn fetch_emails_blocking_tls(
         config: ImapConfig,
         email: String,
@@ -558,13 +946,18 @@ impl ImapClient {
         folder: &str,
         limit: usize,
     ) -> Result<Vec<Mail>> {
+        let total_started_at = Instant::now();
+        let connect_started_at = Instant::now();
         let mut session = Self::connect_and_login(&config, &email, &password)?;
+        let connect_duration_ms = connect_started_at.elapsed().as_millis();
 
         println!("[IMAP] Selecting folder '{}'...", folder);
+        let select_started_at = Instant::now();
         let mailbox = session.select(folder).map_err(|e| {
             println!("[IMAP] Select folder '{}' FAILED: {}", folder, e);
             ImapError::Protocol(format!("Failed to select folder '{}': {}", folder, e))
         })?;
+        let select_duration_ms = select_started_at.elapsed().as_millis();
 
         let exists = mailbox.exists;
         println!(
@@ -600,19 +993,24 @@ impl ImapClient {
             provider, fetch_command
         );
 
+        let fetch_started_at = Instant::now();
         let fetch_results = session.fetch(&range, fetch_command).map_err(|e| {
             println!("[IMAP] Fetch FAILED: {}", e);
             ImapError::FetchFailed(format!("Fetch range {} failed: {}", range, e))
         })?;
+        let fetch_duration_ms = fetch_started_at.elapsed().as_millis();
 
         println!(
             "[IMAP] Fetched {} responses, parsing...",
             fetch_results.len()
         );
 
+        let parse_started_at = Instant::now();
         let mut mails = Vec::new();
         let mut parse_errors = 0u32;
         let needs_rfc822_retry = provider.needs_rfc822_fallback();
+        let mut rfc822_fallback_attempts = 0u32;
+        let mut rfc822_fallback_successes = 0u32;
 
         for (i, fetch) in fetch_results.iter().enumerate() {
             match Self::parse_fetch_response(fetch, folder) {
@@ -622,6 +1020,7 @@ impl ImapClient {
                     if needs_rfc822_retry && e.to_string().contains("No body in fetch response") {
                         // Try RFC822 fallback - need to fetch this specific message again
                         if let Some(uid) = fetch.uid {
+                            rfc822_fallback_attempts += 1;
                             println!("[IMAP] iCloud empty body detected for UID={}, trying RFC822 fallback...", uid);
                             let uid_str = uid.to_string();
                             match session.fetch(&uid_str, provider.get_rfc822_fetch_command()) {
@@ -629,6 +1028,7 @@ impl ImapClient {
                                     if let Some(rfc822_fetch) = rfc822_results.first() {
                                         match Self::parse_fetch_response(rfc822_fetch, folder) {
                                             Ok(rfc822_mail) => {
+                                                rfc822_fallback_successes += 1;
                                                 println!(
                                                     "[IMAP] RFC822 fallback succeeded for UID={}",
                                                     uid
@@ -663,15 +1063,30 @@ impl ImapClient {
                 }
             }
         }
+        let parse_duration_ms = parse_started_at.elapsed().as_millis();
 
         println!(
-            "[IMAP] Parsed {} mails OK, {} parse errors",
+            "[IMAP] Parsed {} mails OK, {} parse errors, RFC822 fallback attempts={}, successes={}",
             mails.len(),
-            parse_errors
+            parse_errors,
+            rfc822_fallback_attempts,
+            rfc822_fallback_successes
         );
 
+        let logout_started_at = Instant::now();
         let _ = session.logout();
+        let logout_duration_ms = logout_started_at.elapsed().as_millis();
         println!("[IMAP] Logged out");
+        println!(
+            "[IMAP][Timing] folder='{}' connect={}ms select={}ms fetch={}ms parse={}ms logout={}ms total={}ms",
+            folder,
+            connect_duration_ms,
+            select_duration_ms,
+            fetch_duration_ms,
+            parse_duration_ms,
+            logout_duration_ms,
+            total_started_at.elapsed().as_millis()
+        );
 
         Ok(mails)
     }
@@ -805,6 +1220,99 @@ impl ImapClient {
         Ok(())
     }
 
+    fn parse_metadata_fetch_response(fetch: &imap::types::Fetch, folder: &str) -> Result<Mail> {
+        let uid = fetch.uid.ok_or_else(|| {
+            ImapError::ParseError("Missing UID in metadata fetch response".to_string())
+        })?;
+
+        let envelope = fetch.envelope().ok_or_else(|| {
+            ImapError::ParseError(format!(
+                "Missing ENVELOPE in metadata fetch response (UID={})",
+                uid
+            ))
+        })?;
+
+        let (from_name, from_email) = if let Some(address) = envelope
+            .from
+            .as_ref()
+            .and_then(|addresses| addresses.first())
+        {
+            let mailbox = address.mailbox.unwrap_or("unknown");
+            let host = address.host.unwrap_or("unknown");
+            let email = format!("{}@{}", mailbox, host);
+            let decoded_name = Self::decode_header_text(address.name.unwrap_or(mailbox));
+            let name = decoded_name.trim();
+            (
+                if name.is_empty() {
+                    mailbox.to_string()
+                } else {
+                    name.to_string()
+                },
+                email,
+            )
+        } else {
+            ("Unknown".to_string(), "unknown@unknown".to_string())
+        };
+        let subject = envelope
+            .subject
+            .map(Self::decode_header_text)
+            .filter(|value| !value.is_empty())
+            .unwrap_or_else(|| "(No Subject)".to_string());
+        let preview = Self::extract_preview_from_metadata(fetch);
+        let flags = fetch.flags();
+        let is_seen = flags
+            .iter()
+            .any(|flag| matches!(flag, imap::types::Flag::Seen));
+        let collect_addresses = |addresses: Option<&Vec<ImapAddress<'_>>>| {
+            let mut list = Vec::new();
+            if let Some(items) = addresses {
+                for address in items {
+                    if let (Some(mailbox), Some(host)) = (address.mailbox, address.host) {
+                        list.push(EmailAddress {
+                            name: Self::decode_header_text(address.name.unwrap_or("")),
+                            email: format!("{}@{}", mailbox, host),
+                        });
+                    }
+                }
+            }
+
+            if list.is_empty() {
+                None
+            } else {
+                Some(list)
+            }
+        };
+
+        Ok(Mail {
+            id: uid.to_string(),
+            uid: Some(uid),
+            from_name,
+            from_email,
+            subject,
+            preview: preview.clone(),
+            body: String::new(),
+            html_body: None,
+            timestamp: Self::parse_envelope_timestamp(envelope.date),
+            folder: folder.to_lowercase(),
+            unread: !is_seen,
+            is_read: is_seen,
+            account_id: None,
+            to: collect_addresses(envelope.to.as_ref()),
+            cc: collect_addresses(envelope.cc.as_ref()),
+            bcc: collect_addresses(envelope.bcc.as_ref()),
+            reply_to: collect_addresses(envelope.reply_to.as_ref()),
+            attachments: None,
+            starred: Some(false),
+            has_attachments: Some(false),
+            remote_uid_validity: None,
+            content_state: if preview.is_empty() {
+                MAIL_CONTENT_STATE_METADATA_ONLY.to_string()
+            } else {
+                MAIL_CONTENT_STATE_SNIPPET_CACHED.to_string()
+            },
+        })
+    }
+
     /// Parse a fetch response into a Mail structure.
     /// Applies fallbacks so that malformed headers don't crash the whole sync.
     fn parse_fetch_response(fetch: &imap::types::Fetch, folder: &str) -> Result<Mail> {
@@ -856,7 +1364,7 @@ impl ImapClient {
         ) = if let Some(ref msg) = message {
             let from_addr = msg.from();
             let (fn_, fe_) = Self::extract_first_address(from_addr);
-            let subj = msg.subject().unwrap_or("(No Subject)").to_string();
+            let subj = Self::decode_header_text(msg.subject().unwrap_or("(No Subject)"));
             let bt = Self::extract_body_text(msg);
             let hb = msg.body_html(0).map(|h| h.to_string());
             let pv = Self::create_preview(&bt);
@@ -941,6 +1449,8 @@ impl ImapClient {
             attachments: None,
             starred: Some(false),
             has_attachments: Some(attachment_count > 0),
+            remote_uid_validity: None,
+            content_state: MAIL_CONTENT_STATE_BODY_CACHED.to_string(),
         })
     }
 
@@ -1068,7 +1578,7 @@ impl ImapClient {
         match address {
             Some(mail_parser::Address::List(addrs)) if !addrs.is_empty() => {
                 let addr = &addrs[0];
-                let name = addr.name().unwrap_or("").to_string();
+                let name = Self::decode_header_text(addr.name().unwrap_or(""));
                 let email = addr.address().unwrap_or("unknown@unknown").to_string();
                 if name.is_empty() {
                     // Use the local part of the email as fallback name
@@ -1081,7 +1591,7 @@ impl ImapClient {
             Some(mail_parser::Address::Group(groups)) if !groups.is_empty() => {
                 let group = &groups[0];
                 if let Some(addr) = group.addresses.first() {
-                    let name = addr.name().unwrap_or("").to_string();
+                    let name = Self::decode_header_text(addr.name().unwrap_or(""));
                     let email = addr.address().unwrap_or("unknown@unknown").to_string();
                     (name, email)
                 } else {
@@ -1100,7 +1610,7 @@ impl ImapClient {
                     .iter()
                     .filter_map(|addr| {
                         addr.address().map(|email| EmailAddress {
-                            name: addr.name().unwrap_or("").to_string(),
+                            name: Self::decode_header_text(addr.name().unwrap_or("")),
                             email: email.to_string(),
                         })
                     })
@@ -1117,7 +1627,7 @@ impl ImapClient {
                     .flat_map(|group| {
                         group.addresses.iter().filter_map(|addr| {
                             addr.address().map(|email| EmailAddress {
-                                name: addr.name().unwrap_or("").to_string(),
+                                name: Self::decode_header_text(addr.name().unwrap_or("")),
                                 email: email.to_string(),
                             })
                         })
@@ -1133,15 +1643,71 @@ impl ImapClient {
         }
     }
 
-    /// Generate a unique ID for an email
-    fn generate_id(from_email: &str, uid: u32) -> String {
+    fn decode_header_text(value: &str) -> String {
+        let trimmed = value.trim();
+        if trimmed.is_empty() {
+            return String::new();
+        }
+
+        let header = format!("{trimmed}\r\n");
+        let mut stream = MessageStream::new(header.as_bytes());
+        match stream.parse_unstructured() {
+            HeaderValue::Text(text) => {
+                let decoded = text.trim();
+                if decoded.is_empty() {
+                    trimmed.to_string()
+                } else {
+                    decoded.to_string()
+                }
+            }
+            HeaderValue::Empty => trimmed.to_string(),
+            _ => trimmed.to_string(),
+        }
+    }
+
+    fn format_name_attribute(attribute: &imap::types::NameAttribute<'_>) -> String {
+        match attribute {
+            imap::types::NameAttribute::NoInferiors => "\\NoInferiors".to_string(),
+            imap::types::NameAttribute::NoSelect => "\\NoSelect".to_string(),
+            imap::types::NameAttribute::Marked => "\\Marked".to_string(),
+            imap::types::NameAttribute::Unmarked => "\\Unmarked".to_string(),
+            imap::types::NameAttribute::Custom(value) => value.to_string(),
+        }
+    }
+
+    fn parse_envelope_timestamp(date: Option<&str>) -> i64 {
+        let fallback = chrono::Utc::now().timestamp_millis();
+        date.and_then(|value| chrono::DateTime::parse_from_rfc2822(value).ok())
+            .map(|value| value.timestamp_millis())
+            .unwrap_or(fallback)
+    }
+
+    fn extract_preview_from_metadata(fetch: &imap::types::Fetch) -> String {
+        let snippet = fetch
+            .text()
+            .map(|bytes| String::from_utf8_lossy(bytes).to_string())
+            .unwrap_or_default();
+        if snippet.is_empty() {
+            String::new()
+        } else {
+            Self::create_preview(&Self::strip_html(&snippet))
+        }
+    }
+
+    pub(crate) fn generate_sync_id(account_id: &str, folder: &str, uid: u32) -> String {
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
 
         let mut hasher = DefaultHasher::new();
-        from_email.hash(&mut hasher);
+        account_id.hash(&mut hasher);
+        folder.hash(&mut hasher);
         uid.hash(&mut hasher);
         format!("{:x}", hasher.finish())
+    }
+
+    /// Generate a unique ID for an email
+    fn generate_id(from_email: &str, uid: u32) -> String {
+        Self::generate_sync_id(from_email, "", uid)
     }
 }
 #[cfg(test)]

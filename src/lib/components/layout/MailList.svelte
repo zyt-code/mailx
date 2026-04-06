@@ -294,7 +294,7 @@
 		if (!(mail.is_read ?? false)) {
 			markMailReadLocally(mailId);
 			if (mail.account_id && typeof mail.uid === 'number') {
-				markMailAsRead(mail.uid, mail.account_id).catch((error) => {
+				markMailAsRead(mail.id).catch((error) => {
 					console.error('[MailList] Failed to sync read status:', error);
 				});
 			}

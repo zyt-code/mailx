@@ -1,9 +1,10 @@
 use crate::accounts::{Account, AccountManager};
 use crate::credentials_legacy::CredentialManager;
-use crate::database::Database;
-use crate::imap_client::ImapClient;
+use crate::database::{Database, ImapFolderState};
+use crate::imap_client::{ImapClient, SyncFolderRequest};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
+use std::time::Instant;
 use tauri::{AppHandle, Emitter};
 use thiserror::Error;
 
@@ -70,6 +71,62 @@ pub struct SyncManager {
     #[allow(dead_code)]
     sync_handles: Arc<Mutex<Vec<tokio::task::JoinHandle<()>>>>,
     is_syncing: Arc<AtomicBool>,
+}
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+struct SyncBatchStats {
+    inserted: u32,
+    updated: u32,
+    new_inbox_unread: u32,
+}
+
+impl SyncBatchStats {
+    fn record_mail(&mut self, local_folder: &str, is_new: bool, unread: bool) {
+        if is_new {
+            self.inserted += 1;
+            if local_folder == "inbox" && unread {
+                self.new_inbox_unread += 1;
+            }
+        } else {
+            self.updated += 1;
+        }
+    }
+
+    fn has_mailbox_changes(&self) -> bool {
+        self.inserted > 0 || self.updated > 0
+    }
+
+    fn merge_into(
+        self,
+        total_inserted: &mut u32,
+        total_updated: &mut u32,
+        total_new_inbox_unread: &mut u32,
+    ) {
+        *total_inserted += self.inserted;
+        *total_updated += self.updated;
+        *total_new_inbox_unread += self.new_inbox_unread;
+    }
+}
+
+fn is_high_priority_sync_folder(local_folder: &str) -> bool {
+    matches!(local_folder, "inbox" | "sent" | "drafts")
+}
+
+fn partition_sync_requests(
+    requests: Vec<SyncFolderRequest>,
+) -> (Vec<SyncFolderRequest>, Vec<SyncFolderRequest>) {
+    let mut high_priority = Vec::new();
+    let mut low_priority = Vec::new();
+
+    for request in requests {
+        if is_high_priority_sync_folder(&request.local_folder) {
+            high_priority.push(request);
+        } else {
+            low_priority.push(request);
+        }
+    }
+
+    (high_priority, low_priority)
 }
 
 unsafe impl Send for SyncManager {}
@@ -157,6 +214,8 @@ impl SyncManager {
 
     /// Inner sync logic — separated so sync_account can wrap errors
     async fn sync_account_inner(&self, account_id: &str, account: &Account) -> Result<SyncStatus> {
+        let sync_started_at = Instant::now();
+
         // Get credentials
         println!("[Sync] Getting credentials for '{}'...", account.email);
         let password = self.credential_manager.get_password(account_id).map_err(
@@ -194,33 +253,106 @@ impl SyncManager {
         let mut total_updated = 0u32;
         let mut total_new_inbox_unread = 0u32;
         let mut synced_local_folders = std::collections::HashSet::new();
+        let mut local_folder_order = Vec::new();
+        let mut candidate_folders = std::collections::HashMap::<String, Vec<String>>::new();
 
-        // Sync each folder — skip folders that fail to SELECT (don't exist on server)
-        for (imap_folder, local_folder) in &sync_folders {
-            // Skip if we already synced this local folder successfully
-            // (multiple IMAP names can map to the same local folder)
-            if synced_local_folders.contains(*local_folder) {
-                continue;
+        for (remote_folder, local_folder) in &sync_folders {
+            let local_key = (*local_folder).to_string();
+            if !candidate_folders.contains_key(&local_key) {
+                local_folder_order.push(local_key.clone());
+            }
+            candidate_folders
+                .entry(local_key)
+                .or_default()
+                .push((*remote_folder).to_string());
+        }
+
+        let mut requests = Vec::new();
+        for local_folder in &local_folder_order {
+            let saved_state = self
+                .database
+                .get_imap_folder_state(account_id, local_folder)
+                .map_err(|e| SyncError::Database(e.to_string()))?;
+
+            let mut folders = Vec::new();
+            if let Some(state) = &saved_state {
+                folders.push(state.name.clone());
+            }
+            if let Some(default_candidates) = candidate_folders.get(local_folder) {
+                for candidate in default_candidates {
+                    if !folders.iter().any(|existing| existing == candidate) {
+                        folders.push(candidate.clone());
+                    }
+                }
             }
 
-            let imap_client =
-                ImapClient::new(imap_config.clone(), account.email.clone(), password.clone());
+            requests.push(SyncFolderRequest {
+                local_folder: local_folder.clone(),
+                candidate_remote_folders: folders,
+                last_seen_uid: saved_state
+                    .as_ref()
+                    .map(|state| state.remote_last_uid.max(0) as u32)
+                    .unwrap_or(0),
+                known_uid_validity: saved_state
+                    .as_ref()
+                    .map(|state| state.remote_uid_validity as u32),
+                initial_fetch_limit: match local_folder.as_str() {
+                    "inbox" => 75,
+                    "sent" => 40,
+                    _ => 20,
+                },
+            });
+        }
 
-            let fetch_limit = if *local_folder == "inbox" { 200 } else { 100 };
+        let (high_priority_requests, low_priority_requests) = partition_sync_requests(requests);
+        let imap_client = ImapClient::new(imap_config.clone(), account.email.clone(), password);
 
-            match imap_client.fetch_emails(imap_folder, fetch_limit).await {
-                Ok(mails) => {
-                    println!(
-                        "[Sync] Fetched {} mails from '{}' -> local '{}'",
-                        mails.len(),
-                        imap_folder,
-                        local_folder
-                    );
+        let mut persist_results =
+            |results: Vec<crate::imap_client::SyncFolderResult>| -> Result<SyncBatchStats> {
+                let mut batch_stats = SyncBatchStats::default();
 
-                    for mut mail in mails {
+                for result in results {
+                    let folder_started_at = Instant::now();
+                    let fetched_count = result.mails.len();
+
+                    if result.uid_validity_changed {
+                        self.database
+                            .clear_account_folder(account_id, &result.local_folder)
+                            .map_err(|e| SyncError::Database(e.to_string()))?;
+                    }
+
+                    let now = chrono::Utc::now().timestamp_millis();
+                    let created_at = self
+                        .database
+                        .get_imap_folder_state(account_id, &result.local_folder)
+                        .ok()
+                        .flatten()
+                        .map(|state| state.created_at)
+                        .unwrap_or(now);
+
+                    self.database
+                        .upsert_imap_folder_state(&ImapFolderState {
+                            id: format!("{}:{}", account_id, result.local_folder),
+                            account_id: account_id.to_string(),
+                            local_name: result.local_folder.clone(),
+                            name: result.remote_folder.clone(),
+                            remote_uid_validity: i64::from(result.uid_validity),
+                            remote_last_uid: i64::from(result.remote_last_uid),
+                            local_count: fetched_count as i64,
+                            created_at,
+                            last_synced_at: now,
+                        })
+                        .map_err(|e| SyncError::Database(e.to_string()))?;
+
+                    for mut mail in result.mails {
                         mail.account_id = Some(account_id.to_string());
-                        // Override folder to local name
-                        mail.folder = local_folder.to_string();
+                        mail.folder = result.local_folder.clone();
+                        mail.remote_uid_validity = Some(result.uid_validity);
+
+                        if let Some(uid) = mail.uid {
+                            mail.id =
+                                ImapClient::generate_sync_id(account_id, &result.local_folder, uid);
+                        }
 
                         let is_new = match self.database.get_mail(&mail.id) {
                             Ok(Some(_)) => false,
@@ -234,23 +366,71 @@ impl SyncManager {
                                 SyncError::Database(e.to_string())
                             })?;
 
-                        if is_new {
-                            total_inserted += 1;
-                            if *local_folder == "inbox" && mail.unread {
-                                total_new_inbox_unread += 1;
-                            }
-                        } else {
-                            total_updated += 1;
-                        }
+                        batch_stats.record_mail(&result.local_folder, is_new, mail.unread);
                     }
 
-                    synced_local_folders.insert(*local_folder);
-                }
-                Err(e) => {
-                    // Folder doesn't exist or can't be selected — skip silently
                     println!(
-                        "[Sync] Skipping '{}' ({}): {}",
-                        imap_folder, local_folder, e
+                        "[Sync][Timing] metadata folder '{}' -> '{}' mails={} total={}ms",
+                        result.remote_folder,
+                        result.local_folder,
+                        fetched_count,
+                        folder_started_at.elapsed().as_millis()
+                    );
+
+                    synced_local_folders.insert(result.local_folder);
+                }
+
+                Ok(batch_stats)
+            };
+
+        let high_priority_results = imap_client
+            .sync_folders_metadata_with_timeout(
+                high_priority_requests,
+                std::time::Duration::from_secs(60),
+            )
+            .await
+            .map_err(|e| SyncError::Imap(e.to_string()))?;
+        let high_priority_stats = persist_results(high_priority_results)?;
+        high_priority_stats.merge_into(
+            &mut total_inserted,
+            &mut total_updated,
+            &mut total_new_inbox_unread,
+        );
+        if high_priority_stats.has_mailbox_changes() {
+            println!(
+                "[Sync] Triggering mails:updated after high-priority sync ({} new, {} updated)",
+                high_priority_stats.inserted, high_priority_stats.updated
+            );
+            let _ = self.app_handle.emit("mails:updated", ());
+        }
+
+        if !low_priority_requests.is_empty() {
+            match imap_client
+                .sync_folders_metadata_with_timeout(
+                    low_priority_requests,
+                    std::time::Duration::from_secs(20),
+                )
+                .await
+            {
+                Ok(results) => {
+                    let low_priority_stats = persist_results(results)?;
+                    low_priority_stats.merge_into(
+                        &mut total_inserted,
+                        &mut total_updated,
+                        &mut total_new_inbox_unread,
+                    );
+                    if low_priority_stats.has_mailbox_changes() {
+                        println!(
+                            "[Sync] Triggering mails:updated after low-priority sync ({} new, {} updated)",
+                            low_priority_stats.inserted, low_priority_stats.updated
+                        );
+                        let _ = self.app_handle.emit("mails:updated", ());
+                    }
+                }
+                Err(error) => {
+                    println!(
+                        "[Sync] Low-priority folders skipped for '{}' after timeout/error: {}",
+                        account.email, error
                     );
                 }
             }
@@ -279,16 +459,11 @@ impl SyncManager {
 
         let _ = self.app_handle.emit("sync:completed", json!(status));
 
-        // Trigger UI reload if there were any changes (new or updated emails)
-        if total_inserted > 0 || total_updated > 0 {
-            println!(
-                "[Sync] Triggering mails:updated event ({} new, {} updated)",
-                total_inserted, total_updated
-            );
-            let _ = self.app_handle.emit("mails:updated", ());
-        }
-
-        println!("[Sync] Sync COMPLETED for '{}'", account.email);
+        println!(
+            "[Sync] Sync COMPLETED for '{}' in {}ms",
+            account.email,
+            sync_started_at.elapsed().as_millis()
+        );
         Ok(status)
     }
 

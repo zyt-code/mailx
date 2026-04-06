@@ -8,7 +8,7 @@ type AppShellMailboxNavigationDeps = {
 	setMobileView: (view: MobileView) => void;
 	setActiveFolder: (folder: Folder) => void;
 	switchFolder: (folder: Folder) => void;
-	setSelectedAccount: (accountId: string | null) => void;
+	selectAccount: (accountId: string | null) => void | Promise<void>;
 };
 
 export function createAppShellMailboxNavigation({
@@ -17,7 +17,7 @@ export function createAppShellMailboxNavigation({
 	setMobileView,
 	setActiveFolder,
 	switchFolder,
-	setSelectedAccount
+	selectAccount: runSelectAccount
 }: AppShellMailboxNavigationDeps) {
 	async function selectMail(id: string): Promise<void> {
 		setSelectedMailId(id);
@@ -34,11 +34,9 @@ export function createAppShellMailboxNavigation({
 	}
 
 	function selectAccount(accountId: string | null): void {
-		setSelectedAccount(accountId);
-		setActiveFolder('inbox');
+		void runSelectAccount(accountId);
 		setSelectedMailId(null);
 		setMobileView('list');
-		switchFolder('inbox');
 	}
 
 	function goBackToList(): void {

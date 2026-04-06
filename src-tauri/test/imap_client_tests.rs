@@ -72,3 +72,31 @@ fn test_flag_command_patterns() {
         assert!(pattern.contains("FLAGS"));
     }
 }
+
+#[test]
+fn test_generate_sync_id_uses_account_and_folder_scope() {
+    let inbox = ImapClient::generate_sync_id("acc-a", "inbox", 42);
+    let sent = ImapClient::generate_sync_id("acc-a", "sent", 42);
+    let other_account = ImapClient::generate_sync_id("acc-b", "inbox", 42);
+
+    assert_ne!(inbox, sent);
+    assert_ne!(inbox, other_account);
+}
+
+#[test]
+fn test_decode_header_text_decodes_rfc2047_subjects() {
+    let encoded = "=?utf-8?b?5b+Y6K6w5a+G56CB77yfIOadpeiuvue9ruaWsOWvhueggQ==?=";
+
+    assert_eq!(
+        ImapClient::decode_header_text(encoded),
+        "忘记密码？ 来设置新密码"
+    );
+}
+
+#[test]
+fn test_decode_header_text_keeps_plain_subjects_readable() {
+    assert_eq!(
+        ImapClient::decode_header_text("  Weekly sync and roadmap  "),
+        "Weekly sync and roadmap"
+    );
+}

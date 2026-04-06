@@ -11,7 +11,7 @@ const {
 	displayedEmailsStore,
 	selectedAccountIdStore,
 	switchFolderMock,
-	setSelectedAccountMock,
+	selectAccountMock,
 	loadMailsMock,
 	syncAccountMock,
 	syncAllAccountsMock,
@@ -67,7 +67,7 @@ const {
 	displayedEmailsStore: createMockStore<Mail[]>([]),
 	selectedAccountIdStore: createMockStore<string | null>(null),
 	switchFolderMock: vi.fn(),
-	setSelectedAccountMock: vi.fn(),
+	selectAccountMock: vi.fn(),
 	loadMailsMock: vi.fn(),
 	syncAccountMock: vi.fn().mockResolvedValue(undefined),
 	syncAllAccountsMock: vi.fn().mockResolvedValue(undefined),
@@ -160,7 +160,8 @@ vi.mock('$lib/stores/preferencesStore.js', () => ({
 vi.mock('$lib/stores/mailStore.js', () => ({
 	initMailStore: vi.fn(),
 	switchFolder: switchFolderMock,
-	setSelectedAccount: setSelectedAccountMock,
+	setSelectedAccount: vi.fn(),
+	selectAccount: selectAccountMock,
 	markMailReadLocally: vi.fn(),
 	markMailUnreadLocally: vi.fn(),
 	displayedEmails: displayedEmailsStore,
@@ -211,7 +212,7 @@ describe('AppShell mailbox workflow', () => {
 		displayedEmailsStore.set([createMail()]);
 		selectedAccountIdStore.set(null);
 		switchFolderMock.mockReset();
-		setSelectedAccountMock.mockReset();
+		selectAccountMock.mockReset();
 		loadMailsMock.mockReset();
 		syncAccountMock.mockClear();
 		syncAllAccountsMock.mockClear();
@@ -221,13 +222,13 @@ describe('AppShell mailbox workflow', () => {
 		gotoMock.mockReset();
 	});
 
-	it('routes account selection through selected-account state and folder switch without forcing an extra reload', async () => {
+	it('routes account selection through the explicit mailbox account command', async () => {
 		render(AppShell);
 
 		await fireEvent.click(screen.getByRole('button', { name: 'mock-select-account' }));
 
-		expect(setSelectedAccountMock).toHaveBeenCalledWith('acc-1');
-		expect(switchFolderMock).toHaveBeenCalledWith('inbox');
+		expect(selectAccountMock).toHaveBeenCalledWith('acc-1');
+		expect(switchFolderMock).not.toHaveBeenCalled();
 		expect(loadMailsMock).not.toHaveBeenCalled();
 	});
 
@@ -254,8 +255,8 @@ describe('AppShell mailbox workflow', () => {
 
 		await fireEvent.click(screen.getByRole('button', { name: 'mock-select-account' }));
 
-		expect(setSelectedAccountMock).toHaveBeenCalledWith('acc-1');
-		expect(switchFolderMock).toHaveBeenCalledWith('inbox');
+		expect(selectAccountMock).toHaveBeenCalledWith('acc-1');
+		expect(switchFolderMock).not.toHaveBeenCalled();
 		expect(screen.getByTestId('mock-mail-list')).toHaveAttribute('data-selected-mail-id', '');
 		expect(screen.getByTestId('mock-reading-pane')).toHaveAttribute('data-mail-id', '');
 	});

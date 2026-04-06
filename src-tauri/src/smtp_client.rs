@@ -201,30 +201,23 @@ impl SmtpClient {
         let mode = Self::transport_mode_for_config(config);
 
         let transport = match mode {
-            TransportSecurityMode::ImplicitTls => {
-                SmtpTransport::relay(relay)
-                    .map_err(|e| {
-                        SmtpError::ConnectionFailed(format!(
-                            "Failed to create TLS transport: {}",
-                            e
-                        ))
-                    })?
-                    .port(port)
-                    .credentials(creds)
-                    .build()
-            }
-            TransportSecurityMode::StartTls => {
-                SmtpTransport::starttls_relay(relay)
-                    .map_err(|e| {
-                        SmtpError::ConnectionFailed(format!(
-                            "Failed to create STARTTLS transport: {}",
-                            e
-                        ))
-                    })?
-                    .port(port)
-                    .credentials(creds)
-                    .build()
-            }
+            TransportSecurityMode::ImplicitTls => SmtpTransport::relay(relay)
+                .map_err(|e| {
+                    SmtpError::ConnectionFailed(format!("Failed to create TLS transport: {}", e))
+                })?
+                .port(port)
+                .credentials(creds)
+                .build(),
+            TransportSecurityMode::StartTls => SmtpTransport::starttls_relay(relay)
+                .map_err(|e| {
+                    SmtpError::ConnectionFailed(format!(
+                        "Failed to create STARTTLS transport: {}",
+                        e
+                    ))
+                })?
+                .port(port)
+                .credentials(creds)
+                .build(),
             TransportSecurityMode::Plain => SmtpTransport::builder_dangerous(relay)
                 .port(port)
                 .credentials(creds)
@@ -302,7 +295,11 @@ impl SmtpClient {
         {
             configs.push(canonical.clone());
             for mode in Self::connection_attempt_modes_for_config(&canonical) {
-                configs.push(Self::config_for_mode(&canonical.server, canonical.port, mode));
+                configs.push(Self::config_for_mode(
+                    &canonical.server,
+                    canonical.port,
+                    mode,
+                ));
             }
         }
 

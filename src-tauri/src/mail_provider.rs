@@ -1,5 +1,7 @@
 use std::fmt;
 
+pub const SYSTEM_LOCAL_FOLDERS: [&str; 5] = ["inbox", "sent", "drafts", "archive", "trash"];
+
 /// Mail provider types with different IMAP behaviors
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MailProvider {
@@ -37,6 +39,15 @@ impl MailProvider {
             // Netease163 and Generic can use standard fetch
             MailProvider::Netease163 | MailProvider::Generic => {
                 "(UID FLAGS INTERNALDATE BODY.PEEK[])"
+            }
+        }
+    }
+
+    /// Get the lightweight metadata fetch command used for mailbox list sync.
+    pub fn get_metadata_fetch_command(&self) -> &'static str {
+        match self {
+            MailProvider::ICloud | MailProvider::Netease163 | MailProvider::Generic => {
+                "(UID FLAGS INTERNALDATE ENVELOPE BODY.PEEK[TEXT]<0.2048>)"
             }
         }
     }
@@ -128,6 +139,68 @@ impl MailProvider {
             ],
         }
     }
+
+    pub fn preferred_remote_folder_for_local(&self, local_folder: &str) -> Option<&'static str> {
+        self.get_sync_folders()
+            .into_iter()
+            .find(|(_, local)| *local == local_folder)
+            .map(|(remote, _)| remote)
+    }
+
+    pub fn classify_remote_folder(
+        &self,
+        remote_name: &str,
+        attributes: &[String],
+    ) -> Option<String> {
+        let trimmed = remote_name.trim();
+        if trimmed.is_empty() {
+            return None;
+        }
+
+        for attribute in attributes {
+            if let Some(system_folder) = Self::classify_attribute(attribute) {
+                return Some(system_folder.to_string());
+            }
+        }
+
+        if let Some(system_folder) = self.classify_remote_name(trimmed) {
+            return Some(system_folder.to_string());
+        }
+
+        Some(Self::custom_local_folder_name(trimmed))
+    }
+
+    pub fn custom_local_folder_name(remote_name: &str) -> String {
+        format!("custom:{}", remote_name.trim())
+    }
+
+    pub fn is_system_local_folder(local_folder: &str) -> bool {
+        SYSTEM_LOCAL_FOLDERS.contains(&local_folder)
+    }
+
+    fn classify_attribute(attribute: &str) -> Option<&'static str> {
+        match attribute.trim().to_ascii_lowercase().as_str() {
+            "\\inbox" => Some("inbox"),
+            "\\sent" => Some("sent"),
+            "\\drafts" => Some("drafts"),
+            "\\archive" | "\\all" => Some("archive"),
+            "\\trash" | "\\junk" => Some("trash"),
+            _ => None,
+        }
+    }
+
+    fn classify_remote_name(&self, remote_name: &str) -> Option<&'static str> {
+        self.get_sync_folders()
+            .into_iter()
+            .find_map(|(candidate_remote, local)| {
+                if candidate_remote.eq_ignore_ascii_case(remote_name) || candidate_remote == remote_name
+                {
+                    Some(local)
+                } else {
+                    None
+                }
+            })
+    }
 }
 
 impl fmt::Display for MailProvider {
@@ -139,3 +212,7 @@ impl fmt::Display for MailProvider {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "../test/mail_provider_tests.rs"]
+mod mail_provider_tests;

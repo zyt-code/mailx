@@ -2461,6 +2461,7 @@ dependencies = [
  "futures",
  "html-escape",
  "imap",
+ "imap-proto",
  "keyring",
  "lettre",
  "mail-parser",

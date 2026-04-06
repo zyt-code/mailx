@@ -32,6 +32,10 @@ export async function getMail(id: string): Promise<Mail> {
 	return invoke<Mail>('get_mail', { id });
 }
 
+export async function ensureMailContent(id: string): Promise<Mail> {
+	return invoke<Mail>('ensure_mail_content', { id });
+}
+
 /**
  * Create a new mail
  */
@@ -110,8 +114,8 @@ export async function markMailRead(id: string, read: boolean): Promise<void> {
 /**
  * Mark a mail as read on the IMAP server (syncs \Seen flag via UID)
  */
-export async function markMailAsRead(uid: number, accountId: string): Promise<void> {
-	await invoke('mark_as_read', { uid, accountId });
+export async function markMailAsRead(id: string): Promise<void> {
+	await invoke('mark_as_read', { id });
 }
 
 /**

@@ -24,6 +24,12 @@
 	let showCompose = $state(false);
 	let composeMode = $state<ReadingPaneComposeMode>(null);
 	let composeMail = $state<Mail | null>(null);
+	let resolvedMail = $state<Mail | null>(null);
+	let isLoadingContent = $state(false);
+	let contentError = $state<string | null>(null);
+	let contentRequestToken = 0;
+
+	let activeMail = $derived(resolvedMail ?? mail);
 
 	const mailActions = createReadingPaneMailActions({
 		db,
@@ -31,7 +37,7 @@
 		onRefresh: () => onRefresh?.()
 	});
 	const composeState = createReadingPaneComposeState({
-		getMail: () => mail,
+		getMail: () => activeMail,
 		setShowCompose: (value) => {
 			showCompose = value;
 		},
@@ -43,10 +49,50 @@
 		},
 		onRefresh: () => onRefresh?.()
 	});
+
+	async function loadRemoteContent(nextMail: Mail): Promise<void> {
+		const requestToken = ++contentRequestToken;
+		isLoadingContent = true;
+		contentError = null;
+
+		try {
+			const loadedMail = await db.ensureMailContent(nextMail.id);
+			if (requestToken !== contentRequestToken) {
+				return;
+			}
+			resolvedMail = loadedMail;
+		} catch (error) {
+			if (requestToken !== contentRequestToken) {
+				return;
+			}
+			contentError = error instanceof Error ? error.message : String(error);
+		} finally {
+			if (requestToken === contentRequestToken) {
+				isLoadingContent = false;
+			}
+		}
+	}
+
+	$effect(() => {
+		resolvedMail = mail;
+		contentError = null;
+
+		if (!mail) {
+			isLoadingContent = false;
+			return;
+		}
+
+		if (mail.content_state === 'body_cached' || !!mail.body || !!mail.html_body) {
+			isLoadingContent = false;
+			return;
+		}
+
+		void loadRemoteContent(mail);
+	});
 </script>
 
 <div class="reading-pane flex flex-1 min-w-0 h-full bg-[var(--bg-primary)] overflow-hidden">
-	{#if mail}
+	{#if activeMail}
 		<div class="flex flex-1 flex-col min-h-0 overflow-hidden">
 			{#if isMobile}
 				<div class="flex items-center border-b border-[var(--border-primary)] px-3 py-2">
@@ -58,13 +104,13 @@
 
 			<!-- Mail header -->
 			<div class="shrink-0">
-				<MailHeader {mail} />
+				<MailHeader mail={activeMail} />
 			</div>
 
 			<!-- Mail actions toolbar - stays fixed at top -->
 			<div class="shrink-0 border-b border-[var(--border-primary)]">
 				<MailActions
-					{mail}
+					mail={activeMail}
 					onReply={composeState.openReply}
 					onReplyAll={composeState.openReplyAll}
 					onForward={composeState.openForward}
@@ -78,7 +124,16 @@
 			<!-- Email body - independent scroll, rendered in isolated iframe -->
 			<div class="reading-scroll-region flex-1 overflow-y-auto min-h-0">
 				<div class="reading-content select-text cursor-text" data-allow-context-menu>
-					<EmailRenderer htmlBody={mail.html_body} plainBody={mail.body} />
+					{#if isLoadingContent && !activeMail.body && !activeMail.html_body}
+						<div class="flex min-h-40 items-center justify-center text-sm text-[var(--text-tertiary)]">
+							{$_('loading')}
+						</div>
+					{:else}
+						<EmailRenderer htmlBody={activeMail.html_body} plainBody={activeMail.body} />
+					{/if}
+					{#if contentError}
+						<p class="px-4 py-3 text-sm text-[var(--text-tertiary)]">{contentError}</p>
+					{/if}
 				</div>
 			</div>
 		</div>

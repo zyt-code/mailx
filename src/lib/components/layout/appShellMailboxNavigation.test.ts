@@ -11,9 +11,10 @@ describe('createAppShellMailboxNavigation', () => {
 			isMobile: () => true,
 			setSelectedMailId,
 			setMobileView,
+			getActiveFolder: () => 'inbox',
 			setActiveFolder: vi.fn(),
 			switchFolder: vi.fn(),
-			setSelectedAccount: vi.fn()
+			selectAccount: vi.fn()
 		});
 
 		await navigation.selectMail('mail-1');
@@ -32,9 +33,10 @@ describe('createAppShellMailboxNavigation', () => {
 			isMobile: () => false,
 			setSelectedMailId,
 			setMobileView,
+			getActiveFolder: () => 'inbox',
 			setActiveFolder,
 			switchFolder,
-			setSelectedAccount: vi.fn()
+			selectAccount: vi.fn()
 		});
 
 		navigation.selectFolder('archive');
@@ -45,8 +47,8 @@ describe('createAppShellMailboxNavigation', () => {
 		expect(switchFolder).toHaveBeenCalledWith('archive');
 	});
 
-	it('resets mailbox state to inbox when switching accounts', () => {
-		const setSelectedAccount = vi.fn();
+	it('preserves the current folder when switching accounts', () => {
+		const selectMailboxAccount = vi.fn();
 		const setActiveFolder = vi.fn();
 		const setSelectedMailId = vi.fn();
 		const setMobileView = vi.fn();
@@ -56,18 +58,44 @@ describe('createAppShellMailboxNavigation', () => {
 			isMobile: () => false,
 			setSelectedMailId,
 			setMobileView,
+			getActiveFolder: () => 'inbox',
 			setActiveFolder,
 			switchFolder,
-			setSelectedAccount
+			selectAccount: selectMailboxAccount
 		});
 
 		navigation.selectAccount('acc-2');
 
-		expect(setSelectedAccount).toHaveBeenCalledWith('acc-2');
+		expect(selectMailboxAccount).toHaveBeenCalledWith('acc-2');
+		expect(setActiveFolder).not.toHaveBeenCalled();
+		expect(setSelectedMailId).toHaveBeenCalledWith(null);
+		expect(setMobileView).toHaveBeenCalledWith('list');
+		expect(switchFolder).not.toHaveBeenCalled();
+	});
+
+	it('resets custom folders back to inbox when switching accounts', () => {
+		const selectMailboxAccount = vi.fn();
+		const setActiveFolder = vi.fn();
+		const setSelectedMailId = vi.fn();
+		const setMobileView = vi.fn();
+		const switchFolder = vi.fn();
+
+		const navigation = createAppShellMailboxNavigation({
+			isMobile: () => false,
+			setSelectedMailId,
+			setMobileView,
+			getActiveFolder: () => 'custom:Projects',
+			setActiveFolder,
+			switchFolder,
+			selectAccount: selectMailboxAccount
+		});
+
+		navigation.selectAccount('acc-2');
+
+		expect(selectMailboxAccount).toHaveBeenCalledWith('acc-2');
 		expect(setActiveFolder).toHaveBeenCalledWith('inbox');
 		expect(setSelectedMailId).toHaveBeenCalledWith(null);
 		expect(setMobileView).toHaveBeenCalledWith('list');
-		expect(switchFolder).toHaveBeenCalledWith('inbox');
 	});
 
 	it('returns to the list view when leaving the reading pane', () => {
@@ -77,9 +105,10 @@ describe('createAppShellMailboxNavigation', () => {
 			isMobile: () => false,
 			setSelectedMailId: vi.fn(),
 			setMobileView,
+			getActiveFolder: () => 'inbox',
 			setActiveFolder: vi.fn(),
 			switchFolder: vi.fn(),
-			setSelectedAccount: vi.fn()
+			selectAccount: vi.fn()
 		});
 
 		navigation.goBackToList();

@@ -166,6 +166,7 @@ vi.mock('$lib/stores/mailStore.js', () => ({
 	initMailStore: vi.fn(),
 	switchFolder: vi.fn(),
 	setSelectedAccount: vi.fn(),
+	selectAccount: vi.fn(),
 	markMailReadLocally: vi.fn(),
 	markMailUnreadLocally: vi.fn(),
 	displayedEmails: displayedEmailsStore,

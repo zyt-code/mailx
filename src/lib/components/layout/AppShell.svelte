@@ -10,7 +10,7 @@
 	import { isSyncing } from '$lib/stores/syncStore.js';
 	import {
 		switchFolder,
-		setSelectedAccount,
+		selectAccount as selectMailboxAccount,
 		markMailReadLocally,
 		markMailUnreadLocally,
 		displayedEmails,
@@ -162,7 +162,7 @@ const DEFAULTS = { sidebarCollapsed: false, mailListWidth: DEFAULT_MAIL_LIST_WID
 			activeFolder = folder;
 		},
 		switchFolder,
-		setSelectedAccount
+		selectAccount: (accountId) => selectMailboxAccount(accountId)
 	});
 
 	const mailSelection = createAppShellMailSelection({

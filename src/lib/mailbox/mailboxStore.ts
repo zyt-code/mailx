@@ -284,6 +284,7 @@ export const loadMails = mailboxStore.loadMails;
 export const loadMoreMails = mailboxStore.loadMoreMails;
 export const switchFolder = mailboxStore.switchFolder;
 export const setSelectedAccount = mailboxStore.setSelectedAccount;
+export const selectAccount = mailboxStore.selectAccount;
 export const initMailStore = mailboxStore.init;
 export const markMailReadLocally = mailboxStore.markMailReadLocally;
 export const markMailUnreadLocally = mailboxStore.markMailUnreadLocally;

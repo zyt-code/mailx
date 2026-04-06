@@ -51,6 +51,8 @@ fn test_mail() -> Mail {
         attachments: None,
         starred: None,
         has_attachments: Some(false),
+        remote_uid_validity: None,
+        content_state: "body_cached".to_string(),
     }
 }
 

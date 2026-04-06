@@ -10,7 +10,7 @@ const {
 	displayedEmailsStore,
 	selectedAccountIdStore,
 	switchFolderMock,
-	setSelectedAccountMock,
+	selectAccountMock,
 	eventBusEmitMock,
 	eventBusEmitAsyncMock
 } = vi.hoisted(() => ({
@@ -73,7 +73,7 @@ const {
 	]),
 	selectedAccountIdStore: createMockStore<string | null>(null),
 	switchFolderMock: vi.fn(),
-	setSelectedAccountMock: vi.fn(),
+	selectAccountMock: vi.fn(),
 	eventBusEmitMock: vi.fn(),
 	eventBusEmitAsyncMock: vi.fn().mockResolvedValue(undefined)
 }));
@@ -157,7 +157,8 @@ vi.mock('$lib/stores/preferencesStore.js', () => ({
 vi.mock('$lib/stores/mailStore.js', () => ({
 	initMailStore: vi.fn(),
 	switchFolder: switchFolderMock,
-	setSelectedAccount: setSelectedAccountMock,
+	setSelectedAccount: vi.fn(),
+	selectAccount: selectAccountMock,
 	markMailReadLocally: vi.fn(),
 	markMailUnreadLocally: vi.fn(),
 	displayedEmails: displayedEmailsStore,
@@ -214,7 +215,7 @@ describe('AppShell mobile workflow', () => {
 			}
 		]);
 		switchFolderMock.mockReset();
-		setSelectedAccountMock.mockReset();
+		selectAccountMock.mockReset();
 		eventBusEmitMock.mockReset();
 		eventBusEmitAsyncMock.mockReset();
 		eventBusEmitAsyncMock.mockResolvedValue(undefined);
@@ -295,8 +296,8 @@ describe('AppShell mobile workflow', () => {
 			expect(screen.getByTestId('mock-mail-list')).toBeTruthy();
 		});
 
-		expect(setSelectedAccountMock).toHaveBeenCalledWith('acc-1');
-		expect(switchFolderMock).toHaveBeenCalledWith('inbox');
+		expect(selectAccountMock).toHaveBeenCalledWith('acc-1');
+		expect(switchFolderMock).not.toHaveBeenCalled();
 	});
 
 	it('returns to the list when deleting from the mobile reading pane', async () => {

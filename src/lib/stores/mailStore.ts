@@ -11,6 +11,7 @@ export {
 	mails,
 	markMailReadLocally,
 	markMailUnreadLocally,
+	selectAccount,
 	selectedAccountId,
 	setSelectedAccount,
 	switchFolder,
