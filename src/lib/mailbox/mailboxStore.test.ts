@@ -280,6 +280,41 @@ describe('createMailboxStore', () => {
 		expect(getMailsCount).not.toHaveBeenCalled();
 	});
 
+	it('does not reload the current mailbox when the current account is updated', async () => {
+		const getMails = vi.fn().mockResolvedValue([makeMail({ folder: 'inbox', account_id: 'acc-1' })]);
+		const getMailsCount = vi.fn().mockResolvedValue(1);
+		const markMailRead = vi.fn().mockResolvedValue(undefined);
+		const accountsStore = writable([
+			{ id: 'acc-1', is_active: true },
+			{ id: 'acc-2', is_active: false }
+		]);
+		const tauriHandlers = new Map<string, (payload?: unknown) => void | Promise<void>>();
+
+		const store = createMailboxStore({
+			db: { getMails, getMailsCount, markMailRead },
+			accountsStore,
+			eventBus: {
+				on: vi.fn(),
+				onTauri(event, callback) {
+					tauriHandlers.set(event, callback);
+					return Promise.resolve();
+				},
+				emit: vi.fn()
+			}
+		});
+
+		store.init();
+		await store.selectAccount('acc-1');
+		getMails.mockClear();
+		getMailsCount.mockClear();
+
+		await tauriHandlers.get('account:updated')?.({ id: 'acc-1' });
+
+		expect(get(store.selectedAccountId)).toBe('acc-1');
+		expect(getMails).not.toHaveBeenCalled();
+		expect(getMailsCount).not.toHaveBeenCalled();
+	});
+
 	it('does not reload the current mailbox when an unrelated account is deleted', async () => {
 		const getMails = vi.fn().mockResolvedValue([makeMail({ folder: 'inbox', account_id: 'acc-1' })]);
 		const getMailsCount = vi.fn().mockResolvedValue(1);
