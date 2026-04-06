@@ -120,7 +120,7 @@ vi.mock('./ReadingPane.svelte', async () => {
 });
 
 vi.mock('$lib/components/get-started/index.js', async () => {
-	const { default: Mock } = await import('$lib/test/EmptyComponentMock.svelte');
+	const { default: Mock } = await import('$lib/test/AppShellGetStartedMock.svelte');
 	return { GetStarted: Mock };
 });
 
@@ -250,6 +250,16 @@ describe('AppShell mobile workflow', () => {
 		await waitFor(() => {
 			expect(screen.getByTestId('mock-mail-list')).toBeTruthy();
 		});
+	});
+
+	it('shows get-started instead of the mailbox list when no accounts are configured on mobile', async () => {
+		hasAccountsStore.set(false);
+		displayedEmailsStore.set([]);
+
+		render(AppShell);
+
+		expect(screen.getByRole('button', { name: 'mock-get-started-open-settings' })).toBeTruthy();
+		expect(screen.queryByTestId('mock-mail-list')).toBeNull();
 	});
 
 	it('returns to the list and switches folders when mobile navigation changes while reading', async () => {

@@ -271,10 +271,16 @@ const DEFAULTS = { sidebarCollapsed: false, mailListWidth: DEFAULT_MAIL_LIST_WID
 	/>
 
 	{#if isMobile}
-		{#if mobileView === 'list'}
-			<MailList {selectedMailId} onSelectMail={mailboxNavigation.selectMail} onMarkRead={readState.setReadState} onDelete={handleContextDelete} onArchive={handleContextArchive} onMoveTo={handleMoveTo} width={undefined} {isAccountConfigured} isSyncing={syncing} />
+		{#if isAccountConfigured}
+			{#if mobileView === 'list'}
+				<MailList {selectedMailId} onSelectMail={mailboxNavigation.selectMail} onMarkRead={readState.setReadState} onDelete={handleContextDelete} onArchive={handleContextArchive} onMoveTo={handleMoveTo} width={undefined} {isAccountConfigured} isSyncing={syncing} />
+			{:else}
+				<ReadingPane mail={selectedMail} {isMobile} onBack={mailboxNavigation.goBackToList} onRefresh={loadMails} onRemoveMail={(mail) => handleRemovedSelectedMail(mail.id)} />
+			{/if}
 		{:else}
-			<ReadingPane mail={selectedMail} {isMobile} onBack={mailboxNavigation.goBackToList} onRefresh={loadMails} onRemoveMail={(mail) => handleRemovedSelectedMail(mail.id)} />
+			<div class="flex-1 pointer-events-auto relative z-10">
+				<GetStarted onOpenSettings={openSettings} />
+			</div>
 		{/if}
 	{:else}
 		{#if isAccountConfigured}
