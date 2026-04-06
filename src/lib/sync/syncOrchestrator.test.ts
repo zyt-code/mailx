@@ -68,4 +68,28 @@ describe('initSyncOrchestrator', () => {
 		expect(syncAccount).not.toHaveBeenCalled();
 		expect(syncAllAccounts).not.toHaveBeenCalled();
 	});
+
+	it('ignores explicit sync intent for an account that no longer exists', async () => {
+		const handlers = new Map<string, (payload?: { accountId?: string }) => void | Promise<void>>();
+		const syncAccount = vi.fn().mockResolvedValue(undefined);
+		const syncAllAccounts = vi.fn().mockResolvedValue(undefined);
+
+		initSyncOrchestrator({
+			eventBus: {
+				on(event, callback) {
+					handlers.set(event, callback);
+				}
+			},
+			syncAccount,
+			syncAllAccounts,
+			getHasAccounts: () => true,
+			getKnownAccountIds: () => ['acc-2'],
+			getActiveAccount: () => ({ id: 'acc-2' })
+		});
+
+		await handlers.get('sync:trigger')?.({ accountId: 'acc-1' });
+
+		expect(syncAccount).not.toHaveBeenCalled();
+		expect(syncAllAccounts).not.toHaveBeenCalled();
+	});
 });
