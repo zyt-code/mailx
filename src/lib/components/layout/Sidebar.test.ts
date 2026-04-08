@@ -126,7 +126,10 @@ vi.mock('$lib/sync/index.js', () => ({
 vi.mock('$lib/events/index.js', () => ({
 	eventBus: {
 		on: vi.fn(),
-		off: vi.fn()
+		off: vi.fn(),
+		onTauri: vi.fn(() => Promise.resolve()),
+		emit: vi.fn(),
+		emitAsync: vi.fn()
 	}
 }));
 

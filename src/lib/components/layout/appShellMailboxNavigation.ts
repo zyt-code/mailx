@@ -6,6 +6,7 @@ type AppShellMailboxNavigationDeps = {
 	isMobile: () => boolean;
 	setSelectedMailId: (mailId: string | null) => void;
 	setMobileView: (view: MobileView) => void;
+	getActiveFolder: () => Folder;
 	setActiveFolder: (folder: Folder) => void;
 	switchFolder: (folder: Folder) => void;
 	selectAccount: (accountId: string | null) => void | Promise<void>;
@@ -15,6 +16,7 @@ export function createAppShellMailboxNavigation({
 	isMobile,
 	setSelectedMailId,
 	setMobileView,
+	getActiveFolder,
 	setActiveFolder,
 	switchFolder,
 	selectAccount: runSelectAccount
@@ -34,6 +36,11 @@ export function createAppShellMailboxNavigation({
 	}
 
 	function selectAccount(accountId: string | null): void {
+		const activeFolder = getActiveFolder();
+		if (activeFolder.startsWith('custom:')) {
+			setActiveFolder('inbox');
+			switchFolder('inbox');
+		}
 		void runSelectAccount(accountId);
 		setSelectedMailId(null);
 		setMobileView('list');

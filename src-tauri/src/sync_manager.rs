@@ -1,7 +1,9 @@
 use crate::accounts::{Account, AccountManager};
 use crate::credentials_legacy::CredentialManager;
 use crate::database::{Database, ImapFolderState};
-use crate::imap_client::{ImapClient, SyncFolderRequest};
+use crate::imap_client::{ImapClient, RemoteFolder, SyncFolderRequest};
+use crate::mail_provider::MailProvider;
+use std::collections::HashSet;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
@@ -129,6 +131,135 @@ fn partition_sync_requests(
     (high_priority, low_priority)
 }
 
+fn persist_sync_results(
+    database: &Database,
+    account_id: &str,
+    results: Vec<crate::imap_client::SyncFolderResult>,
+    synced_local_folders: &mut HashSet<String>,
+) -> Result<SyncBatchStats> {
+    let mut batch_stats = SyncBatchStats::default();
+
+    for result in results {
+        let folder_started_at = Instant::now();
+        let fetched_count = result.mails.len();
+
+        if result.uid_validity_changed {
+            database
+                .clear_account_folder(account_id, &result.local_folder)
+                .map_err(|e| SyncError::Database(e.to_string()))?;
+        }
+
+        let now = chrono::Utc::now().timestamp_millis();
+        let created_at = database
+            .get_imap_folder_state(account_id, &result.local_folder)
+            .ok()
+            .flatten()
+            .map(|state| state.created_at)
+            .unwrap_or(now);
+
+        database
+            .upsert_imap_folder_state(&ImapFolderState {
+                id: format!("{}:{}", account_id, result.local_folder),
+                account_id: account_id.to_string(),
+                local_name: result.local_folder.clone(),
+                name: result.remote_folder.clone(),
+                remote_uid_validity: i64::from(result.uid_validity),
+                remote_last_uid: i64::from(result.remote_last_uid),
+                local_count: fetched_count as i64,
+                created_at,
+                last_synced_at: now,
+            })
+            .map_err(|e| SyncError::Database(e.to_string()))?;
+
+        for mut mail in result.mails {
+            mail.account_id = Some(account_id.to_string());
+            mail.folder = result.local_folder.clone();
+            mail.remote_uid_validity = Some(result.uid_validity);
+
+            if let Some(uid) = mail.uid {
+                mail.id = ImapClient::generate_sync_id(account_id, &result.local_folder, uid);
+            }
+
+            let is_new = match database.get_mail(&mail.id) {
+                Ok(Some(_)) => false,
+                _ => true,
+            };
+
+            database
+                .upsert_mail_preserving_read_status(&mail)
+                .map_err(|e| {
+                    println!("[Sync] DB upsert error: {}", e);
+                    SyncError::Database(e.to_string())
+                })?;
+
+            batch_stats.record_mail(&result.local_folder, is_new, mail.unread);
+        }
+
+        println!(
+            "[Sync][Timing] metadata folder '{}' -> '{}' mails={} total={}ms",
+            result.remote_folder,
+            result.local_folder,
+            fetched_count,
+            folder_started_at.elapsed().as_millis()
+        );
+
+        synced_local_folders.insert(result.local_folder);
+    }
+
+    Ok(batch_stats)
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct DiscoveredFolderPlan {
+    local_folder: String,
+    remote_folder: String,
+    is_custom: bool,
+}
+
+fn plan_discovered_remote_folders(
+    provider: MailProvider,
+    remote_folders: Vec<RemoteFolder>,
+    synced_local_folders: &HashSet<String>,
+) -> Vec<DiscoveredFolderPlan> {
+    let mut planned = Vec::new();
+    let mut seen_locals = HashSet::new();
+
+    for remote in remote_folders {
+        if remote
+            .attributes
+            .iter()
+            .any(|attr| attr.eq_ignore_ascii_case("\\noselect"))
+        {
+            continue;
+        }
+
+        let Some(local_folder) = provider.classify_remote_folder(&remote.name, &remote.attributes)
+        else {
+            continue;
+        };
+
+        if synced_local_folders.contains(&local_folder) || !seen_locals.insert(local_folder.clone())
+        {
+            continue;
+        }
+
+        let is_custom = local_folder.starts_with("custom:");
+        if !is_custom && crate::mail_provider::MailProvider::is_system_local_folder(&local_folder)
+            == false
+        {
+            continue;
+        }
+
+        planned.push(DiscoveredFolderPlan {
+            local_folder,
+            remote_folder: remote.name,
+            is_custom,
+        });
+    }
+
+    planned
+}
+
 unsafe impl Send for SyncManager {}
 unsafe impl Sync for SyncManager {}
 
@@ -240,7 +371,7 @@ impl SyncManager {
         );
 
         // Detect provider for folder mappings
-        let provider = crate::mail_provider::MailProvider::detect_from_host(&imap_config.server);
+        let provider = MailProvider::detect_from_host(&imap_config.server);
         let sync_folders = provider.get_sync_folders();
 
         println!(
@@ -307,82 +438,6 @@ impl SyncManager {
         let (high_priority_requests, low_priority_requests) = partition_sync_requests(requests);
         let imap_client = ImapClient::new(imap_config.clone(), account.email.clone(), password);
 
-        let mut persist_results =
-            |results: Vec<crate::imap_client::SyncFolderResult>| -> Result<SyncBatchStats> {
-                let mut batch_stats = SyncBatchStats::default();
-
-                for result in results {
-                    let folder_started_at = Instant::now();
-                    let fetched_count = result.mails.len();
-
-                    if result.uid_validity_changed {
-                        self.database
-                            .clear_account_folder(account_id, &result.local_folder)
-                            .map_err(|e| SyncError::Database(e.to_string()))?;
-                    }
-
-                    let now = chrono::Utc::now().timestamp_millis();
-                    let created_at = self
-                        .database
-                        .get_imap_folder_state(account_id, &result.local_folder)
-                        .ok()
-                        .flatten()
-                        .map(|state| state.created_at)
-                        .unwrap_or(now);
-
-                    self.database
-                        .upsert_imap_folder_state(&ImapFolderState {
-                            id: format!("{}:{}", account_id, result.local_folder),
-                            account_id: account_id.to_string(),
-                            local_name: result.local_folder.clone(),
-                            name: result.remote_folder.clone(),
-                            remote_uid_validity: i64::from(result.uid_validity),
-                            remote_last_uid: i64::from(result.remote_last_uid),
-                            local_count: fetched_count as i64,
-                            created_at,
-                            last_synced_at: now,
-                        })
-                        .map_err(|e| SyncError::Database(e.to_string()))?;
-
-                    for mut mail in result.mails {
-                        mail.account_id = Some(account_id.to_string());
-                        mail.folder = result.local_folder.clone();
-                        mail.remote_uid_validity = Some(result.uid_validity);
-
-                        if let Some(uid) = mail.uid {
-                            mail.id =
-                                ImapClient::generate_sync_id(account_id, &result.local_folder, uid);
-                        }
-
-                        let is_new = match self.database.get_mail(&mail.id) {
-                            Ok(Some(_)) => false,
-                            _ => true,
-                        };
-
-                        self.database
-                            .upsert_mail_preserving_read_status(&mail)
-                            .map_err(|e| {
-                                println!("[Sync] DB upsert error: {}", e);
-                                SyncError::Database(e.to_string())
-                            })?;
-
-                        batch_stats.record_mail(&result.local_folder, is_new, mail.unread);
-                    }
-
-                    println!(
-                        "[Sync][Timing] metadata folder '{}' -> '{}' mails={} total={}ms",
-                        result.remote_folder,
-                        result.local_folder,
-                        fetched_count,
-                        folder_started_at.elapsed().as_millis()
-                    );
-
-                    synced_local_folders.insert(result.local_folder);
-                }
-
-                Ok(batch_stats)
-            };
-
         let high_priority_results = imap_client
             .sync_folders_metadata_with_timeout(
                 high_priority_requests,
@@ -390,7 +445,12 @@ impl SyncManager {
             )
             .await
             .map_err(|e| SyncError::Imap(e.to_string()))?;
-        let high_priority_stats = persist_results(high_priority_results)?;
+        let high_priority_stats = persist_sync_results(
+            &self.database,
+            account_id,
+            high_priority_results,
+            &mut synced_local_folders,
+        )?;
         high_priority_stats.merge_into(
             &mut total_inserted,
             &mut total_updated,
@@ -413,7 +473,12 @@ impl SyncManager {
                 .await
             {
                 Ok(results) => {
-                    let low_priority_stats = persist_results(results)?;
+                    let low_priority_stats = persist_sync_results(
+                        &self.database,
+                        account_id,
+                        results,
+                        &mut synced_local_folders,
+                    )?;
                     low_priority_stats.merge_into(
                         &mut total_inserted,
                         &mut total_updated,
@@ -432,6 +497,118 @@ impl SyncManager {
                         "[Sync] Low-priority folders skipped for '{}' after timeout/error: {}",
                         account.email, error
                     );
+                }
+            }
+        }
+
+        let discovered = match imap_client
+            .list_remote_folders_with_timeout(std::time::Duration::from_secs(15))
+            .await
+        {
+            Ok(remote_folders) => {
+                plan_discovered_remote_folders(provider, remote_folders, &synced_local_folders)
+            }
+            Err(error) => {
+                println!(
+                    "[Sync] Remote folder discovery skipped for '{}' after timeout/error: {}",
+                    account.email, error
+                );
+                Vec::new()
+            }
+        };
+
+        if !discovered.is_empty() {
+            let now = chrono::Utc::now().timestamp_millis();
+            let mut discovery_requests = Vec::new();
+
+            for plan in discovered {
+                let saved_state = self
+                    .database
+                    .get_imap_folder_state(account_id, &plan.local_folder)
+                    .map_err(|e| SyncError::Database(e.to_string()))?;
+
+                if plan.is_custom {
+                    let created_at = saved_state
+                        .as_ref()
+                        .map(|state| state.created_at)
+                        .unwrap_or(now);
+                    let last_synced_at = saved_state
+                        .as_ref()
+                        .map(|state| state.last_synced_at)
+                        .unwrap_or(0);
+
+                    self.database
+                        .upsert_imap_folder_state(&ImapFolderState {
+                            id: format!("{}:{}", account_id, plan.local_folder),
+                            account_id: account_id.to_string(),
+                            local_name: plan.local_folder.clone(),
+                            name: plan.remote_folder.clone(),
+                            remote_uid_validity: saved_state
+                                .as_ref()
+                                .map(|state| state.remote_uid_validity)
+                                .unwrap_or(0),
+                            remote_last_uid: saved_state
+                                .as_ref()
+                                .map(|state| state.remote_last_uid)
+                                .unwrap_or(0),
+                            local_count: saved_state
+                                .as_ref()
+                                .map(|state| state.local_count)
+                                .unwrap_or(0),
+                            created_at,
+                            last_synced_at,
+                        })
+                        .map_err(|e| SyncError::Database(e.to_string()))?;
+                }
+
+                discovery_requests.push(SyncFolderRequest {
+                    local_folder: plan.local_folder.clone(),
+                    candidate_remote_folders: vec![plan.remote_folder.clone()],
+                    last_seen_uid: saved_state
+                        .as_ref()
+                        .map(|state| state.remote_last_uid.max(0) as u32)
+                        .unwrap_or(0),
+                    known_uid_validity: saved_state
+                        .as_ref()
+                        .map(|state| state.remote_uid_validity as u32),
+                    initial_fetch_limit: 20,
+                });
+            }
+
+            if !discovery_requests.is_empty() {
+                match imap_client
+                    .sync_folders_metadata_with_timeout(
+                        discovery_requests,
+                        std::time::Duration::from_secs(20),
+                    )
+                    .await
+                {
+                    Ok(results) => {
+                        let discovery_stats = persist_sync_results(
+                            &self.database,
+                            account_id,
+                            results,
+                            &mut synced_local_folders,
+                        )?;
+                        discovery_stats.merge_into(
+                            &mut total_inserted,
+                            &mut total_updated,
+                            &mut total_new_inbox_unread,
+                        );
+                        if discovery_stats.has_mailbox_changes() {
+                            println!(
+                                "[Sync] Triggering mails:updated after discovery sync ({} new, {} updated)",
+                                discovery_stats.inserted, discovery_stats.updated
+                            );
+                            let _ = self.app_handle.emit("mails:updated", ());
+                        }
+                    }
+                    Err(error) => {
+                        println!(
+                            "[Sync] Discovery folders skipped for '{}' after timeout/error: {}",
+                            account.email, error
+                        );
+                    }
                 }
             }
         }

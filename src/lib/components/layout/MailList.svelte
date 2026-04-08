@@ -214,6 +214,16 @@
 		archive: $_('nav.archive')
 	});
 
+	function resolveFolderLabel(folder: Folder): string {
+		const knownLabel = folderLabels[folder];
+		if (knownLabel) return knownLabel;
+		if (folder.startsWith('custom:')) {
+			const trimmed = folder.slice('custom:'.length).trim();
+			return trimmed || folder;
+		}
+		return folder;
+	}
+
 	function formatMailTime(timestamp: number): string {
 		const now = new Date();
 		const mailDate = new Date(timestamp);
@@ -465,7 +475,7 @@
 			)} strokeWidth={1.8} />
 			<input
 				type="text"
-				placeholder={$_('mail.searchFolder', { values: { folder: folderLabels[activeFolder] } })}
+				placeholder={$_('mail.searchFolder', { values: { folder: resolveFolderLabel(activeFolder) } })}
 				disabled={!isAccountConfigured || isModalOpen}
 				class={cn(
 					"mail-search-input flex-1 bg-transparent text-[13px] outline-none placeholder:text-[var(--text-tertiary)] transition-colors duration-150",

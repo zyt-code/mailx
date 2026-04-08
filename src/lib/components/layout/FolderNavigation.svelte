@@ -4,18 +4,17 @@
 	import { _ } from 'svelte-i18n';
 	import { cn } from '$lib/utils.js';
 	import type { Folder } from '$lib/types.js';
+	import type { SidebarFolderItem } from './sidebarFolders.js';
 
 	interface Props {
-		navItems: ReadonlyArray<{ readonly icon: any; readonly labelKey: string; readonly folder: Folder }>;
+		navItems: ReadonlyArray<SidebarFolderItem>;
 		activeFolder: Folder;
 		isAccountConfigured: boolean;
-		unreadCounts: Record<Folder, number>;
+		unreadCounts: Record<string, number>;
 		collapsed: boolean;
 		isMobile: boolean;
 		onSelectFolder: (folder: Folder) => void;
 	}
-
-	const FOLDERS: Folder[] = ['inbox', 'sent', 'drafts', 'archive', 'trash'];
 
 	let {
 		navItems,
@@ -29,30 +28,22 @@
 
 	const indicatorY = new Spring(0, { stiffness: 0.18, damping: 0.68 });
 	const indicatorHeight = new Spring(0, { stiffness: 0.18, damping: 0.68 });
-	const buttonScale = Object.fromEntries(
-		FOLDERS.map((folder) => [folder, new Spring(1, { stiffness: 0.24, damping: 0.58 })])
-	) as Record<Folder, Spring<number>>;
+	const buttonScale = new Map<Folder, Spring<number>>();
 
 	let navContainer = $state<HTMLElement | null>(null);
 	let indicatorReady = $state(false);
-	let navButtons = $state<Record<Folder, HTMLButtonElement | null>>({
-		inbox: null,
-		sent: null,
-		drafts: null,
-		archive: null,
-		trash: null
-	});
+	let navButtons = $state(new Map<Folder, HTMLButtonElement>());
 
 	function handleFolderClick(folder: Folder) {
 		onSelectFolder(folder);
 	}
 
 	function pressButton(folder: Folder) {
-		buttonScale[folder].set(0.965);
+		getButtonScale(folder).set(0.965);
 	}
 
 	function releaseButton(folder: Folder) {
-		buttonScale[folder].set(1);
+		getButtonScale(folder).set(1);
 	}
 
 	function syncIndicator(instant = false) {
@@ -61,7 +52,7 @@
 			return;
 		}
 
-		const activeButton = navButtons[activeFolder];
+		const activeButton = navButtons.get(activeFolder);
 		if (!activeButton) return;
 
 		indicatorY.set(activeButton.offsetTop, { instant });
@@ -70,17 +61,41 @@
 	}
 
 	function registerButton(node: HTMLButtonElement, folder: Folder) {
-		navButtons[folder] = node;
+		navButtons.set(folder, node);
 		queueMicrotask(() => syncIndicator(true));
 
 		return {
 			destroy() {
-				if (navButtons[folder] === node) {
-					navButtons[folder] = null;
+				if (navButtons.get(folder) === node) {
+					navButtons.delete(folder);
 				}
 			}
 		};
 	}
+
+	function getButtonScale(folder: Folder): Spring<number> {
+		let scale = buttonScale.get(folder);
+		if (!scale) {
+			scale = new Spring(1, { stiffness: 0.24, damping: 0.58 });
+			buttonScale.set(folder, scale);
+		}
+		return scale;
+	}
+
+	$effect(() => {
+		const activeFolders = new Set(navItems.map((item) => item.folder));
+		for (const folder of activeFolders) {
+			if (!buttonScale.has(folder)) {
+				buttonScale.set(folder, new Spring(1, { stiffness: 0.24, damping: 0.58 }));
+			}
+		}
+		for (const folder of Array.from(buttonScale.keys())) {
+			if (!activeFolders.has(folder)) {
+				buttonScale.delete(folder);
+				navButtons.delete(folder);
+			}
+		}
+	});
 
 	$effect(() => {
 		activeFolder;
@@ -111,7 +126,7 @@
 							? 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer'
 							: 'text-[var(--text-quaternary)] cursor-not-allowed'
 					)}
-					style={`--nav-scale:${buttonScale[item.folder].current};`}
+					style={`--nav-scale:${getButtonScale(item.folder).current};`}
 					onclick={() => handleFolderClick(item.folder)}
 					onpointerdown={() => pressButton(item.folder)}
 					onpointerup={() => releaseButton(item.folder)}
@@ -130,14 +145,14 @@
 					<span
 						class={cn(
 							'flex-1 text-left truncate',
-							unreadCounts[item.folder] > 0 && 'pr-8'
+							(unreadCounts[item.folder] ?? 0) > 0 && 'pr-8'
 						)}
 					>
-						{$_(item.labelKey)}
+						{item.labelKey ? $_(item.labelKey) : item.label}
 					</span>
-					{#if unreadCounts[item.folder] > 0}
+					{#if (unreadCounts[item.folder] ?? 0) > 0}
 						<span class="folder-nav-badge">
-							{unreadCounts[item.folder]}
+							{unreadCounts[item.folder] ?? 0}
 						</span>
 					{/if}
 				</button>
@@ -159,7 +174,7 @@
 							? 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer'
 							: 'text-[var(--text-quaternary)] cursor-not-allowed'
 					)}
-					style={`--nav-scale:${buttonScale[item.folder].current};`}
+					style={`--nav-scale:${getButtonScale(item.folder).current};`}
 					onclick={() => handleFolderClick(item.folder)}
 					onpointerdown={() => pressButton(item.folder)}
 					onpointerup={() => releaseButton(item.folder)}
@@ -167,11 +182,11 @@
 					onpointercancel={() => releaseButton(item.folder)}
 					onblur={() => releaseButton(item.folder)}
 					aria-disabled={!isAccountConfigured}
-					aria-label={$_(item.labelKey)}
+					aria-label={item.labelKey ? $_(item.labelKey) : item.label}
 				>
 					<div class="relative">
 						<item.icon class="size-[17px]" strokeWidth={1.8} />
-						{#if unreadCounts[item.folder] > 0}
+						{#if (unreadCounts[item.folder] ?? 0) > 0}
 							<span class="absolute -top-0.5 -right-0.5 size-2 bg-[var(--accent-primary)] rounded-full border-2 border-[var(--bg-secondary)]"></span>
 						{/if}
 					</div>

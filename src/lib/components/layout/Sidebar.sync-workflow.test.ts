@@ -114,6 +114,7 @@ const {
 		}
 	}
 }));
+const getMailboxFoldersMock = vi.hoisted(() => vi.fn());
 
 function createMockStore<T>(initialValue: T) {
 	let value = initialValue;
@@ -210,6 +211,10 @@ vi.mock('$lib/stores/preferencesStore.js', () => ({
 	}
 }));
 
+vi.mock('$lib/db/index.js', () => ({
+	getMailboxFolders: getMailboxFoldersMock
+}));
+
 vi.mock('$lib/events/index.js', () => ({
 	eventBus: fakeEventBus
 }));
@@ -218,6 +223,8 @@ describe('Sidebar sync workflow', () => {
 	beforeEach(async () => {
 		await i18nStore.waitForReady();
 		selectedAccountIdStore.set(null);
+		getMailboxFoldersMock.mockReset();
+		getMailboxFoldersMock.mockResolvedValue([]);
 		mockState.hasAccounts = true;
 		mockState.activeAccount = {
 			id: 'acc-1',

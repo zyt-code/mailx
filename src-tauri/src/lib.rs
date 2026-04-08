@@ -201,6 +201,7 @@ pub fn run() {
             commands::unarchive_mail,
             commands::toggle_star,
             commands::get_unread_count,
+            commands::get_mailbox_folders,
             commands::clear_database,
             commands::get_database_size,
             commands::compact_database,

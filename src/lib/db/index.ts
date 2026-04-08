@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { Attachment, Mail, Folder } from '$lib/types.js';
+import type { Attachment, Mail, Folder, MailboxFolder } from '$lib/types.js';
 
 /**
  * Get mails with pagination, optionally filtered by folder and account
@@ -152,6 +152,12 @@ export async function toggleStar(id: string, starred: boolean): Promise<void> {
 export async function getUnreadCount(folder: Folder, accountId?: string | null): Promise<number> {
 	return invoke<number>('get_unread_count', {
 		folder,
+		account_id: accountId ?? null
+	});
+}
+
+export async function getMailboxFolders(accountId?: string | null): Promise<MailboxFolder[]> {
+	return invoke<MailboxFolder[]>('get_mailbox_folders', {
 		account_id: accountId ?? null
 	});
 }

@@ -55,6 +55,10 @@ function normalizeMail(mail: Mail): Mail {
 	return ensureReadState(mail, !(mail.unread ?? true));
 }
 
+function isCustomFolder(folder: Folder): boolean {
+	return folder.startsWith('custom:');
+}
+
 export function createMailboxStore({ db, accountsStore, eventBus }: MailboxStoreDeps) {
 	const _mails = writable<Mail[]>([]);
 	const _activeFolder = writable<Folder>('inbox');
@@ -160,7 +164,13 @@ export function createMailboxStore({ db, accountsStore, eventBus }: MailboxStore
 
 	async function selectAccount(accountId: string | null): Promise<void> {
 		setSelectedAccount(accountId);
-		await loadMails();
+		const activeFolder = get(_activeFolder);
+		if (isCustomFolder(activeFolder)) {
+			_activeFolder.set('inbox');
+			await loadMails('inbox');
+			return;
+		}
+		await loadMails(activeFolder);
 	}
 
 	function shouldReloadForAccountDeletion(deletedAccountId: string): boolean {

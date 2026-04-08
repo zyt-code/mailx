@@ -109,11 +109,17 @@ vi.mock('$lib/stores/preferencesStore.js', () => ({
 		updateSection: vi.fn()
 	}
 }));
+const getMailboxFoldersMock = vi.hoisted(() => vi.fn());
+
+vi.mock('$lib/db/index.js', () => ({
+	getMailboxFolders: getMailboxFoldersMock
+}));
 
 vi.mock('$lib/events/index.js', () => ({
 	eventBus: {
 		on: vi.fn(),
 		off: vi.fn(),
+		onTauri: vi.fn(() => Promise.resolve()),
 		emit: vi.fn(),
 		emitAsync: eventBusEmitAsyncMock
 	}
@@ -124,6 +130,8 @@ describe('Sidebar refresh interactions', () => {
 		await i18nStore.waitForReady();
 		eventBusEmitAsyncMock.mockReset();
 		eventBusEmitAsyncMock.mockResolvedValue(undefined);
+		getMailboxFoldersMock.mockReset();
+		getMailboxFoldersMock.mockResolvedValue([]);
 		mockState.hasAccounts = true;
 		mockState.selectedAccountId = null;
 		mockState.activeAccount = {

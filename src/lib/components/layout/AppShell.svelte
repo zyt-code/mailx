@@ -158,6 +158,7 @@ const DEFAULTS = { sidebarCollapsed: false, mailListWidth: DEFAULT_MAIL_LIST_WID
 		setMobileView: (view) => {
 			mobileView = view;
 		},
+		getActiveFolder: () => activeFolder,
 		setActiveFolder: (folder) => {
 			activeFolder = folder;
 		},

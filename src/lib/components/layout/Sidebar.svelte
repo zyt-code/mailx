@@ -1,29 +1,21 @@
 <script lang="ts">
 	import { cn } from '$lib/utils.js';
-	import type { Folder, Account } from '$lib/types.js';
+	import type { Folder, Account, MailboxFolder } from '$lib/types.js';
 	import { hasAccounts, activeAccount, accounts } from '$lib/stores/accountStore.js';
 	import { isSyncing, lastSyncTime, syncingAccountId } from '$lib/stores/syncStore.js';
 	import { folderUnreadCounts } from '$lib/stores/unreadStore.js';
 	import { selectedAccountId as storeSelectedAccountId } from '$lib/stores/mailStore.js';
 	import { eventBus } from '$lib/events/index.js';
 	import { preferences } from '$lib/stores/preferencesStore.js';
+	import { getMailboxFolders } from '$lib/db/index.js';
 	import { _ } from 'svelte-i18n';
 	import { i18nStore } from '$lib/stores/i18nStore.svelte.js';
-	import {
-		Inbox,
-		Send,
-		FileEdit,
-		Trash2,
-		PanelLeftClose,
-		PanelLeftOpen,
-		Archive,
-		RefreshCw,
-		Settings
-	} from 'lucide-svelte';
+	import { PanelLeftClose, PanelLeftOpen, RefreshCw, Settings } from 'lucide-svelte';
 	import { ComposeModal } from '$lib/components/compose/index.js';
 	import ComposeButton from './ComposeButton.svelte';
 	import AccountSelector from './AccountSelector.svelte';
 	import FolderNavigation from './FolderNavigation.svelte';
+	import { buildSidebarFolderItems } from './sidebarFolders.js';
 	import { bindSidebarStoreMirrors } from './sidebarStoreMirrors.js';
 	import { createSidebarRefresh } from './sidebarRefresh.js';
 	import { createSidebarComposeState } from './sidebarComposeState.js';
@@ -49,14 +41,6 @@
 
 	let { collapsed, isMobile, activeFolder, onToggle, onSelectFolder, onRefresh, onSelectAccount, onOpenSettings }: Props = $props();
 
-	const navItems = [
-		{ icon: Inbox, labelKey: 'nav.inbox', folder: 'inbox' as const },
-		{ icon: Send, labelKey: 'nav.sent', folder: 'sent' as const },
-		{ icon: FileEdit, labelKey: 'nav.drafts', folder: 'drafts' as const },
-		{ icon: Archive, labelKey: 'nav.archive', folder: 'archive' as const },
-		{ icon: Trash2, labelKey: 'nav.trash', folder: 'trash' as const }
-	] as const;
-
 	const SIDEBAR_COLLAPSED_WIDTH = 56;
 
 	let showCompose = $state(false);
@@ -75,6 +59,7 @@
 		archive: 0,
 		trash: 0
 	});
+	let mailboxFolders = $state<MailboxFolder[]>([]);
 	let allAccounts = $state<Account[]>([]);
 	let selectedAccountId = $state<string | null>(null); // null = All Inboxes
 	let currentSyncAccountId = $state<string | null>(null); // which account is currently syncing
@@ -82,6 +67,16 @@
 		readSidebarAccountsCollapsed(typeof window !== 'undefined' ? localStorage : undefined)
 	);
 	let showShortcutHints = $state(true);
+	let navItems = $derived(buildSidebarFolderItems(mailboxFolders, selectedAccountId));
+	let customUnreadCounts = $derived(
+		mailboxFolders.reduce((acc, folder) => {
+			if (folder.kind === 'custom') {
+				acc[folder.id] = folder.unread_count;
+			}
+			return acc;
+		}, {} as Record<string, number>)
+	);
+	let combinedUnreadCounts = $derived({ ...unreadCounts, ...customUnreadCounts });
 
 	const accountsCollapse = createSidebarAccountsCollapse({
 		getCollapsed: () => accountsCollapsed,
@@ -210,6 +205,29 @@
 		eventBus,
 		openCompose: composeState.openCompose
 	}));
+
+	async function refreshMailboxFolders(accountId: string | null): Promise<void> {
+		try {
+			mailboxFolders = await getMailboxFolders(accountId);
+		} catch (error) {
+			console.error('[Sidebar] Failed to load mailbox folders:', error);
+		}
+	}
+
+	$effect(() => {
+		void refreshMailboxFolders(selectedAccountId);
+	});
+
+	$effect(() => {
+		const refresh = () => {
+			void refreshMailboxFolders(selectedAccountId);
+		};
+
+		void eventBus.onTauri('sync:completed', refresh);
+		void eventBus.onTauri('account:created', refresh);
+		void eventBus.onTauri('account:deleted', refresh);
+		void eventBus.onTauri('mails:updated', refresh);
+	});
 </script>
 
 {#if !i18nStore.isLoading}
@@ -297,7 +315,7 @@
 			navItems={navItems}
 			activeFolder={activeFolder}
 			isAccountConfigured={isAccountConfigured}
-			unreadCounts={unreadCounts}
+			unreadCounts={combinedUnreadCounts}
 			collapsed={collapsed}
 			isMobile={isMobile}
 			onSelectFolder={navigation.selectFolder}
